@@ -153,21 +153,21 @@
 
   
 ## < 주문 프로세스 FLOW CHART >
-![ORDER_PROCESS_FLOW_CHART](./erd/order-process-flow-chart.png)
+![ORDER_PROCESS_FLOW_CHART](./output/order-process-flow-chart.png)
     
 
 
 ## < DB ERD >
 ERD 편집 : https://www.erdcloud.com/d/LuE5DFSZNinSPhYMe
 
-![ERD](./erd/my-e-commerce-erd.png)
+![ERD](./output/my-e-commerce-erd.png)
 
 
 
 ## < 일정표 >
 JIRA 일정관리 : https://glyceria.atlassian.net/jira/software/projects/MYCMP/boards/1/timeline?epic=COMPLETE3M
 
-![PLANNER](./erd/my-e-commerce-project-planner.png)
+![PLANNER](./output/my-e-commerce-project-planner.png)
 
 
 ---

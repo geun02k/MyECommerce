@@ -160,6 +160,12 @@ ERD 편집 : https://www.erdcloud.com/d/LuE5DFSZNinSPhYMe
 
 
 
+## < 일정표 >
+JIRA 일정관리 : https://glyceria.atlassian.net/jira/software/projects/MYCMP/boards/1/timeline?epic=COMPLETE3M
+
+![PLANNER](./erd/my-e-commerce-project-planner.png)
+
+
 ---
 ### 2. 고도화 (정산) - 추후 개발 시 정리필요 & 플로우차트필요
 #### 판매자

@@ -153,3 +153,9 @@
     
 
 
+## < DB ERD >
+ERD 편집 : https://www.erdcloud.com/d/LuE5DFSZNinSPhYMe
+
+![ERD](./erd/my-e-commerce-erd.png)
+
+

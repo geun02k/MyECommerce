@@ -148,3 +148,8 @@
   - 수거완료
 
   
+## < 주문 프로세스 FLOW CHART >
+![ERD](./erd/order-process-flow-chart.png)
+    
+
+

@@ -59,7 +59,7 @@ public class MemberService {
         }
         // 특수문자, 숫자 제외
         String namePattern = "[^a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ]";
-        if(!Pattern.matches(namePattern, member.getName())) {
+        if(Pattern.matches(namePattern, member.getName())) {
             System.out.println("사용자명은 영문자, 한글만 사용 가능합니다.");
             return false;
         }

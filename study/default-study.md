@@ -2,6 +2,43 @@
 2025 간단한 이커머스 서비스를 만들면서 공부한 내용
 
 ---
+### < 스프링부트 의존성추가 >
+1. org.springframework.boot:spring-boot-starter-web 의존성추가
+    - 참고블로그 https://priming.tistory.com/144
+
+---
+### < slack과 github 연동 >
+- 참고블로그 : https://sepiros.tistory.com/37
+
+---
+### < Mysql 데이터타입 결정 >
+- 참고블로그 https://dev-coco.tistory.com/54
+
+---
+### < DTO, VO, MODEL 차이 >
+https://010562.tistory.com/11
+https://velog.io/@chae_ag/Model-DTO-VO-DAO-%EA%B0%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80%EC%9A%94
+
+---
+### < 비밀번호 유효성검사 정규식 >
+- (?= ...)
+    - 긍정형 전방 탐색(lookahead)를 의미하며 특정 패턴이 뒤따라야 한다는 조건을 확인하지만, 문자열에서 그 부분을 소비하지(매칭으로 소모하지) 않습니다.
+- (?=.[!@#$%^+=-])
+    - 문자열에 하나 이상의 지정된 특수 문자가 포함되어 있는지 확인합니다.
+- 참고블로그 https://ddyes.tistory.com/6
+- 참고블로그 https://kin.naver.com/qna/detail.naver?d1id=1&dirId=1040202&docId=468186271&enc=utf8&kinsrch_src=pc_nx_kin&qb=7KCV6rec7ZGc7ZiE7Iud&rank=1&search_sort=0&section=kin.qna_ency_cafe&spq=0
+- 비밀번호 추가 유효성검사
+    ~~~
+    // ~!@#$%^&*-=_+ 특수문자 중 1개 필수포함
+    String pwPattern = "(?=.[~!@#$%^&*-=_+])";
+    if(!(Pattern.matches(pwPattern, member.getPassword()))) {
+        System.out.println("비밀번호에 특수문자 ~ ! @ # $ % ^ & * - = _ + 중 하나를 필수 포함해야합니다.");
+        return false;
+    }
+    // 연속으로 동일문자 3번 반복 불가
+    ~~~
+  
+---
 ### < service, service impl 분리하지 않는 이유 >
 - 참고블로그 https://zhfvkq.tistory.com/76
 
@@ -97,5 +134,10 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
   - 서비스 내부 로직이 실행됐는지 여부 체크
   - memberRepository.save() 실행 여부 체크
 
+
+---
+### < 인터페이스 사용 이유 >
+- 기능(메소드)의 구현을 강제함으로써, 클래스의 설계 또는 표준화를 유도하기위해 사용함.
+- 참고블로그 https://0soo.tistory.com/62
 
 

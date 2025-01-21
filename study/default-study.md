@@ -177,4 +177,21 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
   - 에러 발생 시 응답을 위한 모델.
   - 모든 에러에 대해 일괄적인 응답을 위해 사용.
 
+- CommonExceptionHandler.java
+  - 발생한 예외처리를 수행.
+    ~~~
+    // 모든 BaseAbstractException을 상속하는 에외객체에 대한 예외처리 수행.
+    @ExceptionHandler
+    protected ResponseEntity<CommonErrorResponse> commonHandler(BaseAbstractException e) {
+        // 응답 객체 생성
+        // 응답 객체 반환
+      }
+    ~~~
+  - HttpStatus.resolve(e.getStatusCode())  : HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
+    ~~~ 
+      return new ResponseEntity<>(errorResponse,
+                Objects.requireNonNull(HttpStatus.resolve(e.getStatusCode())));
+    ~~~
+
+
 

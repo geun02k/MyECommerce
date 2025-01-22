@@ -2,6 +2,7 @@ package com.myecommerce.MyECommerce.service.member;
 
 import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
+import com.myecommerce.MyECommerce.exception.MemberException;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -9,6 +10,8 @@ import org.springframework.util.ObjectUtils;
 
 import java.util.Optional;
 import java.util.regex.Pattern;
+
+import static com.myecommerce.MyECommerce.exception.errorcode.MemberErrorCode.*;
 
 @Service
 @RequiredArgsConstructor
@@ -24,9 +27,7 @@ public class MemberService {
     //@Transactional
     public MemberDto saveMember(MemberDto member) {
         // validation check
-        if(!saveMemberValidationCheck(member)) {
-            return null;
-        }
+        saveMemberValidationCheck(member);
         // 회원정보등록
         Member savedMember = memberRepository.save(member.toEntity(member));
 
@@ -37,31 +38,27 @@ public class MemberService {
     }
 
     // 회원가입 validation check
-    private boolean saveMemberValidationCheck(MemberDto member) {
+    private void saveMemberValidationCheck(MemberDto member) {
         // 회원 객체 존재여부 validation check
         if(ObjectUtils.isEmpty(member)) {
-            System.out.println("회원정보가 존재하지 않습니다.");
-            return false;
+            throw new MemberException(EMPTY_MEMBER_INFO);
         }
 
         // id 존재여부 validation check
         if(!ObjectUtils.isEmpty(member.getId())) {
-            System.out.println("이미 존재하는 회원입니다.");
-            return false;
+            throw new MemberException(ALREADY_REGISTERED_MEMBER);
         }
 
         // 사용자명 validation check
         // 글자수
         if (ObjectUtils.isEmpty(member.getName().trim())
                 || member.getName().length() > 50) {
-            System.out.println("사용자명 길이는 최소 1자, 최대 50자로 제한됩니다.");
-            return false;
+            throw new MemberException(LIMIT_NAME_CHARACTERS_FROM_1_TO_50);
         }
         // 특수문자, 숫자 제외
         String namePattern = "[^a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ]";
         if(Pattern.matches(namePattern, member.getName())) {
-            System.out.println("사용자명은 영문자, 한글만 사용 가능합니다.");
-            return false;
+            throw new MemberException(ONLY_SUPPORT_ENGLISH_AND_KOREAN);
         }
 
         // 비밀번호 validation check
@@ -69,8 +66,7 @@ public class MemberService {
         if (ObjectUtils.isEmpty(member.getPassword().trim())
                 || 8 > member.getPassword().length()
                 || member.getPassword().length() > 100) {
-            System.out.println("비밀번호는 최소 8자 이상 최대 100자 이하입니다.");
-            return false;
+            throw new MemberException(LIMIT_PASSWORD_CHARACTERS_FROM_8_TO_100);
         }
 
         // 전화번호 validation check
@@ -82,8 +78,7 @@ public class MemberService {
                 || !(Pattern.matches(tel1Pattern, member.getTel1()))
                 || !(Pattern.matches(tel2Pattern, member.getTel2()))
                 || !(Pattern.matches(tel2Pattern, member.getTel3()))) {
-            System.out.println("유효하지 않은 전화번호입니다.");
-            return false;
+            throw new MemberException(INVALID_PHONE_NUMBER);
         }
         // 전화번호 중복등록 체크
         Optional<Member> memberEntityIncludeTel =
@@ -91,10 +86,8 @@ public class MemberService {
                         member.getTel2(),
                         member.getTel3());
         if(!ObjectUtils.isEmpty(memberEntityIncludeTel)) {
-            System.out.println("이미 등록된 전화번호입니다.");
-            return false;
+            throw new MemberException(ALREADY_REGISTERED_PHONE_NUMBER);
         }
-
-        return true;
     }
+
 }

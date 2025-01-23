@@ -163,3 +163,30 @@
 9. FilterSecurityInterceptor
    - 권한 부여, 권한 관련 결정을 AccessDscisionManager에게 위임해 권한부여 결정 및 접근 제어 처리.
 
+
+---
+### < 비밀번호 암호화 >
+- 비밀번호 암호화 인터페이스 PasswordEncoder
+  - 인코딩된 패스워드 정보를 DB에 저장하기 위해 사용.
+     PasswordEncoder 인터페이스를 통해 인코딩을 수행하기 위해서는
+     Configuration 파일에 어떤 구현체를 사용할 것인지 직접 정의해 빈 등록이 필요. 
+
+- PasswordEncoder 인터페이스 정의된 내용.
+    ~~~
+    public interface PasswordEncoder {
+          // 비밀번호 암호화 (회원가입 시 사용)
+          String encode(CharSequence rawPassword);
+
+          // 평문 비밀번호, 암호화된 비밀번호 일치여부 확인 (로그인 시 사용)
+          boolean matches(CharSequence rawPassword, String encodedPassword);
+
+          default boolean upgradeEncoding(String encodedPassword) {
+              return false;
+          }
+      }
+    ~~~
+    
+- 참고 블로그     
+  https://hou27.tistory.com/entry/Spring-Boot-Spring-Security-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0-%EC%95%94%ED%98%B8%ED%99%94
+
+

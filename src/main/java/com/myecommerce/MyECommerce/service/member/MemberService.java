@@ -5,6 +5,7 @@ import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.exception.MemberException;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 
@@ -17,6 +18,8 @@ import static com.myecommerce.MyECommerce.exception.errorcode.MemberErrorCode.*;
 @RequiredArgsConstructor
 public class MemberService {
 
+    private final PasswordEncoder passwordEncoder;
+
     private final MemberRepository memberRepository;
 
     /**
@@ -28,6 +31,15 @@ public class MemberService {
     public MemberDto saveMember(MemberDto member) {
         // validation check
         saveMemberValidationCheck(member);
+
+        // 공백문자 제거
+        member.setName(member.getName().trim());
+        member.setTel1(member.getTel1().trim());
+        member.setTel2(member.getTel2().trim());
+        member.setTel3(member.getTel3().trim());
+        // 비밀번호 암호화
+        member.setPassword(passwordEncoder.encode(member.getPassword().trim()));
+
         // 회원정보등록
         Member savedMember = memberRepository.save(member.toEntity(member));
 

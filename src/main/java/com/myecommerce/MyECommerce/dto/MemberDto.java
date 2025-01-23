@@ -1,10 +1,10 @@
 package com.myecommerce.MyECommerce.dto;
 
 import com.myecommerce.MyECommerce.entity.member.Member;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
+import lombok.*;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -31,6 +31,8 @@ public class MemberDto {
 
     private Character delYn;
 
+    private List<MemberAuthority> authorities;
+
     // dto -> entity로 변환
     public Member toEntity(MemberDto memberDto) {
         return Member.builder()
@@ -43,6 +45,7 @@ public class MemberDto {
                 .tel3(memberDto.getTel3())
                 .address(memberDto.getAddress())
                 .delYn(memberDto.getDelYn())
+                .authorities(memberDto.getAuthorities())
                 .build();
     }
 
@@ -58,6 +61,7 @@ public class MemberDto {
                 .tel3(member.getTel3())
                 .address(member.getAddress())
                 .delYn(member.getDelYn())
+                .authorities(member.getAuthorities())
                 .build();
     }
 }

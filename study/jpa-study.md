@@ -2,8 +2,8 @@
 2025 간단한 이커머스 서비스를 만들면서 접한 JPA 공부내용.
 
 
-###  <공통으로 사용하는 추적정보를 위한 BaseEntity 생성 >   
-
+---
+###  <공통으로 사용하는 추적정보를 위한 BaseEntity 생성 >
 1. @MappedSuperclass
     > - 객체 입장에서 공통 매핑 정보 필요 시 사용.
     공통 매핑 정보 필요 시, 부모 클래스에 선언하고 속성만 상속받아 사용하고 싶을 때 사용.
@@ -29,4 +29,19 @@
    > - @LastModifiedDate   
    >   : 조회한 Entity의 값을 변경할 때 시간 자동 저장.
    > - 참고 블로그 : https://webcoding-start.tistory.com/53
+
+
+---
+### < 회원권한테이블 추가 >
+- 유저와 권한은 다대다 관계.
+  한 유저가 여러 권한을 가질 수 있고, 한 권한도 여러 유저가 사용가능. 
+  사용자와 권한은 many to many 관계를 가진다고 볼 수 있지만 DB에서 many to many 관계를 직접적으로 가질수는 없고 반드시 중간에 mapping 테이블을 가져하고 사용자와 mapping 테이블은 one to many 관계를 가져야 하고 역할과 mapping 테이블도 one to many 관계를 가지도록 설계해야 한다.
+
+- 회원가입 권한추가
+    - 참고 블로그   
+      https://xooxpeak.tistory.com/entry/%ED%9A%8C%EC%9B%90%EA%B0%80%EC%9E%85-%EA%B6%8C%ED%95%9CRole-%EC%B6%94%EA%B0%80
+
+- 회원과 권한 일대다 관계
+    - 참고 블로그   
+      https://ttl-blog.tistory.com/126
 

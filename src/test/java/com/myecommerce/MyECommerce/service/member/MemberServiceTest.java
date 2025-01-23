@@ -10,6 +10,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
@@ -22,11 +23,32 @@ import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class MemberServiceTest {
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     @Mock
     private MemberRepository memberRepository;
 
     @InjectMocks
     private MemberService memberService;
+
+    @Test
+    @DisplayName("비밀번호암호화성공")
+    void passwordEncode() {
+        // given
+        String rawPassword = "12345678";
+        // stub(가설) : passwordEncoder.encode() 실행 시 expectEncodePassword 반환 예상.
+        String expectEncodePassword = "encode12345678";
+        given(passwordEncoder.encode(any()))
+                .willReturn(expectEncodePassword);
+
+        // when
+        String encodingPassword = passwordEncoder.encode(rawPassword);
+
+        // then
+        assertEquals(expectEncodePassword, encodingPassword);
+    }
 
     @Test
     @DisplayName("회원가입성공")

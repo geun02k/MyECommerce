@@ -68,7 +68,7 @@ class MemberServiceTest {
         MemberDto savedReturnMemberDto = MemberDto.builder()
                 .id(1L)
                 .userId("sky")
-                .password("123456789")
+                .password("encode12345678")
                 .name("김하늘")
                 .tel1("010")
                 .tel2("1234")
@@ -80,6 +80,11 @@ class MemberServiceTest {
         // stub(가설) : memberRepository.findByTel1AndTel2AndTel3() 실행 시 빈값 반환 예상.
         given(memberRepository.findByTel1AndTel2AndTel3(any(), any(), any()))
                 .willReturn(Optional.empty());
+
+        // stub(가설) : passwordEncoder.encode() 실행 시 encode12345678 반환 예상.
+        given(passwordEncoder.encode(any()))
+                .willReturn("encode12345678");
+
         // stub(가설) : memberRepository.save() 실행 시 memberDto 데이터 반환 예상.
         given(memberRepository.save(any()))
                 .willReturn(memberDto.toEntity(memberDto));
@@ -97,7 +102,7 @@ class MemberServiceTest {
         assertNotNull(savedReturnMemberDto.getId());
         assertEquals(1L, savedReturnMemberDto.getId());
         assertEquals("sky", savedReturnMemberDto.getUserId());
-        assertEquals("123456789", savedReturnMemberDto.getPassword());
+        assertEquals("encode12345678", savedReturnMemberDto.getPassword());
         assertEquals("김하늘", savedReturnMemberDto.getName());
         assertEquals("010", savedReturnMemberDto.getTel1());
         assertEquals("1234", savedReturnMemberDto.getTel2());

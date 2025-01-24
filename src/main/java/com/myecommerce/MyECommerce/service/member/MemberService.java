@@ -5,6 +5,7 @@ import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.exception.MemberException;
 import com.myecommerce.MyECommerce.mapper.MemberMapper;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,7 +31,7 @@ public class MemberService {
      * @param member 신규 회원정보를 가진 MemberDto 객체
      * @return 신규 회원가입한 회원정보를 담은 MemberDto 객체
      */
-    //@Transactional
+    @Transactional
     public MemberDto saveMember(MemberDto member) {
         // validation check
         saveMemberValidationCheck(member);
@@ -45,6 +46,12 @@ public class MemberService {
 
         // 회원정보등록
         Member savedMember = memberRepository.save(memberMapper.toEntity(member));
+
+        // 회원권한정보 수정
+        savedMember.getAuthorities().forEach(authority -> {
+            authority.setMemberId(savedMember.getId());
+
+        });
 
         // 회원정보반환
         return memberMapper.toDto(savedMember);

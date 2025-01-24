@@ -3,12 +3,15 @@ package com.myecommerce.MyECommerce.entity.member;
 import com.myecommerce.MyECommerce.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.DynamicInsert;
+
 import java.util.List;
 
 @Entity
 @Getter
 @Setter
 @Builder
+@DynamicInsert
 @NoArgsConstructor
 @AllArgsConstructor
 public class Member extends BaseEntity {

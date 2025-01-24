@@ -21,6 +21,7 @@ public abstract class BaseEntity {
 
     // @Configuration 어노테이션을 받는 config 클래스에서 빈을 주입받아 현재 로그인한 사용자의 정보 매핑가능.
     @CreatedBy
+    @Column(updatable = false)
     private Long createId;
 
     @CreatedDate

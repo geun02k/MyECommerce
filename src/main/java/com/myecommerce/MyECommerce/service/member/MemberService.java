@@ -3,6 +3,7 @@ package com.myecommerce.MyECommerce.service.member;
 import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.exception.MemberException;
+import com.myecommerce.MyECommerce.mapper.MemberMapper;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,6 +20,8 @@ import static com.myecommerce.MyECommerce.exception.errorcode.MemberErrorCode.*;
 public class MemberService {
 
     private final PasswordEncoder passwordEncoder;
+
+    private final MemberMapper memberMapper;
 
     private final MemberRepository memberRepository;
 
@@ -41,12 +44,10 @@ public class MemberService {
         member.setPassword(passwordEncoder.encode(member.getPassword().trim()));
 
         // 회원정보등록
-        Member savedMember = memberRepository.save(member.toEntity(member));
+        Member savedMember = memberRepository.save(memberMapper.toEntity(member));
 
         // 회원정보반환
-        MemberDto returnMemberDto = new MemberDto();
-        returnMemberDto.toDto(savedMember);
-        return returnMemberDto;
+        return memberMapper.toDto(savedMember);
     }
 
     // 회원가입 validation check

@@ -3,8 +3,65 @@
 
 ---
 ### < 스프링부트 의존성추가 >
-1. org.springframework.boot:spring-boot-starter-web 의존성추가
-    - 참고블로그 https://priming.tistory.com/144
+1. Gradle에서 종속성 추가 시 사용가능한 키워드
+   - dependencies 
+     - Gradle에서 종속 항목을 추가할 때 사용하는 키워드.
+     - 종속 항목을 설정하는 블록을 정의.
+   - 종속성을 추가하는 유형
+     - implementation: 애플리케이션 실행에 필요한 라이브러리.
+     - api: 라이브러리의 공개 API를 제공하는 라이브러리.
+     - testImplementation: 테스트 코드에서 필요한 라이브러리.
+     - compileOnly: 컴파일 시에만 필요한 라이브러리 (실행 시에는 포함되지 않음).
+     - runtimeOnly: 실행 시에만 필요한 라이브러리.
+
+2. annotationprocessor vs implementation
+   - implementation **(애플리케이션 실행에 필요한 라이브러리 지정.)**
+     - 애플리케이션 코드에서 실제로 사용되는 라이브러리나 의존성을 지정할 때 사용.
+     - **의존성은 컴파일, 실행 시에 모두 포함.**
+     - 다른 모듈이 이 모듈을 사용할 때 필요한 라이브러리로 포함됨.
+   - annotationprocessor **(컴파일 타임에만 필요한 의존성 처리.)**
+     - **컴파일 과정에서 애너테이션 프로세서를 사용하도록 지정할 때 사용.**
+     - 주로 **컴파일 시 자동으로 코드를 생성**하거나 수정하는 역할.   
+       ex) Lombok 같은 라이브러리들이 컴파일 시 애너테이션을 처리하는 데 사용됨.
+     - 런타임 시에는 필요하지 않으며, 컴파일 타임에만 필요한 의존성을 지정할 때 사용됨.
+     - 코드 생성이나 바이트코드 수정을 담당하는 툴들에 필요.
+
+   - Lombok         
+        
+         // Lombok 애너테이션을 처리하기 위해 컴파일 시 애너테이션 프로세서를 추가   
+         compileOnly 'org.projectlombok:lombok'   
+         annotationProcessor 'org.projectlombok:lombok'   
+     - Lombok은 @Getter, @Setter 등의 어노테이션에 대해 **컴파일 시에 자동으로 메서드 생성.**
+
+3. org.springframework.boot:spring-boot-starter-web 의존성추가
+   - 참고블로그 https://priming.tistory.com/144
+
+
+### < 스프링부트 의존성추가 >
+- mapstruct-processor 
+  - mapstruct-processor를 annotationProcessor로 의존성 추가하는 이유    
+    MapStruct가 annotationProcessor를 사용하여 컴파일 타임에 코드를 생성하기 때문.
+  - MapStruct가 실행 시에는 필요하지 않지만,
+    컴파일 시에 코드 생성을 위해 사용되므로 런타임에 포함될 필요가 없기에 annotationProcessor로 지정해야함.
+    즉, **성능 최적화**를 위해서 implementation이 아닌 annotationProcessor로 설정하면 
+    mapstruct-processor가 컴파일 중에만 실행되고 실행 파일에 포함되지 않는다.    
+    따라서 애플리케이션의 실행 시 성능에 영향을 미치지 않는다.
+
+- MapStruct    
+  - 자바 Bean 매핑 라이브러리로, 컴파일 타임에 매핑 코드를 자동으로 생성.    
+    이 과정은 annotationProcessor를 통해 이루어짐.   
+    MapStruct는 @Mapper 애너테이션을 처리하여 매핑 인터페이스에 대한 구현체 생성.
+
+- mapstruct 와 mapstruct-processor
+  - **mapstruct 라이브러리 자체는 애플리케이션에서 실행 시 사용되고
+    mapstruct-processor는 컴파일 시에만 작동하여 매핑 코드가 생성.**
+   ~~~
+   dependencies {
+       implementation 'org.mapstruct:mapstruct:1.5.2.Final'  
+       annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.2.Final'  
+   }
+   ~~~
+  
 
 ---
 ### < slack과 github 연동 >

@@ -2,30 +2,35 @@ package com.myecommerce.MyECommerce.service.member;
 
 import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
+import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
+import com.myecommerce.MyECommerce.mapper.MemberMapper;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
+import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class MemberServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private MemberMapper memberMapper;
 
     @Mock
     private MemberRepository memberRepository;
@@ -54,6 +59,14 @@ class MemberServiceTest {
     @DisplayName("회원가입성공")
     void successSaveMember() {
         // given
+        // 저장할 회원권한생성
+        List<MemberAuthority> memberAuthorityList = new ArrayList<>();
+        memberAuthorityList.add(MemberAuthority.builder()
+                                    .authority(MemberAuthorityType.SELLER)
+                                    .build());
+        memberAuthorityList.add(MemberAuthority.builder()
+                                    .authority(MemberAuthorityType.CUSTOMER)
+                                    .build());
         // 저장할 회원객체생성
         MemberDto memberDto = MemberDto.builder()
                 .userId("sky")
@@ -63,9 +76,22 @@ class MemberServiceTest {
                 .tel2("1234")
                 .tel3("1234")
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
+                .authorities(memberAuthorityList)
                 .build();
-        // 저장된 회원객체생성
-        MemberDto savedReturnMemberDto = MemberDto.builder()
+        // 저장된 회원권한생성
+        List<MemberAuthority> expectMmemberAuthorityList = new ArrayList<>();
+        expectMmemberAuthorityList.add(MemberAuthority.builder()
+                .id(1L)
+                .memberId(1L)
+                .authority(MemberAuthorityType.SELLER)
+                .build());
+        expectMmemberAuthorityList.add(MemberAuthority.builder()
+                .id(2L)
+                .memberId(1L)
+                .authority(MemberAuthorityType.CUSTOMER)
+                .build());
+        // 저장된 회원 DTO객체 생성
+        MemberDto expectMemberDto = MemberDto.builder()
                 .id(1L)
                 .userId("sky")
                 .password("encode12345678")
@@ -74,6 +100,20 @@ class MemberServiceTest {
                 .tel2("1234")
                 .tel3("1234")
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
+                .authorities(expectMmemberAuthorityList)
+                .delYn('N')
+                .build();
+        // 저장된 회원 Entity객체 생성
+        Member expectMemberEntity = Member.builder()
+                .id(1L)
+                .userId("sky")
+                .password("encode12345678")
+                .name("김하늘")
+                .tel1("010")
+                .tel2("1234")
+                .tel3("1234")
+                .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
+                .authorities(expectMmemberAuthorityList)
                 .delYn('N')
                 .build();
 
@@ -85,30 +125,33 @@ class MemberServiceTest {
         given(passwordEncoder.encode(any()))
                 .willReturn("encode12345678");
 
+        // stub(가설) : 저장된 회원정보 Entity를 Dto로 변환 예상.
+        given(memberMapper.toEntity(any(MemberDto.class)))  // MemberDto -> Member 변환
+                .willReturn(expectMemberEntity);
+        // stub(가설) : 저장된 회원정보 Dto를 Entity로 변환 예상.
+        given(memberMapper.toDto(any(Member.class)))  // Member -> MemberDto 변환
+                .willReturn(expectMemberDto);
+
         // stub(가설) : memberRepository.save() 실행 시 memberDto 데이터 반환 예상.
-        given(memberRepository.save(any()))
-                .willReturn(memberDto.toEntity(memberDto));
-        // 조회내용캡쳐
-        ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
+        given(memberRepository.save(any(Member.class)))
+                .willReturn(expectMemberEntity);
 
         // when
         MemberDto savedMember = memberService.saveMember(memberDto);
 
         // then
-        // memberRepository.save() 실행 여부 체크
-        verify(memberRepository, times(1)).save(captor.capture());
-
         assertNotNull(savedMember);
-        assertNotNull(savedReturnMemberDto.getId());
-        assertEquals(1L, savedReturnMemberDto.getId());
-        assertEquals("sky", savedReturnMemberDto.getUserId());
-        assertEquals("encode12345678", savedReturnMemberDto.getPassword());
-        assertEquals("김하늘", savedReturnMemberDto.getName());
-        assertEquals("010", savedReturnMemberDto.getTel1());
-        assertEquals("1234", savedReturnMemberDto.getTel2());
-        assertEquals("1234", savedReturnMemberDto.getTel3());
-        assertEquals("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층", savedReturnMemberDto.getAddress());
-        assertEquals('N', savedReturnMemberDto.getDelYn());
+        assertNotNull(savedMember.getId());
+        assertEquals(1L, savedMember.getId());
+        assertEquals("sky", savedMember.getUserId());
+        assertEquals("encode12345678", savedMember.getPassword());
+        assertEquals("김하늘", savedMember.getName());
+        assertEquals("010", savedMember.getTel1());
+        assertEquals("1234", savedMember.getTel2());
+        assertEquals("1234", savedMember.getTel3());
+        assertEquals("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층", savedMember.getAddress());
+        assertEquals(2, savedMember.getAuthorities().size());
+        assertEquals('N', savedMember.getDelYn());
     }
 
 }

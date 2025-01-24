@@ -192,6 +192,233 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
   - memberRepository.save() 실행 여부 체크
 
 
+### < Controller 테스트케이스 작성 - 도저히 안되서 Chat gpt를 통해 작성 >
+- MockMvc를 이용한 테스트 목적
+  -  컨트롤러의 엔드포인트를 호출하여 HTTP 클라이언트의 요청을 모방하고 적절한 응답을 확인하기 위해 테스트 수행.
+- @WebMvcTest(MemberController.class)
+   - MockMvc 객체를 생성해 컨트롤러와 상호작용함.
+   - 명시한 해당 컨트롤러만 격리시켜 단위테스트 수행가능.
+   - value : 테스트 할 controller 클래스 명시.
+- @MockBean
+   - 테스트 환경에서 애플리케이션 컨텍스트(ApplicationContext)의 빈을 모킹하도록 설정.
+   - Spring Boot 3.4.0부터 deprecated된 @MockBean과 거의 동일.
+   - 빈으로 등록해주는 mock
+   - 자동으로 빈으로 등록되어 컨트롤러에 주입됨.
+
+
+1. 일반적으로 **@WebMvcTest**와 **MockMvc**를 사용하여 Controller를 테스트할 수 있습니다.    
+   이 테스트는 Controller의 HTTP 요청과 응답을 실제로 처리하는 방식으로 동작합니다.   
+   다음은 signUpSeller() 메서드의 성공적인 테스트 케이스입니다.   
+   이 예제에서는 @MockBean을 사용하여 의존성 주입되는 MemberService를 mock하고, MockMvc를 사용하여 실제 HTTP 요청을 시뮬레이션합니다.
+   - 코드 설명
+       - MockMvc 설정
+           - MockMvcBuilders.standaloneSetup(memberController).build()로 MockMvc를 설정하여 Controller를 테스트할 수 있게 만듭니다.
+       - Mock 객체 설정
+           - @Mock 어노테이션을 통해 MemberService를 mock하고, @InjectMocks를 사용하여 MemberController에 mock된 MemberService를 주입합니다.
+       - MockMvc로 HTTP 요청 시뮬레이션
+           - mockMvc.perform(post("/member/signup/seller")...)로 HTTP POST 요청을 시뮬레이션합니다.
+           - andExpect(status().isOk())는 응답 상태 코드가 200 OK임을 검증.
+           - andExpect(jsonPath("$.name").value("John Doe"))는 JSON 응답 본문에서 name 값이 "John Doe"인지 확인합니다.
+
+    ~~~
+    package com.myecommerce.MyECommerce.controller;
+    
+    import com.fasterxml.jackson.databind.ObjectMapper;
+    import com.myecommerce.MyECommerce.dto.MemberDto;
+    import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
+    import com.myecommerce.MyECommerce.service.member.MemberService;
+    import com.myecommerce.MyECommerce.type.MemberAuthorityType;
+    import org.junit.jupiter.api.BeforeEach;
+    import org.junit.jupiter.api.Test;
+    import org.mockito.InjectMocks;
+    import org.mockito.Mock;
+    import org.mockito.Mockito;
+    import org.springframework.http.HttpStatus;
+    import org.springframework.http.MediaType;
+    import org.springframework.test.web.servlet.MockMvc;
+    import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+    import org.springframework.web.context.WebApplicationContext;
+    
+    import java.util.Collections;
+    
+    import static org.mockito.ArgumentMatchers.any;
+    import static org.mockito.Mockito.when;
+    import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+    import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+    
+    class MemberControllerTest {
+    
+        private MockMvc mockMvc;
+    
+        @Mock
+        private MemberService memberService;
+    
+        @InjectMocks
+        private MemberController memberController;
+    
+        private ObjectMapper objectMapper;
+    
+        @BeforeEach
+        void setUp() {
+            objectMapper = new ObjectMapper();
+            mockMvc = MockMvcBuilders.standaloneSetup(memberController).build();
+        }
+    
+        @Test
+        void signUpSeller_Success() throws Exception {
+            // given
+            MemberDto memberDto = new MemberDto();
+            memberDto.setName("John Doe");
+            memberDto.setTel1("010");
+            memberDto.setTel2("1234");
+            memberDto.setTel3("5678");
+            memberDto.setPassword("password123");
+    
+            // 권한 설정
+            MemberAuthority authority = new MemberAuthority();
+            authority.setAuthority(MemberAuthorityType.SELLER);
+            memberDto.setAuthorities(Collections.singletonList(authority));
+    
+            // when
+            when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
+    
+            // then
+            mockMvc.perform(post("/member/signup/seller")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(memberDto)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.name").value("John Doe"))
+                    .andExpect(jsonPath("$.tel1").value("010"))
+                    .andExpect(jsonPath("$.tel2").value("1234"))
+                    .andExpect(jsonPath("$.tel3").value("5678"))
+                    .andExpect(jsonPath("$.password").value("password123"))
+                    .andExpect(jsonPath("$.authorities[0].authority").value("SELLER"));
+        }
+    }
+    ~~~
+
+
+2. 스프링부트 3.4.0 버전 이상인 경우 @Mock 어노테이션 사용 불가.
+   다른방식으로 테스트코드 작성 필요.
+   - @Mock 어노테이션 대신 Mockito.mock()을 사용하여 mock 객체를 생성해야 합니다. (Mockito.mock 사용)
+   - @Mock 어노테이션을 사용하지 않고, Mockito.mock()을 사용하여 MemberService의 mock 객체를 생성합니다. 
+     ~~~
+     // mock 객체  생성
+     memberService = Mockito.mock(MemberService.class);
+     ~~~
+   - @InjectMocks
+     - @InjectMocks는 여전히 MemberController에 mock 객체를 주입하는 데 사용됩니다. 
+       ~~~
+       // mock 객체를 직접 생성하여 주입
+       new MemberController(memberService);
+       ~~~
+   - Mockito로 Mock 객체 설정
+     ~~~
+     // memberService.saveMember 메서드 호출 시 mock된 MemberDto를 반환하도록 설정
+     when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
+     ~~~
+
+    ~~~
+    package com.myecommerce.MyECommerce.controller;
+    
+    import com.fasterxml.jackson.databind.ObjectMapper;
+    import com.myecommerce.MyECommerce.dto.MemberDto;
+    import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
+    import com.myecommerce.MyECommerce.service.member.MemberService;
+    import com.myecommerce.MyECommerce.type.MemberAuthorityType;
+    import org.junit.jupiter.api.BeforeEach;
+    import org.junit.jupiter.api.Test;
+    import org.mockito.InjectMocks;
+    import org.mockito.Mockito;
+    import org.springframework.http.HttpStatus;
+    import org.springframework.http.MediaType;
+    import org.springframework.test.web.servlet.MockMvc;
+    import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+    
+    import java.util.Collections;
+    
+    import static org.mockito.ArgumentMatchers.any;
+    import static org.mockito.Mockito.when;
+    import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+    import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+    
+    class MemberControllerTest {
+    
+        private MockMvc mockMvc;
+    
+        private MemberService memberService;  // @Mock 대신 필드로 사용
+    
+        @InjectMocks
+        private MemberController memberController;
+    
+        private ObjectMapper objectMapper;
+    
+        @BeforeEach
+        void setUp() {
+            // Mockito.mock을 사용하여 mock 객체 생성
+            memberService = Mockito.mock(MemberService.class);
+            
+            // InjectMocks로 Controller에 mock 객체 주입
+            memberController = new MemberController(memberService);
+            
+            objectMapper = new ObjectMapper();
+            mockMvc = MockMvcBuilders.standaloneSetup(memberController).build();
+        }
+    
+        @Test
+        void signUpSeller_Success() throws Exception {
+            // given
+            MemberDto memberDto = new MemberDto();
+            memberDto.setName("John Doe");
+            memberDto.setTel1("010");
+            memberDto.setTel2("1234");
+            memberDto.setTel3("5678");
+            memberDto.setPassword("password123");
+    
+            // 권한 설정
+            MemberAuthority authority = new MemberAuthority();
+            authority.setAuthority(MemberAuthorityType.SELLER);
+            memberDto.setAuthorities(Collections.singletonList(authority));
+    
+            // when
+            when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
+    
+            // then
+            mockMvc.perform(post("/member/signup/seller")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(memberDto)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.name").value("John Doe"))
+                    .andExpect(jsonPath("$.tel1").value("010"))
+                    .andExpect(jsonPath("$.tel2").value("1234"))
+                    .andExpect(jsonPath("$.tel3").value("5678"))
+                    .andExpect(jsonPath("$.password").value("password123"))
+                    .andExpect(jsonPath("$.authorities[0].authority").value("SELLER"));
+        }
+    }
+    ~~~
+
+
+3. 테스트코드를 작성시 @MockMvc 어노테이션을 적용하지 않는 이유
+   - @MockMvc는 테스트 클래스에 적용할 수 없고, 객체를 수동으로 생성해야하기 때문입니다.   
+     @MockMvc 어노테이션은 실제로 MockMvc 객체를 설정하는 것이 아니라, MockMvc 객체를 자동으로 초기화하기 위한 테스트 클래스의 기본적인 설정을 도와줍니다.    
+     그러나, 이 어노테이션은 Spring 3.4.0 이상에서는 사용되지 않으며, @MockMvc를 클래스에 붙여도 동작하지 않습니다.
+   - @MockMvc 어노테이션 역할
+     - 실제로 MockMvc 객체를 생성해주는 역할을 하지만, **@MockMvc**를 클래스 레벨에 직접 적용하는 것은 지원되지 않습니다.    
+       대신, MockMvc 객체는 테스트 클래스에서 직접 **MockMvcBuilders**를 사용하여 설정하고 초기화합니다.
+   - MockMvc를 초기화
+     - **MockMvcBuilders**를 사용해 MockMvc 객체를 수동으로 설정해야 합니다. 
+     - 예를 들어, MockMvcBuilders.standaloneSetup(memberController).build();로 MockMvc 객체를 설정하여 Controller를 테스트할 수 있습니다.   
+   - @WebMvcTest 사용 시 @MockMvc 자동 설정
+     - 만약 @WebMvcTest를 사용하면, @MockMvc가 자동으로 주입되지만, @WebMvcTest는 기본적으로 Spring Boot에서 웹 레이어를 테스트할 때 사용됩니다. 
+     - @MockMvc는 @WebMvcTest 내에서만 자동으로 동작하는 것입니다.
+   - 권장
+     - @MockMvc는 클래스를 통해 자동 주입되지 않기 때문에 MockMvcBuilders를 사용하여 MockMvc를 수동으로 설정해야 합니다.   
+       **@MockMvc**는 @WebMvcTest에서 사용되지만, 일반적으로 @WebMvcTest 없이 사용할 때는 MockMvc를 수동으로 설정하는 방식이 필요합니다.   
+       따라서 MockMvc 객체를 수동으로 초기화하는 방식이 더 유연하고, 명시적으로 테스트가 필요한 컨트롤러만 설정할 수 있습니다.    
+     - MockMvcBuilders.standaloneSetup(memberController).build() 방식이 더 권장됩니다.
+
+    
 ---
 ### < 인터페이스 사용 이유 >
 - 기능(메소드)의 구현을 강제함으로써, 클래스의 설계 또는 표준화를 유도하기위해 사용함.

@@ -24,10 +24,22 @@ repositories {
 }
 
 dependencies {
+	// JPA 사용을 위한 의존성 추가 (내부에 jdbc 관련 라이브러리를 포함 -> jdbc 의존성 따로 추가 필요x)
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+	// 스프링 시큐리티 사용을 위한 의존성 추가
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	// 객체간 매핑을 위한 의존성 추가1
+	implementation 'org.mapstruct:mapstruct:1.6.3'
+
 	compileOnly 'org.projectlombok:lombok'
 
 	annotationProcessor 'org.projectlombok:lombok'
+	// 객체간 매핑을 위한 의존성 추가2
+	annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+
+	// mysql 드라이버 의존성 추가
+	runtimeOnly 'com.mysql:mysql-connector-j'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'

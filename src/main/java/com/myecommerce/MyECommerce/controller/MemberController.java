@@ -29,12 +29,11 @@ public class MemberController {
         // 권한추가
         List<MemberAuthority> authorities = new ArrayList<>();
         authorities.add(MemberAuthority.builder()
-                .authority(MemberAuthorityType.SELLER)
-                .build());
-        member.setAuthorities(authorities);
+                                    .authority(MemberAuthorityType.SELLER)
+                                    .build());
 
         // 회웍정보등록
-        return ResponseEntity.ok(memberService.saveMember(member));
+        return ResponseEntity.ok(memberService.saveMember(member, authorities));
     }
 
     /**
@@ -45,12 +44,11 @@ public class MemberController {
         // 권한추가
         List<MemberAuthority> authorities = new ArrayList<>();
         authorities.add(MemberAuthority.builder()
-                .authority(MemberAuthorityType.CUSTOMER)
-                .build());
-        member.setAuthorities(authorities);
+                                    .authority(MemberAuthorityType.CUSTOMER)
+                                    .build());
 
         // 회웍정보등록
-        return ResponseEntity.ok(memberService.saveMember(member));
+        return ResponseEntity.ok(memberService.saveMember(member, authorities));
     }
 
     /**

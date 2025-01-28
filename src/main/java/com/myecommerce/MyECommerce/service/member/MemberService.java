@@ -2,8 +2,10 @@ package com.myecommerce.MyECommerce.service.member;
 
 import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
+import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.exception.MemberException;
 import com.myecommerce.MyECommerce.mapper.MemberMapper;
+import com.myecommerce.MyECommerce.repository.member.MemberAuthorityRepository;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -25,6 +28,7 @@ public class MemberService {
     private final MemberMapper memberMapper;
 
     private final MemberRepository memberRepository;
+    private final MemberAuthorityRepository memberAuthorityRepository;
 
     /**
      * 회원가입
@@ -32,7 +36,7 @@ public class MemberService {
      * @return 신규 회원가입한 회원정보를 담은 MemberDto 객체
      */
     @Transactional
-    public MemberDto saveMember(MemberDto member) {
+    public MemberDto saveMember(MemberDto member, List<MemberAuthority> authorities) {
         // validation check
         saveMemberValidationCheck(member);
 
@@ -46,11 +50,10 @@ public class MemberService {
 
         // 회원정보등록
         Member savedMember = memberRepository.save(memberMapper.toEntity(member));
-
-        // 회원권한정보 수정
-        savedMember.getAuthorities().forEach(authority -> {
-            authority.setMemberId(savedMember.getId());
-
+        // 회원권한정보등록
+        authorities.forEach(authority -> {
+                    authority.setMember(savedMember);
+                    memberAuthorityRepository.save(authority);
         });
 
         // 회원정보반환

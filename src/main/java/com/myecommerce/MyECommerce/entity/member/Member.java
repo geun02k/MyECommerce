@@ -1,5 +1,6 @@
 package com.myecommerce.MyECommerce.entity.member;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.myecommerce.MyECommerce.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -48,7 +49,8 @@ public class Member extends BaseEntity {
 
     // 유저:권한 (1:N)
     // 사용자 권한 데이터 member_authority 테이블 join해서 가져옴.
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "member") // 테이블 연관관계 1:N 설정
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "member")
+    @JsonManagedReference
     private List<MemberAuthority> authorities; // 사용자가 여러 권한을 가질 수 있음.
 
 }

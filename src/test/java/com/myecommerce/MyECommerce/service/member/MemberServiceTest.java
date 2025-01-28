@@ -4,6 +4,7 @@ import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.mapper.MemberMapper;
+import com.myecommerce.MyECommerce.repository.member.MemberAuthorityRepository;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
 import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +35,8 @@ class MemberServiceTest {
 
     @Mock
     private MemberRepository memberRepository;
+    @Mock
+    private MemberAuthorityRepository memberAuthorityRepository;
 
     @InjectMocks
     private MemberService memberService;
@@ -64,9 +67,6 @@ class MemberServiceTest {
         memberAuthorityList.add(MemberAuthority.builder()
                                     .authority(MemberAuthorityType.SELLER)
                                     .build());
-        memberAuthorityList.add(MemberAuthority.builder()
-                                    .authority(MemberAuthorityType.CUSTOMER)
-                                    .build());
         // 저장할 회원객체생성
         MemberDto memberDto = MemberDto.builder()
                 .userId("sky")
@@ -78,18 +78,7 @@ class MemberServiceTest {
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
                 .authorities(memberAuthorityList)
                 .build();
-        // 저장된 회원권한생성
-        List<MemberAuthority> expectMmemberAuthorityList = new ArrayList<>();
-        expectMmemberAuthorityList.add(MemberAuthority.builder()
-                .id(1L)
-                .memberId(1L)
-                .authority(MemberAuthorityType.SELLER)
-                .build());
-        expectMmemberAuthorityList.add(MemberAuthority.builder()
-                .id(2L)
-                .memberId(1L)
-                .authority(MemberAuthorityType.CUSTOMER)
-                .build());
+
         // 저장된 회원 DTO객체 생성
         MemberDto expectMemberDto = MemberDto.builder()
                 .id(1L)
@@ -100,7 +89,6 @@ class MemberServiceTest {
                 .tel2("1234")
                 .tel3("1234")
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
-                .authorities(expectMmemberAuthorityList)
                 .delYn('N')
                 .build();
         // 저장된 회원 Entity객체 생성
@@ -113,9 +101,15 @@ class MemberServiceTest {
                 .tel2("1234")
                 .tel3("1234")
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
-                .authorities(expectMmemberAuthorityList)
                 .delYn('N')
                 .build();
+        // 저장된 회원권한 Entity객체 생성
+        List<MemberAuthority> expectAuthorityList = new ArrayList<>();
+        expectAuthorityList.add(MemberAuthority.builder()
+                .id(1L)
+                .member(expectMemberEntity)
+                .authority(MemberAuthorityType.SELLER)
+                .build());
 
         // stub(가설) : memberRepository.findByTel1AndTel2AndTel3() 실행 시 빈값 반환 예상.
         given(memberRepository.findByTel1AndTel2AndTel3(any(), any(), any()))
@@ -136,8 +130,12 @@ class MemberServiceTest {
         given(memberRepository.save(any(Member.class)))
                 .willReturn(expectMemberEntity);
 
+        // stub(가설) : memberAuthorityRepository.save() 실행 시 memberDto 데이터 반환 예상.
+        given(memberAuthorityRepository.save(any(MemberAuthority.class)))
+                .willReturn(expectAuthorityList.get(0));
+
         // when
-        MemberDto savedMember = memberService.saveMember(memberDto);
+        MemberDto savedMember = memberService.saveMember(memberDto, memberAuthorityList);
 
         // then
         assertNotNull(savedMember);
@@ -150,7 +148,6 @@ class MemberServiceTest {
         assertEquals("1234", savedMember.getTel2());
         assertEquals("1234", savedMember.getTel3());
         assertEquals("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층", savedMember.getAddress());
-        assertEquals(2, savedMember.getAuthorities().size());
         assertEquals('N', savedMember.getDelYn());
     }
 

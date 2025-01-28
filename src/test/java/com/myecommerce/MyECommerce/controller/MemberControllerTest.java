@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Collections;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -62,7 +63,7 @@ class MemberControllerTest {
         memberDto.setAuthorities(Collections.singletonList(authority));
 
         // when
-        when(memberService.saveMember(any(MemberDto.class)))
+        when(memberService.saveMember(any(MemberDto.class), anyList()))
                 .thenReturn(MemberDto.builder()
                         .id(1L)
                         .userId("sky")
@@ -106,7 +107,7 @@ class MemberControllerTest {
         memberDto.setAuthorities(Collections.singletonList(authority));
 
         // when
-        when(memberService.saveMember(any(MemberDto.class)))
+        when(memberService.saveMember(any(MemberDto.class), anyList()))
                 .thenReturn(MemberDto.builder()
                         .id(1L)
                         .userId("sky")

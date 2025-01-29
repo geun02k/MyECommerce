@@ -9,5 +9,5 @@ import java.util.Optional;
 @Repository
 public interface MemberRepository extends JpaRepository<Member, Long> {
     // 동일 전화번호 조회
-    Optional<Member> findByTel1AndTel2AndTel3(String tel1, String tel2, String tel3);
+    Optional<Member> findByTelephone(String telephone);
 }

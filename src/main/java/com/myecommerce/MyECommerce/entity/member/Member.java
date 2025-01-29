@@ -32,14 +32,8 @@ public class Member extends BaseEntity {
     @Column(nullable = false, length = 50)
     private String name;
 
-    @Column(nullable = false, length = 3)
-    private String tel1;
-
-    @Column(nullable = false, length = 4)
-    private String tel2;
-
-    @Column(nullable = false, length = 4)
-    private String tel3;
+    @Column(nullable = false, length = 11)
+    private String telephone;
 
     @Column(nullable = false, length = 500)
     private String address;

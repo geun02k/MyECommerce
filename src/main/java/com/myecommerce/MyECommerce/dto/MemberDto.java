@@ -20,11 +20,7 @@ public class MemberDto {
 
     private String name;
 
-    private String tel1;
-
-    private String tel2;
-
-    private String tel3;
+    private String telephone;
 
     private String address;
 

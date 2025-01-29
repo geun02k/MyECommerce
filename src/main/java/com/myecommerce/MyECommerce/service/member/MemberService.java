@@ -42,9 +42,7 @@ public class MemberService {
 
         // 공백문자 제거
         member.setName(member.getName().trim());
-        member.setTel1(member.getTel1().trim());
-        member.setTel2(member.getTel2().trim());
-        member.setTel3(member.getTel3().trim());
+        member.setTelephone(member.getTelephone().trim());
         // 비밀번호 암호화
         member.setPassword(passwordEncoder.encode(member.getPassword().trim()));
 
@@ -93,21 +91,17 @@ public class MemberService {
         }
 
         // 전화번호 validation check
-        String tel1Pattern = "^01[016789]";
-        String tel2Pattern = "^\\d{3,4}$";
-        if (ObjectUtils.isEmpty(member.getTel1().trim())
-                || ObjectUtils.isEmpty(member.getTel2().trim())
-                || ObjectUtils.isEmpty(member.getTel3().trim())
-                || !(Pattern.matches(tel1Pattern, member.getTel1()))
-                || !(Pattern.matches(tel2Pattern, member.getTel2()))
-                || !(Pattern.matches(tel2Pattern, member.getTel3()))) {
+        String realPhoneNumber = member.getTelephone().trim().replaceAll("-", "");
+        // 휴대폰번호가 010,011,017,017,018,019로 시작하고 숫자만으로 총 10 또는 11자리인지 확인
+        String phonePattern = "^01[016789]\\d{7,8}$";
+
+        if (ObjectUtils.isEmpty(realPhoneNumber)
+                || !(Pattern.matches(phonePattern, realPhoneNumber))) {
             throw new MemberException(INVALID_PHONE_NUMBER);
         }
         // 전화번호 중복등록 체크
         Optional<Member> memberEntityIncludeTel =
-                memberRepository.findByTel1AndTel2AndTel3(member.getTel1(),
-                        member.getTel2(),
-                        member.getTel3());
+                memberRepository.findByTelephone(realPhoneNumber);
         if(!ObjectUtils.isEmpty(memberEntityIncludeTel)) {
             throw new MemberException(ALREADY_REGISTERED_PHONE_NUMBER);
         }

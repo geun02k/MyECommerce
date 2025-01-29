@@ -72,9 +72,7 @@ class MemberServiceTest {
                 .userId("sky")
                 .password("123456789")
                 .name("김하늘")
-                .tel1("010")
-                .tel2("1234")
-                .tel3("1234")
+                .telephone("01011112222")
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
                 .authorities(memberAuthorityList)
                 .build();
@@ -85,9 +83,7 @@ class MemberServiceTest {
                 .userId("sky")
                 .password("encode12345678")
                 .name("김하늘")
-                .tel1("010")
-                .tel2("1234")
-                .tel3("1234")
+                .telephone("01011112222")
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
                 .delYn('N')
                 .build();
@@ -97,9 +93,7 @@ class MemberServiceTest {
                 .userId("sky")
                 .password("encode12345678")
                 .name("김하늘")
-                .tel1("010")
-                .tel2("1234")
-                .tel3("1234")
+                .telephone("01011112222")
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
                 .delYn('N')
                 .build();
@@ -112,7 +106,7 @@ class MemberServiceTest {
                 .build());
 
         // stub(가설) : memberRepository.findByTel1AndTel2AndTel3() 실행 시 빈값 반환 예상.
-        given(memberRepository.findByTel1AndTel2AndTel3(any(), any(), any()))
+        given(memberRepository.findByTelephone(any()))
                 .willReturn(Optional.empty());
 
         // stub(가설) : passwordEncoder.encode() 실행 시 encode12345678 반환 예상.
@@ -144,9 +138,7 @@ class MemberServiceTest {
         assertEquals("sky", savedMember.getUserId());
         assertEquals("encode12345678", savedMember.getPassword());
         assertEquals("김하늘", savedMember.getName());
-        assertEquals("010", savedMember.getTel1());
-        assertEquals("1234", savedMember.getTel2());
-        assertEquals("1234", savedMember.getTel3());
+        assertEquals("01011112222", savedMember.getTelephone());
         assertEquals("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층", savedMember.getAddress());
         assertEquals('N', savedMember.getDelYn());
     }

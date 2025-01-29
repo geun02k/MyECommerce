@@ -11,8 +11,10 @@
 - 보안 작업은 까다롭지만 스프링 시큐리티를 이용하면 제공 기능들을 이용해 보다 쉽게 보안작업 진행가능.
 - 스프링 시큐리티는 필터 방식으로 동작.
   - 인증, 인가에 대한 처리를 스프링 시큐리티 내부적 필터를 순차적으로 통과하면서 수행.
-- 설정에 따라 필요한 필터가있고 필요없는 필터가 있을 수 있음.
-- HttpSecurity
+  - Spring Security 의존성을 추가하게 되면 15개의 **기본 필터들이 자동으로 적용**됨.
+  - 설정에 따라 필요한 필터가있고 필요없는 필터가 있을 수 있음.
+  - **SecurityConfig에서 필요하지 않은 필터들을 끌 수 있음**.
+- HttpSecurity 
   - 실제 필터를 생성.
   - 해당 필터들은 WebSecurity 클래스를 통해 FilterChainProxy의 인자들로 전달됨.   
   - 사용자가 요청 > DelegatingFilterProxy가 가장 먼저 그 요청 받음 > FilterChainProxy에게 요청 위임 > 위임받은 요청에 해당하는 SecurityFilterChain이 필터 수행 > 반복...

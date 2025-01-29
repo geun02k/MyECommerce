@@ -37,7 +37,13 @@
    - 참고블로그 https://priming.tistory.com/144
 
 
-### < 스프링부트 의존성추가 >
+---
+### < 매핑 라이브러리 MapStruct >
+- MapStruct
+    - 자바 Bean 매핑 라이브러리로, 컴파일 타임에 매핑 코드를 자동으로 생성.    
+      이 과정은 annotationProcessor를 통해 이루어짐.   
+      MapStruct는 @Mapper 애너테이션을 처리하여 매핑 인터페이스에 대한 구현체 생성.
+
 - mapstruct-processor 
   - mapstruct-processor를 annotationProcessor로 의존성 추가하는 이유    
     MapStruct가 annotationProcessor를 사용하여 컴파일 타임에 코드를 생성하기 때문.
@@ -46,11 +52,6 @@
     즉, **성능 최적화**를 위해서 implementation이 아닌 annotationProcessor로 설정하면 
     mapstruct-processor가 컴파일 중에만 실행되고 실행 파일에 포함되지 않는다.    
     따라서 애플리케이션의 실행 시 성능에 영향을 미치지 않는다.
-
-- MapStruct    
-  - 자바 Bean 매핑 라이브러리로, 컴파일 타임에 매핑 코드를 자동으로 생성.    
-    이 과정은 annotationProcessor를 통해 이루어짐.   
-    MapStruct는 @Mapper 애너테이션을 처리하여 매핑 인터페이스에 대한 구현체 생성.
 
 - mapstruct 와 mapstruct-processor
   - **mapstruct 라이브러리 자체는 애플리케이션에서 실행 시 사용되고

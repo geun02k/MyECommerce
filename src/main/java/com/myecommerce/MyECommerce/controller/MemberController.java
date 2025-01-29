@@ -4,6 +4,7 @@ import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.service.member.MemberService;
 import com.myecommerce.MyECommerce.type.MemberAuthorityType;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,7 +26,7 @@ public class MemberController {
      * 판매자 회원가입 post /member/signup/seller
      **/
     @PostMapping("/signup/seller")
-    public ResponseEntity<MemberDto> signUpSeller(@RequestBody MemberDto member) {
+    public ResponseEntity<MemberDto> signUpSeller(@Valid @RequestBody MemberDto member) {
         // 권한추가
         List<MemberAuthority> authorities = new ArrayList<>();
         authorities.add(MemberAuthority.builder()
@@ -40,7 +41,7 @@ public class MemberController {
      * 고객 회원가입 post /member/signup/customer
      **/
     @PostMapping("/signup/customer")
-    public ResponseEntity<MemberDto> signUpCustomer(@RequestBody MemberDto member) {
+    public ResponseEntity<MemberDto> signUpCustomer(@Valid @RequestBody MemberDto member) {
         // 권한추가
         List<MemberAuthority> authorities = new ArrayList<>();
         authorities.add(MemberAuthority.builder()

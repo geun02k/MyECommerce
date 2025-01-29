@@ -64,6 +64,282 @@
   
 
 ---
+### < 유효성 검사 라이브러리 validation >
+1. 작동방식
+   - 지원하는 어노테이션으로 클래스의 필드에 대한 제약조건을 정의.
+   - Validator에 객체를 전달해 제약 조건이 충족되는지 확인하여 객체의 유효성 검증.
+     ~~~
+     Set<ConstraintViolation<Input>> violations = validator.validate(customer);
+     if (!violations.isEmpty()) {
+         throw new ConstraintViolationException(violations);
+     } 
+     ~~~
+   - @Validated, @Valid 어노테이션 
+     - 사용 시 대부분 스프링이 대신 검증해주므로 Validator 직접 생성할 필요 없음.
+     - @Validated
+       - Spring에 해당 어노테이션이 달린 클래스의 메서드로 전달되는 매개변수를 검증하도록 지시하는 데 사용할 수 있는 **클래스 수준의 어노테이션.**
+     - @Valid
+       - **메서드 매개변수와 필드**에 주석을 달아서 Spring에 메서드 매개변수나 필드의 유효성을 검사.
+     - Spring MVC 컨트롤러에 대한 입력 검증가능.
+       - Spring REST Controller 구현 시 클라이언트가 전달한 입력 검증 가능.
+
+2. 가장 일반적인 검증 어노테이션
+    - @NotNull
+        - 필드가 null이어서는 안 됨을 나타냅니다. (null허용x)
+    - @NotEmpty
+        - 목록 필드는 비워둘 수 없음을 나타냅니다. (null, 빈문자 허용x)
+    - @NotBlank
+        - 문자열 필드는 빈 문자열이어서는 안 됩니다. (null, 빈문자, 공백 허용x / 최소한 하나의 문자가 있어야 함)
+    - @Min, @Max
+        - 숫자 필드는 값이 특정 값보다 크거나 작을 때만 유효함을 나타냅니다.
+    - @Pattern
+        - 문자열 필드는 특정 정규 표현식과 일치할 때만 유효함을 나타냅니다.
+    - @Email
+        - 문자열 필드는 유효한 이메일 주소여야 함을 나타냅니다.
+
+3. 검증 가능한 HTTP 요청
+   1. Request Body
+      - 검증 실패 시 MethodArgumentNotValidException 예외를 발생시키며, HTTP 상태코드 400으로 응답 반환.
+      ~~~
+      class Input {  
+          @Min(1)
+          @Max(10)
+          private int numberBetweenOneAndTen;
+        
+          @Pattern(regexp = "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$")
+          private String ipAddress;
+        
+          // ...
+      }
+      ~~~
+      ~~~
+      @RestController
+      class ValidateRequestBodyController { 
+      
+          // Spring은 들어오는 JSON을 Java 객체인 Input에 자동
+          @PostMapping("/validateBody")
+          ResponseEntity<String> validateBody(@Valid @RequestBody Input input) {
+              return ResponseEntity.ok("valid");
+          }
+      } 
+      ~~~
+      
+   2. 경로 내 전달되는 변수    
+      ex) /shop/{id} 에서 id를 지칭.   
+   3. 쿼리 매개변수      
+      - 경로 변수와 요청 매개변수의 유효성 검사 request body와는 다르게 작동.   
+        이 때는 복잡한 Java 객체의 유효성을 검사하지 않음.
+      - 검증 실패 시 ConstraintViolationException 예외를 발생시키며, HTTP 상태코드 500으로 응답 반환.
+      - HTTP 상태 400을 반환하려는 경우 컨트롤러에 사용자 정의 Exception Handler 추가해 처리가능.
+      ~~~
+      @RestController
+      @Validated
+      class ValidateParametersController {
+
+          @GetMapping("/validatePathVariable/{id}")
+          ResponseEntity<String> validatePathVariable(
+              @PathVariable("id") @Min(5) int id) {
+                  return ResponseEntity.ok("valid");
+          }
+
+          @GetMapping("/validateRequestParameter")
+          ResponseEntity<String> validateRequestParameter(
+              @RequestParam("param") @Min(5) int param) {
+                  return ResponseEntity.ok("valid");
+          }
+      }
+      ~~~
+      ~~~
+      // 통합 테스트코드
+      @ExtendWith(SpringExtension.class)
+      @WebMvcTest(controllers = ValidateRequestBodyController.class)
+      class ValidateRequestBodyControllerTest {
+   
+          @Autowired
+          private MockMvc mvc;
+    
+          @Autowired
+          private ObjectMapper objectMapper;
+           
+          @Test
+          void whenInputIsInvalid_thenReturnsStatus400() throws Exception {
+              Input input = invalidInput();
+              String body = objectMapper.writeValueAsString(input);
+         
+              mvc.perform(post("/validateBody")
+                             .contentType("application/json")
+                             .content(body))
+                             .andExpect(status().isBadRequest());
+         }
+      }     
+      ~~~ 
+      ~~~
+      // Exception Handler
+      @RestController
+      @Validated
+      class ValidateParametersController {
+    
+          // request mapping method omitted 
+          @ExceptionHandler(ConstraintViolationException.class)
+          @ResponseStatus(HttpStatus.BAD_REQUEST)
+          ResponseEntity<String> handleConstraintViolationException(ConstraintViolationException e) {
+              return new ResponseEntity<>("not valid due to validation error: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+          }
+      }       
+      ~~~
+
+4. 컨트롤러 수준에서 입력을 검증함과 동시에 모든 Spring 구성 요소에 대한 입력을 검증도 함께하려는 경우.
+   - @Validated, @Valid 조합으로 사용.
+   ~~~
+   @Service
+   @Validated
+   class ValidatingService{
+       void validateInput(@Valid Input input){
+         // do something
+       } 
+   }
+   ~~~
+5. JPA Entity 검증 (Bean Validation 안티 패턴)
+   - 검증을 위한 마지막 방어선은 지속성 계층임.
+   - 일반적으로 지속성 계층에서 가장 늦게 검증을 하지 않는다.    
+     비즈니스 코드가 잠재적으로 유효하지 않은 객체와 함께 작동하여 예상치 못한 오류를 초래할 수 있기 때문임.
+
+6. SpringBoot 사용한 사용자정의 검증 (어노테이션)
+   - 어노테이션 생성
+   ~~~
+    @Target({ FIELD })
+    @Retention(RUNTIME)
+    @Constraint(validatedBy = IpAddressValidator.class)
+    @Documented
+    public @interface IpAddress {
+    
+        String message() default "{IpAddress.invalid}";
+    
+        Class<?>[] groups() default { };
+    
+        Class<? extends Payload>[] payload() default { };
+    
+    }   
+   ~~~
+   - 검증 구현
+   ~~~
+    class IpAddressValidator implements ConstraintValidator<IpAddress, String> {
+    
+        @Override
+        public boolean isValid(String value, ConstraintValidatorContext context) {
+            Pattern pattern =
+                Pattern.compile("^([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})$");
+            Matcher matcher = pattern.matcher(value);
+            try {
+                if (!matcher.matches()) {
+                    return false;
+                } else {
+                    for (int i = 1; i <= 4; i++) {
+                        int octet = Integer.valueOf(matcher.group(i));
+                        if (octet > 255) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            } catch (Exception e) {
+                return false;
+            }
+        }
+    }   
+   ~~~
+   - 어노테이션 사용
+   ~~~
+    class InputWithCustomValidator {
+        @IpAddress
+        private String ipAddress;
+    
+        // ...
+    }
+   ~~~
+
+7. 프로그래밍 방식으로 검증   
+   - 하단의 링크 참조      
+     - https://reflectoring.io/bean-validation-with-spring-boot/
+
+
+---
+### < 검증관련처리 >
+1. DTO에서 처리
+   > 단순한 검증 로직은 DTO에서 @Valid 어노테이션을 사용.   
+     기본적인 @NotNull, @Size, @Pattern 등의 검증 어노테이션으로 처리하는 것이 더 효율적.
+   - 클라이언트와 서버 간의 빠른 피드백 제공
+     - DTO에서 검증을 수행 시 클라이언트가 서버에 요청을 보내기 전에 빠르게 유효성 검사 수행가능.    
+     - @NotNull, @Size 등의 어노테이션을 사용하여 필드의 값이 유효한지 확인할 수 있기 때문에, 잘못된 데이터를 보내는 것을 방지 가능.
+     - 클라이언트는 서버로부터 응답을 받기 전에 자신이 보낸 데이터가 잘못된지 빠르게 알 수 있음. 
+     - 사용자 경험을 개선하는 데 중요한 역할 수행.
+   - 비즈니스 로직과 검증 로직의 분리
+     - DTO에서 검증을 처리하면 비즈니스 로직과 검증 로직을 명확히 분리가능 -> 코드가 깔끔하고 관리에 용이. 
+     - 서비스 계층에서 비즈니스 로직만 처리하고, DTO에서 유효성 검증을 전담.
+     - 비즈니스 로직에서 DTO 객체를 바로 사용할 수 있기 때문에, 유효성 검증이 빠르게 이루어지고, 불필요한 추가적인 검증 코드가 서비스 계층에 포함되지 않게 함.
+   - 표준화된 검증 처리 (Spring Validation과 같은 프레임워크를 사용 시)
+     - 검증 로직을 표준화된 방식으로 처리가능. 
+     - 각 필드에 대한 검증 로직이 명확하고 일관되게 처리.
+     - 다양한 검증 어노테이션(@NotNull, @Size, @Pattern 등)을 사용하여 검증 로직을 간단하고 명확하게 작성가능.
+   - 중복 코드 최소화
+     - 필드별로 여러 검증 조건을 추가 시, DTO에서 @Size, @NotBlank, @Pattern 등 여러 어노테이션을 조합하여 사용가능. 
+     - 각 검증 로직을 서비스나 컨트롤러에서 중복해서 작성할 필요 x.
+     - 특히 여러 엔드포인트에서 동일한 DTO를 사용하는 경우, DTO에 검증을 추가하면 각 엔드포인트마다 검증 로직을 반복하지 않아도 됨.
+   - 쉽고 빠른 디버깅
+     - DTO에서 검증을 시 요청이 서비스로 전달되기 전에 유효성 검사 실패로 인해 문제가 발생하는 지점을 빠르게 파악가능. 
+     - 예외가 발생하면 검증에 실패한 필드가 명시적으로 반환되어, 디버깅이 용이.
+   - 복잡한 비즈니스 로직 검증 불가
+     - 비즈니스 로직에 기반한 복잡한 검증처리 어려움. 
+     - 여러 필드의 값들이 특정 조건에 따라 서로 관계를 가져야 하는 경우(예: startDate가 endDate보다 이전이어야 한다면) DTO에서 처리하는 것은 한계가 있을 수 있음.
+   - 검증 로직의 변경 시 코드 수정 필요
+     - DTO에서 검증을 하게 되면, 검증 로직이 DTO에 결합되므로 검증 로직을 변경하려면 DTO를 수정 필요. 
+     - 비즈니스 로직에서만 사용하는 복잡한 검증 조건이 있을 경우, 이 검증을 DTO에 포함시키는 것이 코드의 복잡도를 증가시킬 수 있음.
+     - 사용자 정의 검증 어노테이션을 추가하려면 별도의 클래스 생성 필요.
+     - 이를 관리하고 변경하는 데 추가적인 유지보수 작업이 필요할 수 있음.
+   - 테스트 어려움
+     - DTO에서 유효성 검증을 수행하는 경우, 검증 로직을 테스트하는 데 추가적인 설정이 필요할 수 있음. 
+     - 테스트 코드에서 검증 실패를 감지하고, 적절한 예외 처리를 할 수 있도록 해야 하기 때문에, 검증 로직을 독립적으로 테스트하는 과정이 번거로울 수 있음.
+     - @Valid나 @Validated를 사용하는 경우, 이를 테스트하려면 Spring의 @WebMvcTest나 @SpringBootTest와 같은 테스트 어노테이션을 사용해야 하므로, 단위 테스트가 어려울 수 있음.
+   - 한정된 유효성 검증
+     - DTO의 유효성 검증은 단순히 필드 값을 체크. 
+     - 복잡한 데이터 검증이나 외부 서비스와의 연동 검증 등은 DTO에서 처리 어려움. 
+     - 특정 필드 값이 외부 API나 데이터베이스의 값을 기반으로 해야 할 때, 이를 DTO에서 처리하기 어려움.
+     - 조건부 검증(예: if 조건에 따라 다른 검증을 해야 하는 경우)은 DTO에서 구현 어려움.
+   - 어노테이션에 의존적 
+     - DTO에서 검증을 어노테이션 기반으로 하게 되면, 어노테이션의 제한된 기능에 의존하게 됨. 
+     - 복잡한 규칙이나 특정 조건을 반영하는 검증 로직은 어노테이션을 사용하여 구현이 어려움. 
+
+2. 서비스 로직에서 처리
+   > 복잡한 비즈니스 로직 검증이나 특정 조건에 맞는 검증 로직은 서비스 계층에서 처리하는 것을 권장.    
+     이는 유연성과 확장성을 높일 수 있음.
+   - 유연성
+     - 비즈니스 로직에서 필요한 추가 검증을 세밀하게 처리할 수 있습니다. 
+   - 분리된 책임
+     - DTO는 데이터를 표현하고 검증하는 데만 집중하고, 비즈니스 로직은 서비스 계층에서 별도로 처리할 수 있습니다. 각 계층의 책임이 명확하게 분리됩니다.
+   - 복잡한 검증 로직 처리
+     - DTO에 정의하기 힘든 복잡한 비즈니스 검증 로직을 서비스에서 처리할 수 있습니다.
+   - 검증 코드 중복
+     - 여러 서비스에서 동일한 검증을 반복적으로 작성할 경우 코드가 중복될 수 있습니다.
+   - 가독성 저하
+     - 서비스 로직이 커질 수 있으며, 검증 로직이 서비스 코드에 섞여 들어가면 가독성이 떨어질 수 있습니다.
+
+3. 사용자 정의 검증 어노테이션 생성
+   > 사용자 정의 검증 어노테이션을 사용하는 것은 복잡한 검증 로직을 DTO에서 처리하고 싶을 때 유용.   
+     이 방법은 여러 곳에서 재사용 가능.
+     DTO에 검증 로직을 명시적으로 포함시킬 수 있어 코드의 일관성을 높일 수 있음.
+   - 한 곳에서 검증 처리
+     - 검증 로직을 별도의 클래스로 분리할 수 있기 때문에 코드 중복을 줄일 수 있습니다. 또한, 여러 필드에 동일한 검증 로직을 재사용할 수 있습니다.
+   - DTO에서 검증 로직을 처리
+     - 검증을 DTO 내에서 처리하기 때문에, 클라이언트가 요청할 때 한 번에 데이터 검증을 완료할 수 있습니다. 이를 통해 서비스 로직이 더 깔끔해질 수 있습니다.
+   - 편리한 재사용성
+     - 복잡한 검증을 @Valid와 결합하여, 다른 DTO에서도 동일한 검증 로직을 재사용할 수 있습니다.
+   - 복잡성 증가
+     - 사용자 정의 어노테이션을 만들고, 검증 로직을 작성하는 데 시간이 소요됩니다. 또한, 너무 많은 사용자 정의 어노테이션이 존재하면 프로젝트가 복잡해질 수 있습니다.
+   - 제한된 검증
+     - DTO의 필드에 대해 간단한 유효성 검증은 @NotBlank, @Size 등의 내장 어노테이션을 사용하면 되지만, 비즈니스 로직에서 필요로 하는 복잡한 검증은 사용자 정의 어노테이션으로 처리하기 어려운 경우가 있을 수 있습니다.
+
+
+---
 ### < slack과 github 연동 >
 - 참고블로그 : https://sepiros.tistory.com/37
 

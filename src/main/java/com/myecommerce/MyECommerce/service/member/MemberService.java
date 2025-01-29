@@ -70,18 +70,6 @@ public class MemberService {
             throw new MemberException(ALREADY_REGISTERED_MEMBER);
         }
 
-        // 사용자명 validation check
-        // 글자수
-        if (ObjectUtils.isEmpty(member.getName().trim())
-                || member.getName().length() > 50) {
-            throw new MemberException(LIMIT_NAME_CHARACTERS_FROM_1_TO_50);
-        }
-        // 특수문자, 숫자 제외
-        String namePattern = "[^a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ]";
-        if(Pattern.matches(namePattern, member.getName())) {
-            throw new MemberException(ONLY_SUPPORT_ENGLISH_AND_KOREAN);
-        }
-
         // 비밀번호 validation check
         // 글자수
         if (ObjectUtils.isEmpty(member.getPassword().trim())
@@ -91,15 +79,8 @@ public class MemberService {
         }
 
         // 전화번호 validation check
-        String realPhoneNumber = member.getTelephone().trim().replaceAll("-", "");
-        // 휴대폰번호가 010,011,017,017,018,019로 시작하고 숫자만으로 총 10 또는 11자리인지 확인
-        String phonePattern = "^01[016789]\\d{7,8}$";
-
-        if (ObjectUtils.isEmpty(realPhoneNumber)
-                || !(Pattern.matches(phonePattern, realPhoneNumber))) {
-            throw new MemberException(INVALID_PHONE_NUMBER);
-        }
         // 전화번호 중복등록 체크
+        String realPhoneNumber = member.getTelephone().trim().replaceAll("-", "");
         Optional<Member> memberEntityIncludeTel =
                 memberRepository.findByTelephone(realPhoneNumber);
         if(!ObjectUtils.isEmpty(memberEntityIncludeTel)) {

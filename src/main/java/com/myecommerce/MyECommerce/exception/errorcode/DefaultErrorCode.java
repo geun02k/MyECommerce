@@ -8,8 +8,11 @@ import org.springframework.http.HttpStatus;
 @AllArgsConstructor
 public enum DefaultErrorCode implements CommonErrorCode {
 
-    // login validation check
-    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR.value(), "서버 오류입니다.\n관리자에게 문의하세요.")
+    // 서버 오류
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR.value(), "서버 오류입니다.\n관리자에게 문의하세요."),
+
+    // 유효성검증 오류
+    INVALID_VALUE(HttpStatus.BAD_REQUEST.value(), "유효하지않은 값입니다.")
     ;
 
     private final int statusCode; // http 상태코드

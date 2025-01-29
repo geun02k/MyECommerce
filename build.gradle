@@ -29,6 +29,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	// 스프링 시큐리티 사용을 위한 의존성 추가
 	implementation 'org.springframework.boot:spring-boot-starter-security'
+	// 필드에 대한 유효성검사 단순화를 위한 의존성 추가
+	implementation 'org.springframework.boot:spring-boot-starter-validation:3.4.1'
 	// 객체간 매핑을 위한 의존성 추가1
 	implementation 'org.mapstruct:mapstruct:1.6.3'
 

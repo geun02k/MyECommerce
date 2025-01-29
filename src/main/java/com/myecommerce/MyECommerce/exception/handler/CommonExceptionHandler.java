@@ -18,11 +18,11 @@ import static com.myecommerce.MyECommerce.exception.errorcode.DefaultErrorCode.I
 @ControllerAdvice
 public class CommonExceptionHandler {
 
-    @ExceptionHandler
+    /** 사용자정의예외 예외처리 **/
+    @ExceptionHandler(BaseAbstractException.class)
     protected ResponseEntity<CommonErrorResponse> commonHandler(BaseAbstractException e) {
         // 응답 객체 생성
         CommonErrorResponse errorResponse = CommonErrorResponse.builder()
-                .statusCode(e.getStatusCode())
                 .errorCode(e.getErrorCode())
                 .errorMessage(e.getErrorMessage())
                 .build();
@@ -46,7 +46,6 @@ public class CommonExceptionHandler {
 
         // 응답 객체 생성
         CommonErrorResponse errorResponse = CommonErrorResponse.builder()
-                .statusCode(errorCode.getStatusCode())
                 .errorCode(errorCode)
                 .errorMessage(errorCode.getErrorMessage() + defaultErrorMessage)
                 .build();
@@ -64,7 +63,6 @@ public class CommonExceptionHandler {
 
         // 응답 객체 생성
         CommonErrorResponse errorResponse = CommonErrorResponse.builder()
-                .statusCode(errorCode.getStatusCode())
                 .errorCode(errorCode)
                 .errorMessage(errorCode.getErrorMessage())
                 .build();

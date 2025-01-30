@@ -192,3 +192,41 @@
   https://hou27.tistory.com/entry/Spring-Boot-Spring-Security-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0-%EC%95%94%ED%98%B8%ED%99%94
 
 
+---
+### < JWT : Json Web Token >
+- 필수 참고 블로그   
+  https://hjpkotlin2024.tistory.com/68
+
+1. JWT
+   - 많이 사용하는 보안방식 중 하나.
+   - 보통은 송수신측에서 인증가능한 키들을 가지고 신뢰여부를 판단.
+   - 보통은 인증서 등을 통해 진행.
+   - JWT를 통해 로그인을 하고 아이디를 추출하도록 한다.
+
+2. JWT 토큰 구성
+   - 헤더
+   - 페이로드
+     - 일반적으로 키가 없어도 다른 사람들과 디코드 가능함.   
+       So, 중요 데이터는 담지 않는다.
+   - 시그니쳐
+
+3. 비밀키 생성
+   - JWT 토큰 생성 시 사용할 비밀키 생성.
+     - 토큰 생성시 HS512알고리즘 사용을 위해 -> 512비트(64바이트 이상)의 시크릿키 사용.   
+     - 평문을 사용하기보다는 base64로 인코딩한 값을 사용.   
+     - 터미널에서 생성가능.   
+       - 평문키 파일을 생성해 base64로 인코딩한 새파일 생성.
+       ~~~
+         C:\workspace\reservation\src\main\resources\token>certutil -encode jwt-secret-key.txt jwt_secret_key_encoding_b64   
+         입력 길이 = 49   
+         출력 길이 = 128   
+         CertUtil: -encode 명령이 성공적으로 완료되었습니다.   
+       ~~~
+     - 도움받은 블로그   
+       https://interconnection.tistory.com/120   
+
+4. application.yml에 환경변수설정 추가
+   - 설정한 변수 호출해 JWT 토큰 생성 시 사용가능.
+   - spring.jwt.secret-key: '생성한 비밀키 등록'
+
+

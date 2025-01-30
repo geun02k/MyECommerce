@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Collections;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -51,9 +52,7 @@ class MemberControllerTest {
                 .userId("sky")
                 .password("123456789")
                 .name("김하늘")
-                .tel1("010")
-                .tel2("1234")
-                .tel3("1234")
+                .telephone("01011112222")
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
                 .build();
         // 권한 설정
@@ -62,15 +61,13 @@ class MemberControllerTest {
         memberDto.setAuthorities(Collections.singletonList(authority));
 
         // when
-        when(memberService.saveMember(any(MemberDto.class)))
+        when(memberService.saveMember(any(MemberDto.class), anyList()))
                 .thenReturn(MemberDto.builder()
                         .id(1L)
                         .userId("sky")
                         .password("encode123456789")
                         .name("김하늘")
-                        .tel1("010")
-                        .tel2("1234")
-                        .tel3("1234")
+                        .telephone("01011112222")
                         .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
                         .delYn('N')
                         .authorities(Collections.singletonList(authority))
@@ -95,9 +92,7 @@ class MemberControllerTest {
                 .userId("sky")
                 .password("123456789")
                 .name("김하늘")
-                .tel1("010")
-                .tel2("1234")
-                .tel3("1234")
+                .telephone("01011112222")
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
                 .build();
         // 권한 설정
@@ -106,15 +101,13 @@ class MemberControllerTest {
         memberDto.setAuthorities(Collections.singletonList(authority));
 
         // when
-        when(memberService.saveMember(any(MemberDto.class)))
+        when(memberService.saveMember(any(MemberDto.class), anyList()))
                 .thenReturn(MemberDto.builder()
                         .id(1L)
                         .userId("sky")
                         .password("encode123456789")
                         .name("김하늘")
-                        .tel1("010")
-                        .tel2("1234")
-                        .tel3("1234")
+                        .telephone("01011112222")
                         .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
                         .delYn('N')
                         .authorities(Collections.singletonList(authority))

@@ -10,8 +10,6 @@ import lombok.*;
 @AllArgsConstructor
 public class CommonErrorResponse {
 
-    // HTTP 상태코드
-    private int statusCode;
     // 발생에러코드
     private CommonErrorCode errorCode;
     // 예외메세지

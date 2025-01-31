@@ -21,7 +21,12 @@ public enum MemberErrorCode implements CommonErrorCode {
     LIMIT_PASSWORD_CHARACTERS_FROM_8_TO_100(HttpStatus.BAD_REQUEST.value(), "비밀번호는 최소 8자 이상 최대 100자 이하입니다."),
 
     // 전화번호 validation check
-    ALREADY_REGISTERED_PHONE_NUMBER(HttpStatus.BAD_REQUEST.value(),  "이미 등록된 전화번호입니다.")
+    ALREADY_REGISTERED_PHONE_NUMBER(HttpStatus.BAD_REQUEST.value(),  "이미 등록된 전화번호입니다."),
+
+    // login validation check
+    USER_NOT_FOUND(HttpStatus.BAD_REQUEST.value(), "존재하지 않는 사용자입니다."),
+    MISMATCH_PASSWORD(HttpStatus.BAD_REQUEST.value(), "비밀번호가 일치하지 않습니다.")
+    ;
     ;
 
     private final int statusCode;

@@ -282,4 +282,40 @@ DB에서 공통코드, Enum 사이에서 가장 중요한 부분은 **얼마나 
 > 따라서 Mysql DB password 정보, JWT secret key는 민감정보임에도 불구하고 유료 api secret key 같은 정보가 아니므로 문제없다고 판단해 application.properties 파일에 작성하도록 한다.
 
 
+---
+### < 날짜 데이터 역직렬화 에러해결 >
+- 로그인 시 아래의 오류발생.    
+  로그인 시 JWT(Json Web Token) 토큰을 생성하는 과정에서 LocalDateTime 타입을 직렬화할 때 문제 발생.    
+  **JWT 토큰을 생성하려면 일반적으로 사용자 정보를 Claims 객체에 넣어 JSON 형태로 직렬화**하는데, 
+  이 과정에서 LocalDateTime 같은 Java 8의 날짜/시간 타입을 처리할 수 없어서 오류가 발생한 것.
+
+- Serialization(직렬화)
+  - 객체를 바이트 스트림이나 다른 저장 가능한 형식(JSON, XML)으로 변환하는 과정
+  - 직렬화의 목적은 객체를 메모리 내에서 외부로 내보내거나(저장) 외부에서 불러오는 것(복원).
+  
+- 발생에러   
+  (근데 데이터 반환을 회원가입때 하고 로그인 때는 토큰만 반환하는데 왜 로그인 때 에러가 났지..?)
+  - com.fasterxml.jackson.databind.exc.InvalidDefinitionException: Java 8 date/time type `java.time.LocalDateTime` not supported by default: add Module "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" to enable handling (through reference chain: io.jsonwebtoken.impl.DefaultClaims["roles"]->org.hibernate.collection.spi.PersistentBag[0]->com.shop.reservation.entity.MemberRole["createDate"])
+
+- 발생원인
+  - LocalDateTime 데이터타입은 바이트화(직렬화) 할 때 어떤 규칙으로 진행할 것인지 
+    Serialization에 대한 정의가 되어있지않아 발생한 에러. 
+    LocalDateTime에 대해 어떤 데이터 타입으로 직렬화, 역직렬화 할 것인지 따로 지정이 필요.
+
+- 해결방법
+  - 날짜타입의 직렬화 역직렬화를 위해 Entity에 아래의 어노테이션 추가   
+    @JsonSerialize(using = LocalDateTimeSerializer.class) // 직렬화   
+    @JsonDeserialize(using = LocalDateTimeDeserializer.class) // 역직렬화   
+    @JsonFormat(pattern = "yyyy-MM-dd kk-mm:ss") // 원하는 형태의 LocalDateTime 설정
+  - Dto가 아닌 Entity에서 해당 문제를 해결하는 이유   
+    - Entity에 설정을 추가하는 이유는 LocalDateTime이 엔티티 필드일 경우, 
+      해당 엔티티를 직접 JSON으로 변환하거나 직렬화/역직렬화할 때 발생할 수 있는 문제를 방지하기 위함이고 
+      이로인해 일관성 유지 가능.   
+      DTO는 데이터를 전달하는 역할이므로 LocalDateTime과 같은 날짜/시간 타입을 Entity에서 직렬화/역직렬화 하도록 설정하는 것이 더 일관적이고 효율적이며.
+
+
+- 참고 블로그   
+  https://justdo1tme.tistory.com/entry/Spring-Jackson-%EC%9D%B4%ED%95%B4-%EB%B0%8F-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0
+
+
 

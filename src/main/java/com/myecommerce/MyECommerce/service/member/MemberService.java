@@ -58,6 +58,22 @@ public class MemberService {
         return memberMapper.toDto(savedMember);
     }
 
+    /** 로그인 검증 */
+    public MemberDto authenticateMember(MemberDto memberDto) {
+        // 1. 사용자ID로 사용자 조회
+        Member member = memberRepository.findByUserId(memberDto.getUserId())
+                .orElseThrow(() -> new MemberException(USER_NOT_FOUND));
+
+        // 2. 비밀번호 검증
+        if(!passwordEncoder.matches(memberDto.getPassword(), member.getPassword())) {
+            throw new MemberException(MISMATCH_PASSWORD);
+        }
+
+        // 3. 회원정보 반환
+        return memberMapper.toDto(member);
+    }
+
+
     // 회원가입 validation check
     private void saveMemberValidationCheck(MemberDto member) {
         // 회원 객체 존재여부 validation check

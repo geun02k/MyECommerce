@@ -1,5 +1,6 @@
 package com.myecommerce.MyECommerce.controller;
 
+import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
 import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.service.member.MemberService;
@@ -19,6 +20,8 @@ import java.util.List;
 @RequestMapping("/member")
 @RequiredArgsConstructor
 public class MemberController {
+
+    private final JwtAuthenticationProvider jwtAuthenticationProvider;
 
     private final MemberService memberService;
 
@@ -55,6 +58,17 @@ public class MemberController {
     /**
      * 회원 로그인 post /member/signin
      **/
+    @PostMapping("/signin")
+    public ResponseEntity<String> signIn(@RequestBody MemberDto memberDto) {
+        // 1. 아이디, 패스워드 일치여부 확인
+        MemberDto authenticatedMember = memberService.authenticateMember(memberDto);
+
+        // 2. JWT 토큰 생성
+        String token = jwtAuthenticationProvider.createToken(authenticatedMember);
+
+        // 3. 토큰 반환
+        return ResponseEntity.ok(token);
+    }
 
     /**
      * 회원 조회 get /member

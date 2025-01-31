@@ -308,3 +308,33 @@
    - 참고 블로그      
      https://velog.io/@qkre/Spring-Security-%EB%B2%84%EC%A0%84-%EC%97%85-%EB%90%9C-%EC%8A%A4%ED%94%84%EB%A7%81-%EC%8B%9C%ED%81%90%EB%A6%AC%ED%8B%B0%EC%97%90%EC%84%9C-JWT-%EB%B0%9C%ED%96%89%ED%95%98%EA%B8%B0
 
+7. JWT 토큰생성 테스트코드 작성
+   - JWT를 파싱하여 그 안에 포함된 클레임(Claims) 을 추출하는 과정
+    3. JWT 파싱 및 검증 (Parsing and validating JWT)
+    - JWT 검증을 위해 **Jwts.parser()** 사용.
+    - JWT 토큰을 파싱하고 서명 및 유효성 검증.
+     ~~~
+     // JWT 파싱 및 서명 검증 예시
+     Claims claims = Jwts.parser()
+                         .setSigningKey(secretKey) // 서명 검증용 비밀 키
+                         .parseClaimsJws(jwt) // JWT 파싱
+                         .getBody(); // Claims 추출          
+     ~~~
+    1. Jwts.parser()
+        - Jwts는 JWT를 처리하는 라이브러리에서 제공하는 클래스로 JWT를 파싱할 때 사용.
+        - parser() 메서드는 JWT를 파싱할 준비를 하는 객체를 반환.
+    2. setSigningKey(decodedSecretKey)
+        - JWT의 서명을 검증하기 위해 사용되는 비밀 키(decodedSecretKey)를 설정.
+        - decodedSecretKey는 JWT가 유효한지 확인하는 데 필요.
+    3. build()
+        - build() 메서드는 Jwts.parser()로 생성한 JwtParser 객체를 최종적으로 생성.
+    4. parseClaimsJws(token)
+        - parseClaimsJws(token)는 주어진 token (JWT)을 파싱.
+        - JWT의 서명을 검증하고, 유효한 JWT라면 JWT의 본문(클레임)을 추출.
+    5. getBody()
+        - 파싱된 JWT에서 실제 데이터(클레임)를 추출.
+        - 클레임은 JWT에 담긴 정보들(예: 사용자 ID, 권한 등)을 나타냄.
+
+8. Spring Security에서 JWT 토큰을 사용한 인증.
+    - JWT 토큰을 이용해 접근제어권한을 확인한다.
+    - 로그인을 하지 않은 사람이 허용되지 않은 엔드포인드(api호출경로)에 접근하는 문제를 막는다.

@@ -204,18 +204,26 @@
    - JWT를 통해 로그인을 하고 아이디를 추출하도록 한다.
 
 2. JWT 토큰 구성
-   - 헤더
-   - 페이로드
-     - 일반적으로 키가 없어도 다른 사람들과 디코드 가능함.   
-       So, 중요 데이터는 담지 않는다.
-   - 시그니쳐
+   - 각 부분은 Base64 URL 인코딩된 문자열로 연결됨.
+   - . 으로 구분 ex) <header>.<payload>.<signature>
+   1. 헤더 (Header)
+      - 토큰의 유형 및 서명 알고리즘 정보.
+      - ex) HS256, RS256
+   2. 페이로드 (Payload)
+      - **실제 데이터나 클레임(Claims)**이 들어 있는 부분.
+      - 일반적으로 키가 없어도 다른 사람들과 디코드 가능함.   
+        So, 중요 데이터는 담지 않는다.
+      - ex) 사용자ID, 권한정보, 만료시간 등
+   3. 시그니쳐 (Signature, 서명)
+      - 데이터의 무결성을 확인하는 서명.
+      - 헤더와 페이로드를 비밀키로 서명해 무결성 보장.
 
-3. 비밀키 생성
-   - JWT 토큰 생성 시 사용할 비밀키 생성.
-     - 토큰 생성시 HS512알고리즘 사용을 위해 -> 512비트(64바이트 이상)의 시크릿키 사용.   
-     - 평문을 사용하기보다는 base64로 인코딩한 값을 사용.   
-     - 터미널에서 생성가능.   
-       - 평문키 파일을 생성해 base64로 인코딩한 새파일 생성.
+3. 비밀키 암호화
+   - JWT 토큰 생성 시 사용할 암호화된 비밀키 생성.
+     - 토큰 생성시 HS512알고리즘 사용을 위해 512비트(64바이트 이상)의 시크릿키 사용.   
+     - 보안을 위해 평문보다는 base64로 인코딩한 값을 사용.   
+     - 터미널에서 암호화된 문자열 생성가능.   
+       - 평문키 파일을 생성해 base64로 인코딩된 문자열을 포함한 새파일 생성.
        ~~~
          C:\workspace\reservation\src\main\resources\token>certutil -encode jwt-secret-key.txt jwt_secret_key_encoding_b64   
          입력 길이 = 49   
@@ -227,6 +235,76 @@
 
 4. application.yml에 환경변수설정 추가
    - 설정한 변수 호출해 JWT 토큰 생성 시 사용가능.
-   - spring.jwt.secret-key: '생성한 비밀키 등록'
+   - spring.jwt.secret-key: '암호화된 비밀키 등록'
 
+5. JWT 서명 검증을 위한 비밀키 생성 (JwtAuthenticationProvider.java)
+   - JWT 생성 시 사용할 비밀키 생성
+     - JWT 서명 검증을 위해 비밀키 생성 필요.
+     - 만약 비밀키로 사용할 문자열이 암호화된 상태라면 해당 문자열을 디코딩해 평문으로 변경해 준 뒤 사용해야 한다.
+       그리고 해당 평문키를 HMAC-SHA 알고리즘을 이용해 키를 생성해 사용한다.
+     ~~~
+     private SecretKey getDecodedSecretKey() {
+         byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY); //1
+         return Keys.hmacShaKeyFor(keyBytes); //2
+     }     
+     ~~~
+     1. secret key 문자열을 UTF-8 바이트 배열로 변환.
+     2. Keys.hmacShakeyFor() 메서드를 사용해서 HMAC-SHA 알고리즘에 맞는 키 객체 생성.
+     - 비밀키를 생성하는데 encoding이 아닌 decoding하는 이유
+       - 비밀키인 문자열이 이미 보안을 위한 base64로 암호화된 상태였다.   
+         이를 평문으로 변경하기 위해 base64로 디코딩하는 과정이 필요하기 때문이다.
+
+6. JWT 토큰생성 (JwtAuthenticationProvider.java)
+   - JWT
+     - 사용자 인증 및 데이터 전송을 위한 경량의 안전한 토큰 형식으로 사용됨.
+   - Jwts
+     - JWT 생성 및 검증을 도와주는 Java 라이브러리.
+     - JJWT(Java JWT Library) 라이브러리에서 제공하는 주요 클래스 중 하나.
+     - JWT의 생성, 서명, 파싱, 검증 등 쉽게 처리 가능.
+       1. JWT 생성 (Creating JWT)
+          - JWT 생성을 위해 **Jwts.builder()** 사용.
+          - JWT의 헤더, 페이로드, 서명 등 설정가능.
+          ~~~
+           // JWT 생성 예시
+           String jwt = Jwts.builder()
+                            .setSubject("user123") // 주제 (예: 사용자 ID)
+                            .setIssuedAt(new Date()) // 발급 시간
+                            .setExpiration(new Date(System.currentTimeMillis() + 3600000)) // 만료 시간 (1시간)
+                            .signWith(SignatureAlgorithm.HS256, secretKey) // // 서명 (HMAC SHA-256 알고리즘 이용해 서명)
+                            .compact(); // 최종적으로 JWT 문자열 생성
+          ~~~
+       2. JWT 서명 (Signing JWT)
+       3. JWT 파싱 및 검증 (Parsing and validating JWT)
+          - JWT 검증을 위해 **Jwts.parser()** 사용.
+          - JWT 토큰을 파싱하고 서명 및 유효성 검증.
+          ~~~
+            // JWT 파싱 및 서명 검증 예시
+            Claims claims = Jwts.parser()
+                    .setSigningKey(secretKey) // 서명 검증용 비밀 키
+                    .parseClaimsJws(jwt) // JWT 파싱
+                    .getBody(); // Claims 추출          
+          ~~~
+   - Claims
+     - JWT의 Payload 부분에 포함되며, 토큰이 담고 있는 실제 정보.
+     - 사용자의 아이디, 역할, 권한 등과 같은 중요한 데이터를 포함가능.
+     - 변경 불가능한 JSON Map.
+     - 한번 입력 후 getter()만 사용가능.
+     - signWith() 메서드는 지정된 키와 저장된 알고리즘을 사용해 토큰에 서명함.
+   ~~~
+    public String createToken(Long id, String userPk, List<MemberAuthority> authorities) {
+        Date now = new Date();
+
+        return Jwts.builder()
+                .claim("id", id)
+                .claim("userId", userPk)
+                .claim("authorities", authorities)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + TOKEN_VALID_TIME))
+                .signWith(getDecodedSecretKey())
+                .compact();
+    }
+   ~~~
+   
+   - 참고 블로그      
+     https://velog.io/@qkre/Spring-Security-%EB%B2%84%EC%A0%84-%EC%97%85-%EB%90%9C-%EC%8A%A4%ED%94%84%EB%A7%81-%EC%8B%9C%ED%81%90%EB%A6%AC%ED%8B%B0%EC%97%90%EC%84%9C-JWT-%EB%B0%9C%ED%96%89%ED%95%98%EA%B8%B0
 

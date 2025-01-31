@@ -1,6 +1,7 @@
 package com.myecommerce.MyECommerce.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import io.jsonwebtoken.Claims;
@@ -50,7 +51,7 @@ class JwtAuthenticationProviderTest {
     void successCreateTokenTest() {
         // given
         Long id = 1L;
-        String userPk = "testUser";
+        String userId = "testUser";
         String name = "테스트유저";
         List<MemberAuthority> authorities = Arrays.asList(
                 MemberAuthority.builder()
@@ -65,7 +66,12 @@ class JwtAuthenticationProviderTest {
         // when
         // 실제 토큰을 생성
         String token = jwtAuthenticationProvider.createToken(
-                id, userPk, name, authorities);
+                MemberDto.builder()
+                        .id(id)
+                        .userId(userId)
+                        .name(name)
+                        .authorities(authorities)
+                        .build());
         // System.out.println(token);
 
         // then
@@ -91,7 +97,7 @@ class JwtAuthenticationProviderTest {
 
         assertNotNull(token, "Token should not be null");
         assertEquals(String.valueOf(id), claims.getSubject()); // id
-        assertEquals(userPk, claims.get("userId").toString()); // userId
+        assertEquals(userId, claims.get("userId").toString()); // userId
         assertEquals(name, claims.get("name").toString()); // name
         assertEquals(1, authorityList.size());
         assertEquals(MemberAuthorityType.SELLER, authorityList.get(0).getAuthority());

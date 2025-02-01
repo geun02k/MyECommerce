@@ -363,6 +363,11 @@
   - JWT 토큰을 이용해 접근제어권한을 확인한다.
   - 로그인을 하지 않은 사람이 허용되지 않은 엔드포인드(api호출경로)에 접근하는 문제를 막는다.
 
+10. JWT 토큰과 세션
+    - JWT 토큰을 사용해 사용자 인증을 진행하는 경우 Session stateless 설정하는 이유.
+      - 참고 블로그   
+        https://mini-frontend.tistory.com/6
+        https://giron.tistory.com/17
 
 ---
 ### < 로그인 (최소한의) 인증 구현 >

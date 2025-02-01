@@ -74,7 +74,6 @@ class MemberServiceTest {
                 .name("김하늘")
                 .telephone("01011112222")
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
-                .authorities(memberAuthorityList)
                 .build();
 
         // 저장된 회원 DTO객체 생성

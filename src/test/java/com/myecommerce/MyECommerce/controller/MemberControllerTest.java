@@ -8,8 +8,10 @@ import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
-import org.mockito.Mockito;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -22,23 +24,21 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@ExtendWith(MockitoExtension.class)
 class MemberControllerTest {
-
-    private MemberService memberService;  // @Mock 대신 필드로 사용
-
-    @InjectMocks
-    private MemberController memberController;
 
     private MockMvc mockMvc;
 
     private ObjectMapper objectMapper;
 
+    @Mock
+    private MemberService memberService;
+
+    @InjectMocks
+    private MemberController memberController;
+
     @BeforeEach
-    void setUp() { // 객체생성
-        // Mockito.mock을 사용하여 mock 객체 생성
-        memberService = Mockito.mock(MemberService.class);
-        // InjectMocks로 Controller에 mock 객체 주입
-        memberController = new MemberController(memberService);
+    void setUp() {
         objectMapper = new ObjectMapper();
         mockMvc = MockMvcBuilders.standaloneSetup(memberController).build();
     }
@@ -97,7 +97,6 @@ class MemberControllerTest {
         // 권한 설정
         MemberAuthority authority = new MemberAuthority();
         authority.setAuthority(MemberAuthorityType.CUSTOMER);
-        memberDto.setAuthorities(Collections.singletonList(authority));
 
         // when
         when(memberService.saveMember(any(MemberDto.class), anyList()))

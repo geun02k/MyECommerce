@@ -4,6 +4,7 @@ import com.myecommerce.MyECommerce.exception.BaseAbstractException;
 import com.myecommerce.MyECommerce.exception.errorcode.DefaultErrorCode;
 import com.myecommerce.MyECommerce.exception.errorcode.SpringSecurityErrorCode;
 import com.myecommerce.MyECommerce.exception.model.CommonErrorResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -20,6 +21,7 @@ import static com.myecommerce.MyECommerce.exception.errorcode.DefaultErrorCode.I
 import static com.myecommerce.MyECommerce.exception.errorcode.SpringSecurityErrorCode.ACCESS_DENIED;
 import static com.myecommerce.MyECommerce.exception.errorcode.SpringSecurityErrorCode.INVALID_TOKEN;
 
+@Slf4j
 @ControllerAdvice
 public class CommonExceptionHandler {
 
@@ -31,6 +33,8 @@ public class CommonExceptionHandler {
                 .errorCode(e.getErrorCode())
                 .errorMessage(e.getErrorMessage())
                 .build();
+
+        log.error(e.getErrorMessage(), e);
 
         // 응답 객체 반환
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
@@ -55,6 +59,8 @@ public class CommonExceptionHandler {
                 .errorMessage(errorCode.getErrorMessage() + defaultErrorMessage)
                 .build();
 
+        log.error(errorCode.getErrorMessage(), e);
+
         // 응답 객체 반환
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
         return new ResponseEntity<>(errorResponse,
@@ -74,6 +80,8 @@ public class CommonExceptionHandler {
                 .errorCode(errorCode)
                 .errorMessage(errorCode.getErrorMessage())
                 .build();
+
+        log.error(errorCode.getErrorMessage(), e);
 
         // 응답 객체 반환
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
@@ -95,6 +103,8 @@ public class CommonExceptionHandler {
                 .errorMessage(errorCode.getErrorMessage())
                 .build();
 
+        log.error(errorCode.getErrorMessage(), e);
+
         // 응답 객체 반환
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
         return new ResponseEntity<>(errorResponse,
@@ -112,6 +122,8 @@ public class CommonExceptionHandler {
                 .errorCode(errorCode)
                 .errorMessage(errorCode.getErrorMessage())
                 .build();
+
+        log.error(errorCode.getErrorMessage(), e);
 
         // 응답 객체 반환
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.

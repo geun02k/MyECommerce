@@ -424,3 +424,32 @@
       - 참고 블로그   
         https://loginshin.tistory.com/98
 
+
+---
+### < 권한과 역할 >
+1. 역할 (Role)
+   - 일반적으로 사용자가 수행할 수 있는 "대분류" 작업으로 권한을 포함하는 상위개념.   
+     ex) ADMIN, USER, MANAGER  // ADMIN은 USER 관련 권한을 포함할 수 있음.
+   - Spring Security에서 ROLE_ 접두사를 붙여 사용하는 것이 일반적.    
+     ex) ROLE_ADMIN, ROLE_USER
+
+2. 권한 (Authority)
+   - 사용자가 시스템 내에서 **"구체적으로 할 수 있는 작업"**으로 세부 권한을 나타냄.    
+     ex) READ_PRIVILEGES, WRITE_PRIVILEGES, DELETE_PRIVILEGES
+
+- 따라서 접근 권한을 허용하기 위해 hasAnyRole(), hasAnyAuthority() 처럼 두 가지의 메서드가 존재하는 것.
+
+
+---
+### < 인증관 권한에 대한 HTTP 상태코드 >
+1. 401 Unauthorized(인증되지않음)
+   - 요청을 처리하기 위해 사용자가 인증을 받아야함을 의미.
+   - 클라이언트가 인증을 제공하지 않았거나 잘못된 인증 정보를 제공했을 때 반환.
+
+2. 403 Forbidden(접근금지됨)
+   - 사용자가 인증되었어도 해당 요청을 수행할 권한이 없음을 의미.
+   - 서버는 요청을 받았지만 특정 리소스에 대한 엑세스를 거부.
+
+
+---
+

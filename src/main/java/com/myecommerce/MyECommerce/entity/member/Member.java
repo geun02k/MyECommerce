@@ -50,13 +50,13 @@ public class Member extends BaseEntity implements UserDetails {
     // 사용자 권한 데이터 member_authority 테이블 join해서 가져옴.
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "member")
     @JsonManagedReference
-    private List<MemberAuthority> authorities; // 사용자가 여러 권한을 가질 수 있음.
+    private List<MemberAuthority> roles; // 사용자가 여러 권한을 가질 수 있음.
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         // authorities 정보를 SimpleGrantedAuthority로 매핑
         // -> 스프링 시큐리티에서 지원하는 role 관련기능을 쓰기 위함.
-        return this.authorities.stream()
+        return this.roles.stream()
                 .map((MemberAuthority authority) ->
                         new SimpleGrantedAuthority(authority.getAuthority().toString()))
                 .collect(Collectors.toList());

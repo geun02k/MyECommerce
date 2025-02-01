@@ -37,7 +37,7 @@ public class JwtAuthenticationProvider {
                 .subject(String.valueOf(member.getId()))
                 .claim("userId", member.getUserId())
                 .claim("name", member.getName())
-                .claim("authorities", member.getAuthorities())
+                .claim("roles", member.getRoles())
                 .issuedAt(now) // 발급시간
                 .expiration(new Date(now.getTime() + TOKEN_VALID_TIME)) // 만료시간
                 .signWith(getDecodedSecretKey()) // 서명 (HMAC SHA-256 알고리즘 이용해 서명)

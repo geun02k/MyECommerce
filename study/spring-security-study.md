@@ -358,3 +358,64 @@
   }
   ~~~
 
+
+---
+### < 로그인 (최소한의) 인증 구현 >
+1. 사용자 Entity 생성 (Member.java)
+   - 사용자 인증 시 사용할 Entity.
+   - UserDetails 인터페이스
+     - Spring Security에서 사용자 인증과 관련된 정보를 제공하는 인터페이스.
+     - 스프링 시큐리티 기능 사용을 위해 UserDetails 인터페이스 구현필요.
+     - 사용자에 대한 정보를 Spring Security에서 사용할 수 있는 형대로 제공.
+     - 사용자 이름, 비밀번호, 권한(roles) 등을 포함.
+     - Spring Security에서 인증을 처리할 때, 
+       사용자 정보를 제공하는 UserDetails 객체는 
+       UserDetailsService의 loadUserByUsername() 메서드를 통해 로드됩니다. 
+     - UserDetails 인터페이스를 구현한 객체는 Authentication 객체의 일부분으로 사용되어 인증 정보를 담고있음.
+     - UserDetails 인터페이스는 인증된 사용자에 대한 정보를 반환하는 여러 메서드를 제공
+   - UserDetails 인터페이스 주요메서드
+     - getAuthorities()
+       - 사용자에게 부여된 권한(roles)을 반환.
+       - GrantedAuthority 객체의 컬렉션을 반환.
+     - 
+2. 사용자 인증 service (MemberService.java)
+   - DB에 사용자 존재여부, 비밀번호 일치여부 확인 완료 시 로그인 토큰 반환.
+   - UserDetailsService 인터페이스
+     - 스프링 시큐리티 기능 사용을 위해 UserDetailsService 인터페이스 구현.
+     - UserDetailsService는 UserDetails 인터페이스를 사용하여 인증된 사용자를 로드하고, AuthenticationManager는 이 정보를 바탕으로 인증을 수행
+   - loadUserByUsername()
+     - 스프링 시큐리티 기능을 사용하기위한 필수구현 메서드
+   - 반환타입 UserDetails 
+     - memberRepository.findByUserId() 의 반환타입은 Optional<MemberEntity>이다.
+     - 반환값이 null이 아니면 MemberEntity 타입으로 값을 반환한다.
+     - Member Entity는 UserDetails 인터페이스의 구현체이므로 
+       loadUserByUsername() 메서드는 다형성에 의해 MemberEntity 타입으로도 반환가능.
+     - username은 회원아이디(회원구분식별데이터)로 간주한다.
+       - 참고 블로그    
+         https://velog.io/@jyyoun1022/SpringSpring-Security%EB%A5%BC-%EC%9D%B4%EC%9A%A9%ED%95%9C-%EB%A1%9C%EA%B7%B8%EC%9D%B8%EC%B2%98%EB%A6%AC-5
+   
+
+3. 인증 Filter (JwtAuthenticationFilter.java)
+   - 인증 필터를 통해 토큰의 유효성을 확인.
+   - OncePerRequestFilter 필터를 상속해 생성.
+     - 해당 필터를 상속해 정의해주면 모든 요청이 올 때 마다 (한 요청당 한 번) 필터 실행.
+   - doFilterInternal() 메서드 필수구현.
+   - 사용자가 signup, signin api를 호출했을 때 바로 해당 컨트롤러로 요청이 들어오는 것은 아니다.   
+     컨트롤러로 요청이 들어오기 전에 제일 먼저 필터를 거치게 된다.   
+     ( 컨트롤러 요청 -> 필터 -> 서블릿 -> 인터셉터 -> aop layer를 거친 후 컨트롤러 호출.
+     응답을 내보낼 때는 위의 과정을 반대로 거쳐 내보낸다. )
+     OncePerRequestFilter를 상속했기에 요청이 들어올 때 마다 매번 해당 필터를 실행하게 된다.
+     따라서 컨트롤러 실행 전의 request, 컨트롤러 실행 후 응답 시 response를 가공 가능.   
+     So, 컨트롤러에 요청이 들어올 때 마다 사용자토큰의 포함여부, 유효성 여부 등 확인가능.
+  - UsernamePasswordAuthenticationToken 클래스
+    - 사용자이름, 비밀번호를 기반으로 사용자 인증을 처리하는 역할을 수행.
+    - 주로 사용자 인증 정보를 캡슐화하고 인증 프로세스 중에 사용됨.
+    - 주요 목적   
+      - 사용자로부터 입력받은 사용자이름, 비밀번호롤 AuthenticationManager에 전달해 인증을 수행.
+    - 주요 필드
+      - principal : 사용자이름
+      - credentials : 비밀번호
+      - authorities : 사용자권한
+      - 참고 블로그   
+        https://loginshin.tistory.com/98
+

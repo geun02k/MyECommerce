@@ -313,9 +313,56 @@ DB에서 공통코드, Enum 사이에서 가장 중요한 부분은 **얼마나 
       이로인해 일관성 유지 가능.   
       DTO는 데이터를 전달하는 역할이므로 LocalDateTime과 같은 날짜/시간 타입을 Entity에서 직렬화/역직렬화 하도록 설정하는 것이 더 일관적이고 효율적이며.
 
-
 - 참고 블로그   
   https://justdo1tme.tistory.com/entry/Spring-Jackson-%EC%9D%B4%ED%95%B4-%EB%B0%8F-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0
 
+
+---
+### < JWT 토큰인증필터 추가 시 순환참조 오류발생 >
+1. 발생오류
+   - Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+     2025-02-01T21:44:22.568+09:00 ERROR 22252 --- [MyECommerce] [           main] o.s.b.d.LoggingFailureAnalysisReporter   :
+    ***************************
+    APPLICATION FAILED TO START
+    *************************** 
+    Description:
+    The dependencies of some of the beans in the application context form a cycle:
+    ┌─────┐
+    |  jwtAuthenticationFilter defined in file [C:\workspace\MyECommerce\build\classes\java\main\com\myecommerce\MyECommerce\security\filter\JwtAuthenticationFilter.class]
+    ↑     ↓
+    |  jwtAuthenticationProvider defined in file [C:\workspace\MyECommerce\build\classes\java\main\com\myecommerce\MyECommerce\config\JwtAuthenticationProvider.class]
+    ↑     ↓
+    |  memberService defined in file [C:\workspace\MyECommerce\build\classes\java\main\com\myecommerce\MyECommerce\service\member\MemberService.class]
+    ↑     ↓
+    |  securityConfig defined in file [C:\workspace\MyECommerce\build\classes\java\main\com\myecommerce\MyECommerce\config\SecurityConfig.class]
+    └─────┘
+    Action:
+    Relying upon circular references is discouraged and they are prohibited by default. Update your application to remove the dependency cycle between beans. As a last resort, it may be possible to break the cycle automatically by setting spring.main.allow-circular-references to true.
+    Disconnected from the target VM, address: '127.0.0.1:60863', transport: 'socket'
+    Process finished with exit code 1
+    
+2. 발생원인
+   - **JwtAuthenticationFilter**가 토큰 유효성 검사 및 JWT 토큰 정보를 스프링 시큐리티 인증정보로 변환하기 위해 JwtAuthenticationProvider를 의존하고 있습니다.
+   - **JwtAuthenticationProvider**는 JWT 토큰 정보를 스프링 시큐리티 인증정보로 변환을 위한 사용자조회(loadUserByUsername())를 위해 MemberService를 의존하고 있습니다.
+   - **MemberService**는 비밀번호 암호화를 위해 SecurityConfig에서 빈으로 정의해 등록한 passwordEncoder()를 사용하고 있기에 간접적으로 SecurityConfig를 의존하고 있습니다.
+     > MemberService의 의존관계를 확인해보면 아래의 4가지에 의존적이다.
+     > 
+     > private final PasswordEncoder passwordEncoder;
+     > private final MemberMapper memberMapper;
+     > private final MemberRepository memberRepository;
+     > private final MemberAuthorityRepository memberAuthorityRepository;
+     > 
+     > 확인해보면 SecurityConfig를 직접적으로 참조하거나 주입하는 부분은 없다.
+     > 하지만 MemberService와 SecurityConfig 간의 간접적인 관계는 있을 수 있다.
+     > 실제로 PasswordEncoder를 SecurityConfig에서 정의하고 빈등록하였기에 간접적으로 참조하는 것으로 보여진다.
+   - **SecurityConfig**는 JWT토큰인증을 위해 .addFilterBefore() 메서드를 통해 jwtAuthenticationFilter 필터를 추가하기 위해 다시 JwtAuthenticationFilter를 의존하고 있습니다.
+   - 이러한 의존성 구조는 순환 참조로, Spring이 bean을 초기화할 수 없게 만듭니다.
+
+3. 해결방법
+   - 위의 순환관계를 끊어내기 위해 의존관게 재구성이 필요.
+   - 기존 MemberService를 UserDetailsService 인터페이스를 구현하도록 했다.
+   - 하지만 위의 순환참조가 발생하여 UserDetailsService 인터페이스의 구현체가 PasswordEncoder를 의존하지 않도록 분리가 필요하다.
+   - 따라서 MemberService는 UserDetailsService를 구현하지 않고 SignInAuthenticationService를 신규 생성해 UserDetailsService를 구현한다.
+   - 그러면 JwtAuthenticationProvider에서 loadUserByUsername() 호출 시 MemberService가 아닌 SignInAuthenticationService에 의존하므로 순환관계가 끊긴다.
 
 

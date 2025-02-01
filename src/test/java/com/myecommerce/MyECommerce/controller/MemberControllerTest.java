@@ -79,7 +79,7 @@ class MemberControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.password").value("encode123456789"))
-                .andExpect(jsonPath("$.authorities[0].authority").value("SELLER"));
+                .andExpect(jsonPath("$.roles[0].authority").value("SELLER"));
     }
 
     @Test
@@ -118,6 +118,6 @@ class MemberControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.password").value("encode123456789"))
-                .andExpect(jsonPath("$.authorities[0].authority").value("CUSTOMER"));
+                .andExpect(jsonPath("$.roles[0].authority").value("CUSTOMER"));
     }
 }

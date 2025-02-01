@@ -70,7 +70,7 @@ class JwtAuthenticationProviderTest {
                         .id(id)
                         .userId(userId)
                         .name(name)
-                        .authorities(authorities)
+                        .roles(authorities)
                         .build());
         // System.out.println(token);
 
@@ -87,7 +87,7 @@ class JwtAuthenticationProviderTest {
         ObjectMapper objectMapper = new ObjectMapper();
         // claims.get("authorities")는 List<Map> 형태일 것으로 예상
         List<Map<String, Object>> authoritiesMaps =
-                (List<Map<String, Object>>) claims.get("authorities");
+                (List<Map<String, Object>>) claims.get("roles");
         // List<Map<String, Object>> -> List<MemberAuthority>로 변환
         List<MemberAuthority> authorityList =
                 objectMapper.convertValue(authoritiesMaps,

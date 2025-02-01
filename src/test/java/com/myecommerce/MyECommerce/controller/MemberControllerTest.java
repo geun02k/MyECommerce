@@ -58,7 +58,6 @@ class MemberControllerTest {
         // 권한 설정
         MemberAuthority authority = new MemberAuthority();
         authority.setAuthority(MemberAuthorityType.SELLER);
-        memberDto.setAuthorities(Collections.singletonList(authority));
 
         // when
         when(memberService.saveMember(any(MemberDto.class), anyList()))
@@ -70,7 +69,7 @@ class MemberControllerTest {
                         .telephone("01011112222")
                         .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
                         .delYn('N')
-                        .authorities(Collections.singletonList(authority))
+                        .roles(Collections.singletonList(authority))
                         .build());
 
         // then
@@ -110,7 +109,7 @@ class MemberControllerTest {
                         .telephone("01011112222")
                         .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
                         .delYn('N')
-                        .authorities(Collections.singletonList(authority))
+                        .roles(Collections.singletonList(authority))
                         .build());
 
         // then

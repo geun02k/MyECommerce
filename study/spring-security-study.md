@@ -452,4 +452,42 @@
 
 
 ---
+### < 인증, 권한 관련 예외처리 >
+스프링 시큐리티에서 인증 및 인가 과정 중 예외가 발생했을 때, 일반적으로 IDEA의 콘솔 창에 예외가 출력되지 않는다.
+스프링 시큐리티가 자체적으로 예외를 처리하고, 이를 클라이언트에게 적절한 HTTP 응답 코드와 메시지로 반환하기 때문이다.
+
+이에 불편함을 느껴 스프링 시큐리티에서 발생하는 예외를 CommonExceptionHandler.class에서 처리할 수 있도록 변경하고자 한다.
+
+- 참고 블로그
+  https://backend-jaamong.tistory.com/169
+
+1. AuthenticationEntryPoint 인터페이스
+   - 인증되지 않은 사용자가 인증이 필요한 endpoint(api url)로 접근 시 발생하는
+   - 401 Unauthorized 예외처리할 수 있도록 도움. 
+   - commence()
+     - 인증되지 않은 요청 발생 시 호출되는 메서드.
+     - 예외처리를 직접 수행하지 않고 HandlerExceptionResolver로 넘긴다.
+
+2. AccessDeniedHandler 인터페이스
+   - 권한이 없는 사용자가 권한이 필요한 endpoint로 접근 시 발생하는
+   - 403 Forbidden 예외를 처리할 수 있도록 도움.
+   - handle()
+     - 권한이 없는 요청이 발생했을 때 호출되는 메서드.
+     - 예외를 직접 처리하지 않고 HandlerExceptionResolver로 넘긴다.
+
+3. HandlerExceptionResolver 인터페이스
+   - Spring Security 영역이 아닌 Spring MVC 영역에 속해있는 컴포넌트.
+   - 스프링 MVC에서 HandlerExceptionResolver는 
+     DispatcherServlet의 HandlerExceptionResolver 체인(예외처리체인)에 등록되어있다.
+   - 이 체인은 컨트롤러 영역에서 발생한 예외를 처리하는 역할을 한다.
+   - 따라서 위의 **두 스프링 시큐리티 핸들러는 결국 스프링 MVC의 HandlerExceptionResolver를 호출해** 
+     **컨트롤러에서 예외를 처리할 수 있도록 한다.**
+   ~~~
+   handlerExceptionResolver.resolveException(request, response, null, accessDeniedException);
+   ~~~
+   - 위와 같이 handler = null 로 전달하면 ExceptionHandler를 찾아 실행한다.   
+     만약 처리할 수 있는 ExceptionResolver가 없으면 예외처리를 수행하지 않고 기존 발생한 예외를 서블릿 밖으로 던진다.   
+     즉, null을 인자로 전달하면 @RestControllerAdvice, @ExceptionHandler를 사용하는 클래스에서 예외처리가 가능해진다.
+
+
 

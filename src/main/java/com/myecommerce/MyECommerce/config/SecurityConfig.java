@@ -1,5 +1,7 @@
 package com.myecommerce.MyECommerce.config;
 
+import com.myecommerce.MyECommerce.security.exception.handler.CustomAccessDeniedHandler;
+import com.myecommerce.MyECommerce.security.exception.handler.CustomAuthenticationEntryPoint;
 import com.myecommerce.MyECommerce.security.filter.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -20,6 +22,10 @@ public class SecurityConfig {
     // JWT 를 이용한 인증을 위한 필터
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    // 스프링 시큐리티 인증,인가 예외처리 핸들러
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+    private final CustomAccessDeniedHandler customAccessDeniedHandler;
+
     /** 인증관련설정: 자원별 접근권한 설정 */
     @Bean
     protected SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -36,7 +42,13 @@ public class SecurityConfig {
                             .anyRequest().authenticated())
                 // ID, Password 기반 유저 인증 처리하는 UsernamePasswordAuthenticationFilter 필터 호출 전에
                 // jwt 토큰  -> 시큐리티 컨텍스트 인증정보로 변환을 위한 사용자정의 jwtAuthenticationFilter 필터 추가.
-                .addFilterBefore(this.jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(this.jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+
+                // 스프링 시큐리티 예외처리
+                .exceptionHandling(exception ->
+                        exception
+                                .authenticationEntryPoint(this.customAuthenticationEntryPoint)
+                                .accessDeniedHandler(this.customAccessDeniedHandler));
 
         return http.build();
     }

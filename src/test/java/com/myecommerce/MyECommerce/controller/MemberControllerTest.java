@@ -58,7 +58,6 @@ class MemberControllerTest {
         // 권한 설정
         MemberAuthority authority = new MemberAuthority();
         authority.setAuthority(MemberAuthorityType.SELLER);
-        memberDto.setAuthorities(Collections.singletonList(authority));
 
         // when
         when(memberService.saveMember(any(MemberDto.class), anyList()))
@@ -98,7 +97,6 @@ class MemberControllerTest {
         // 권한 설정
         MemberAuthority authority = new MemberAuthority();
         authority.setAuthority(MemberAuthorityType.CUSTOMER);
-        memberDto.setAuthorities(Collections.singletonList(authority));
 
         // when
         when(memberService.saveMember(any(MemberDto.class), anyList()))

@@ -257,56 +257,38 @@
 6. JWT 토큰생성 (JwtAuthenticationProvider.java)
    - JWT
      - 사용자 인증 및 데이터 전송을 위한 경량의 안전한 토큰 형식으로 사용됨.
+   
    - Jwts
      - JWT 생성 및 검증을 도와주는 Java 라이브러리.
      - JJWT(Java JWT Library) 라이브러리에서 제공하는 주요 클래스 중 하나.
      - JWT의 생성, 서명, 파싱, 검증 등 쉽게 처리 가능.
-       1. JWT 생성 (Creating JWT)
-          - JWT 생성을 위해 **Jwts.builder()** 사용.
-          - JWT의 헤더, 페이로드, 서명 등 설정가능.
-          ~~~
-           // JWT 생성 예시
-           String jwt = Jwts.builder()
-                            .setSubject("user123") // 주제 (예: 사용자 ID)
-                            .setIssuedAt(new Date()) // 발급 시간
-                            .setExpiration(new Date(System.currentTimeMillis() + 3600000)) // 만료 시간 (1시간)
-                            .signWith(SignatureAlgorithm.HS256, secretKey) // // 서명 (HMAC SHA-256 알고리즘 이용해 서명)
-                            .compact(); // 최종적으로 JWT 문자열 생성
-          ~~~
-       2. JWT 서명 (Signing JWT)
-       3. JWT 파싱 및 검증 (Parsing and validating JWT)
-          - JWT 검증을 위해 **Jwts.parser()** 사용.
-          - JWT 토큰을 파싱하고 서명 및 유효성 검증.
-          ~~~
-            // JWT 파싱 및 서명 검증 예시
-            Claims claims = Jwts.parser()
-                    .setSigningKey(secretKey) // 서명 검증용 비밀 키
-                    .parseClaimsJws(jwt) // JWT 파싱
-                    .getBody(); // Claims 추출          
-          ~~~
-   - Claims
-     - JWT의 Payload 부분에 포함되며, 토큰이 담고 있는 실제 정보.
-     - 사용자의 아이디, 역할, 권한 등과 같은 중요한 데이터를 포함가능.
-     - 변경 불가능한 JSON Map.
-     - 한번 입력 후 getter()만 사용가능.
-     - signWith() 메서드는 지정된 키와 저장된 알고리즘을 사용해 토큰에 서명함.
-   ~~~
-    public String createToken(Long id, String userPk, List<MemberAuthority> authorities) {
-        Date now = new Date();
 
-        return Jwts.builder()
-                .claim("id", id)
-                .claim("userId", userPk)
-                .claim("authorities", authorities)
-                .issuedAt(now)
-                .expiration(new Date(now.getTime() + TOKEN_VALID_TIME))
-                .signWith(getDecodedSecretKey())
-                .compact();
-    }
-   ~~~
-   
-   - 참고 블로그      
-     https://velog.io/@qkre/Spring-Security-%EB%B2%84%EC%A0%84-%EC%97%85-%EB%90%9C-%EC%8A%A4%ED%94%84%EB%A7%81-%EC%8B%9C%ED%81%90%EB%A6%AC%ED%8B%B0%EC%97%90%EC%84%9C-JWT-%EB%B0%9C%ED%96%89%ED%95%98%EA%B8%B0
+  - Claims
+    - JWT의 Payload 부분에 포함되며, 토큰이 담고 있는 실제 정보.
+    - 사용자의 아이디, 역할, 권한 등과 같은 중요한 데이터를 포함가능.
+    - 변경 불가능한 JSON Map.
+    - 한번 입력 후 getter()만 사용가능.
+    
+  - JWT 생성 및 서명 (Creating JWT, Signing JWT)
+    - JWT 생성을 위해 **Jwts.builder()** 사용.
+    - JWT의 헤더, 페이로드, 서명 등 설정가능.
+    ~~~
+     // JWT 생성 예시
+     String jwt = Jwts.builder()
+                     .subject(String.valueOf(id)) // 주제 (예: 사용자 ID)
+                     .claim("userId", userPk)
+                     .claim("name", name)
+                     .claim("authorities", authorities)
+                     .issuedAt(now) // 발급시간
+                     .expiration(new Date(now.getTime() + TOKEN_VALID_TIME)) // 만료시간
+                     .signWith(getDecodedSecretKey()) // 서명 (HMAC SHA-256 알고리즘 이용해 서명)
+                     .compact(); // 최종적으로 JWT 문자열 생성
+    ~~~
+     1. signWith() 
+        - 지정된 키와 저장된 알고리즘을 사용해 토큰에 서명함.
+         
+  - 참고 블로그      
+    https://velog.io/@qkre/Spring-Security-%EB%B2%84%EC%A0%84-%EC%97%85-%EB%90%9C-%EC%8A%A4%ED%94%84%EB%A7%81-%EC%8B%9C%ED%81%90%EB%A6%AC%ED%8B%B0%EC%97%90%EC%84%9C-JWT-%EB%B0%9C%ED%96%89%ED%95%98%EA%B8%B0
 
 7. JWT 토큰생성 테스트코드 작성
    - JWT를 파싱하여 그 안에 포함된 클레임(Claims) 을 추출하는 과정

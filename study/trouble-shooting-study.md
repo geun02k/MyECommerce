@@ -223,3 +223,146 @@ DB에서 공통코드, Enum 사이에서 가장 중요한 부분은 **얼마나 
 
 
 ---
+### < 노출되면 안되는 정보 관리 방법 결정 >
+1. 환경 변수 사용 
+   - 코드베이스에서 민감한 정보를 직접 다루지 않기 때문에 코드가 노출되어도 비밀 정보가 유출되지 않습니다. 
+   - 설정 파일을 통한 노출을 방지하고, **환경에 따라 다르게 설정 가능**합니다.
+   - 서버의 접근 권한을 통해 환경 변수를 볼 수 있는 위험이 있으며, 관리하는 서버(운영 체제)에 대한 보안이 중요합니다.
+   - Java에서는 System.getenv("VARIABLE_NAME")를 사용하여 환경 변수 값을 읽을 수 있습니다.
+   
+2. 보안 파일 또는 키 관리 서비스 사용 
+   - 클라우드 제공자들(AWS, GCP, Azure 등)은 비밀 키를 안전하게 관리할 수 있는 서비스들을 제공합니다.   
+     (민감한 정보를 안전하게 저장하고 관리할 수 있으며, 필요한 경우에만 접근할 수 있도록 설정가능.)
+   - 이 방법은 여러 가지 보안 장치가 적용되어 있어 매우 안전합니다.
+     - 자동화된 관리: 비밀번호, API 키, 인증서와 같은 민감한 데이터를 안전하게 저장하고, 애플리케이션에서 이를 동적으로 로드할 수 있습니다.
+     - 암호화: 비밀 정보를 자동으로 암호화하여 저장합니다. 또한, 복호화 키를 안전하게 관리하고, 비밀 데이터에 대한 액세스를 제어할 수 있습니다.
+     - 접근 제어: 각 애플리케이션이나 사용자에게 특정 비밀 정보에 대한 액세스를 제어할 수 있으며, 최소 권한 원칙(least privilege)을 따를 수 있습니다.
+     - 자동화된 로테이션: 비밀번호나 API 키와 같은 민감한 정보의 주기를 설정하여 자동으로 교체할 수 있습니다.
+     - 감사 로그: 언제, 누가, 어떤 정보에 접근했는지에 대한 감사 로그를 자동으로 기록합니다.
+   - ex) AWS의 Secrets Manager, Azure Key Vault 등
+
+3. 암호화
+   - application.properties 파일은 코드베이스에 포함되기 때문에 민감한 정보를 저장하는 것은 보안상 좋지 않습니다.
+   - 소스 코드가 외부에 노출되거나 관리되지 않은 상태에서 해당 정보가 유출될 수 있기에 보안상 좋지 않습니다.
+   - 만약 application.properties에 저장할 수밖에 없다면, 해당 정보를 암호화하여 저장하고, 프로그램 실행 중에 복호화하는 방법을 사용할 수 있습니다.
+   - 암호화된 설정 파일을 사용하는 방법도 가능하지만, 이 방법은 관리가 복잡하고 키 관리가 제대로 이루어지지 않으면 여전히 안전하지 않을 수 있습니다.    
+     또한 암호화된 파일을 읽을 수 있는 애플리케이션이 필요하고, 그 암호화 키가 유출되지 않도록 관리해야 하기 때문입니다.
+
+4. **Spring Boot의 @Value와 application.yml 활용**
+   - Spring Boot에서는 application.yml이나 application.properties 대신, 보안 정보를 환경 변수나 외부 시스템에서 읽어오는 방식을 사용할 수 있습니다.
+   - 결론적으로, application.properties 파일에 민감한 정보를 저장하는 것은 피하고, 외부 환경 변수나 보안 시스템을 활용하는 것이 더 안전합니다.
+   - **application.properties 파일은 일반적으로 개발 환경에서 사용됩니다.**
+   - 운영 환경에서는 민감한 정보가 다른 방법으로 관리되어야 합니다.   
+     예를 들어, 운영 환경에서는 클라우드 비밀 관리 서비스나 환경 변수 등을 사용하여 민감한 정보를 관리하는 것이 더 안전합니다.
+   - 토이 프로젝트라도 민감한 정보를 application.properties 파일에 저장하는 것은 피하는 것이 좋습니다.
+     대신 환경 변수나 비밀 관리 서비스, .env 파일 등을 사용하는 것이 보안상 더 안전하고, 실제 배포 환경에서도 유용한 방법입니다.   
+     코드에 민감한 정보를 하드코딩하는 것은 최악의 선택이므로, 가능한 안전한 방법을 사용해야 합니다.   
+     만약 application.properties 파일에 민감한 정보를 작성했다면, 이를 .gitignore 파일에 추가하여 Git에 커밋되지 않도록 설정해야 합니다.   
+
+     1. 환경 변수 사용   
+       민감한 정보를 코드에서 하드코딩하지 않고 환경 변수로 관리하는 것이 훨씬 안전합니다. 이를 통해 각 환경별로 민감한 정보를 쉽게 다룰 수 있습니다.   
+       예를 들어, application.properties에서 환경 변수로 값을 참조할 수 있습니다.   
+       운영 시스템에서는 DB_USERNAME과 DB_PASSWORD 환경 변수를 설정하여 해당 값을 사용할 수 있습니다.
+        > application.properties에서 변수 호출 예시   
+        > spring.datasource.username=${DB_USERNAME}   
+        > spring.datasource.password=${DB_PASSWORD}
+
+     2. .env 파일 사용   
+       개발 환경에서는 .env 파일을 사용하여 민감한 정보를 관리할 수도 있습니다.    
+       .env 파일은 Git에 커밋하지 않도록 .gitignore에 추가해야 합니다.   
+       그 후 Java에서 이를 읽어오는 방식으로 사용할 수 있습니다. Spring Boot에서는 dotenv를 로드하는 라이브러리를 사용할 수 있습니다.
+        > .env 파일 설정 예시
+        > DB_USERNAME=your_db_username   
+        > DB_PASSWORD=your_db_password
+
+> - secret key 노출되지 않도록 하기위해 선택한 방법.   
+> 보안상으로는 키관리 서비스를 이용하는 것이 가장 안전하다.    
+> 하지만 유료 서비스이며 개인 프로젝트에서는 오버 스펙으로 판단된다.   
+> 그래서 남은 방법 중 최선인 환경변수사용 방법을 선택하려고 했지만, 스터디를 위한 프로젝트인 점을 감안해 application.properties 파일에 작성해도 무방하겠다고 생각했다.   
+> 따라서 Mysql DB password 정보, JWT secret key는 민감정보임에도 불구하고 유료 api secret key 같은 정보가 아니므로 문제없다고 판단해 application.properties 파일에 작성하도록 한다.
+
+
+---
+### < 날짜 데이터 역직렬화 에러해결 >
+- 로그인 시 아래의 오류발생.    
+  로그인 시 JWT(Json Web Token) 토큰을 생성하는 과정에서 LocalDateTime 타입을 직렬화할 때 문제 발생.    
+  **JWT 토큰을 생성하려면 일반적으로 사용자 정보를 Claims 객체에 넣어 JSON 형태로 직렬화**하는데, 
+  이 과정에서 LocalDateTime 같은 Java 8의 날짜/시간 타입을 처리할 수 없어서 오류가 발생한 것.
+
+- Serialization(직렬화)
+  - 객체를 바이트 스트림이나 다른 저장 가능한 형식(JSON, XML)으로 변환하는 과정
+  - 직렬화의 목적은 객체를 메모리 내에서 외부로 내보내거나(저장) 외부에서 불러오는 것(복원).
+  
+- 발생에러   
+  (근데 데이터 반환을 회원가입때 하고 로그인 때는 토큰만 반환하는데 왜 로그인 때 에러가 났지..?)
+  - com.fasterxml.jackson.databind.exc.InvalidDefinitionException: Java 8 date/time type `java.time.LocalDateTime` not supported by default: add Module "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" to enable handling (through reference chain: io.jsonwebtoken.impl.DefaultClaims["roles"]->org.hibernate.collection.spi.PersistentBag[0]->com.shop.reservation.entity.MemberRole["createDate"])
+
+- 발생원인
+  - LocalDateTime 데이터타입은 바이트화(직렬화) 할 때 어떤 규칙으로 진행할 것인지 
+    Serialization에 대한 정의가 되어있지않아 발생한 에러. 
+    LocalDateTime에 대해 어떤 데이터 타입으로 직렬화, 역직렬화 할 것인지 따로 지정이 필요.
+
+- 해결방법
+  - 날짜타입의 직렬화 역직렬화를 위해 Entity에 아래의 어노테이션 추가   
+    @JsonSerialize(using = LocalDateTimeSerializer.class) // 직렬화   
+    @JsonDeserialize(using = LocalDateTimeDeserializer.class) // 역직렬화   
+    @JsonFormat(pattern = "yyyy-MM-dd kk-mm:ss") // 원하는 형태의 LocalDateTime 설정
+  - Dto가 아닌 Entity에서 해당 문제를 해결하는 이유   
+    - Entity에 설정을 추가하는 이유는 LocalDateTime이 엔티티 필드일 경우, 
+      해당 엔티티를 직접 JSON으로 변환하거나 직렬화/역직렬화할 때 발생할 수 있는 문제를 방지하기 위함이고 
+      이로인해 일관성 유지 가능.   
+      DTO는 데이터를 전달하는 역할이므로 LocalDateTime과 같은 날짜/시간 타입을 Entity에서 직렬화/역직렬화 하도록 설정하는 것이 더 일관적이고 효율적이며.
+
+- 참고 블로그   
+  https://justdo1tme.tistory.com/entry/Spring-Jackson-%EC%9D%B4%ED%95%B4-%EB%B0%8F-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0
+
+
+---
+### < JWT 토큰인증필터 추가 시 순환참조 오류발생 >
+1. 발생오류
+   - Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+     2025-02-01T21:44:22.568+09:00 ERROR 22252 --- [MyECommerce] [           main] o.s.b.d.LoggingFailureAnalysisReporter   :
+    ***************************
+    APPLICATION FAILED TO START
+    *************************** 
+    Description:
+    The dependencies of some of the beans in the application context form a cycle:
+    ┌─────┐
+    |  jwtAuthenticationFilter defined in file [C:\workspace\MyECommerce\build\classes\java\main\com\myecommerce\MyECommerce\security\filter\JwtAuthenticationFilter.class]
+    ↑     ↓
+    |  jwtAuthenticationProvider defined in file [C:\workspace\MyECommerce\build\classes\java\main\com\myecommerce\MyECommerce\config\JwtAuthenticationProvider.class]
+    ↑     ↓
+    |  memberService defined in file [C:\workspace\MyECommerce\build\classes\java\main\com\myecommerce\MyECommerce\service\member\MemberService.class]
+    ↑     ↓
+    |  securityConfig defined in file [C:\workspace\MyECommerce\build\classes\java\main\com\myecommerce\MyECommerce\config\SecurityConfig.class]
+    └─────┘
+    Action:
+    Relying upon circular references is discouraged and they are prohibited by default. Update your application to remove the dependency cycle between beans. As a last resort, it may be possible to break the cycle automatically by setting spring.main.allow-circular-references to true.
+    Disconnected from the target VM, address: '127.0.0.1:60863', transport: 'socket'
+    Process finished with exit code 1
+    
+2. 발생원인
+   - **JwtAuthenticationFilter**가 토큰 유효성 검사 및 JWT 토큰 정보를 스프링 시큐리티 인증정보로 변환하기 위해 JwtAuthenticationProvider를 의존하고 있습니다.
+   - **JwtAuthenticationProvider**는 JWT 토큰 정보를 스프링 시큐리티 인증정보로 변환을 위한 사용자조회(loadUserByUsername())를 위해 MemberService를 의존하고 있습니다.
+   - **MemberService**는 비밀번호 암호화를 위해 SecurityConfig에서 빈으로 정의해 등록한 passwordEncoder()를 사용하고 있기에 간접적으로 SecurityConfig를 의존하고 있습니다.
+     > MemberService의 의존관계를 확인해보면 아래의 4가지에 의존적이다.
+     > 
+     > private final PasswordEncoder passwordEncoder;
+     > private final MemberMapper memberMapper;
+     > private final MemberRepository memberRepository;
+     > private final MemberAuthorityRepository memberAuthorityRepository;
+     > 
+     > 확인해보면 SecurityConfig를 직접적으로 참조하거나 주입하는 부분은 없다.
+     > 하지만 MemberService와 SecurityConfig 간의 간접적인 관계는 있을 수 있다.
+     > 실제로 PasswordEncoder를 SecurityConfig에서 정의하고 빈등록하였기에 간접적으로 참조하는 것으로 보여진다.
+   - **SecurityConfig**는 JWT토큰인증을 위해 .addFilterBefore() 메서드를 통해 jwtAuthenticationFilter 필터를 추가하기 위해 다시 JwtAuthenticationFilter를 의존하고 있습니다.
+   - 이러한 의존성 구조는 순환 참조로, Spring이 bean을 초기화할 수 없게 만듭니다.
+
+3. 해결방법
+   - 위의 순환관계를 끊어내기 위해 의존관게 재구성이 필요.
+   - 기존 MemberService를 UserDetailsService 인터페이스를 구현하도록 했다.
+   - 하지만 위의 순환참조가 발생하여 UserDetailsService 인터페이스의 구현체가 PasswordEncoder를 의존하지 않도록 분리가 필요하다.
+   - 따라서 MemberService는 UserDetailsService를 구현하지 않고 SignInAuthenticationService를 신규 생성해 UserDetailsService를 구현한다.
+   - 그러면 JwtAuthenticationProvider에서 loadUserByUsername() 호출 시 MemberService가 아닌 SignInAuthenticationService에 의존하므로 순환관계가 끊긴다.
+
+

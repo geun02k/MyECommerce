@@ -34,6 +34,6 @@ public class MemberDto {
 
     private Character delYn;
 
-    private List<MemberAuthority> authorities;
+    private List<MemberAuthority> roles;
 
 }

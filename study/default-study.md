@@ -396,14 +396,30 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
   스프링 어플리케이션이 뜨는지를 테스트해주는 기본적으로 내장되어있는 test코드.   
   서버가 실행중일 떄 테스트코드를 실행하면 redis 포트를 사용하고있다고 에러가 발생한다.   
   그래서 전체 테스트 시 AccountApplicationTests이 포함되어있고 서버가 실행중이라면
-  스프링 어플리케이션 서버를 종료해야 AccountApplicationTests 에러가 발생하지 않는다.   
+  스프링 어플리케이션 서버를 종료해야 AccountApplicationTests 에러가 발생하지 않는다.  
 
-- @SpringBootTest
-    - org.springframework.boot:spring-boot-starter-test 에 포함된 기능.
-    - 의존성을 주입하지 않고 테스트가능.
+- main함수가 아니지만 실행가능한 이유 : Junit 프레임워크가 대신 실행해주기 때문.
+
+1. @SpringBootTest나 @WebMvcTest 어노테이션 미사용 시 (단위테스트)
+   - Spring 애플리케이션의 빈이나 컨텍스트를 로드하지 않고, 단위 테스트 시 @WebMvcTest나 @SpringBootTest 불필요.
+   - JUnit 5는 기본적으로 SpringRunner(또는 @ExtendWith(SpringExtension.class))와 함께 사용할 때 Spring이 제공하는 기능들을 활성화. 
+   - @SpringBootTest나 @WebMvcTest를 사용하지 않으면, **단위테스트**로만 실행가능.
+   - 단위테스트 실행
+     - @Test 어노테이션을 사용한 메서드는 Spring 컨텍스트를 로드하지 않고도 실행.
+     - 빈 주입이 필요 없다면 @Autowired나 @MockBean 같은 어노테이션을 사용하지 않고, 
+       @Mock을 사용해서 수동으로 객체를 만들어 테스트 가능.
+   - @WebMvcTest, @SpringBootTest를 사용하지 않으면 기본적으로 컨트롤러, 서비스, 레포지토리 등이 로드되지 않음. 
+     그 대신 @Mock이나 @InjectMocks를 사용하여 필요한 객체들을 직접 주입하여 테스트. 따라서 빈 로딩 없음.
+   - 특정 객체만 테스트하고자 할 때, @Mock으로 의존성 객체들을 수동으로 모킹하여 컨텍스트를 로드하지 않고도 테스트 가능.
+
+2. @SpringBootTest (애플리케이션 통합테스트)
+    - 애플리케이션 전체가 제대로 통합되어 동작하는지 확인하고 싶은 경우 사용.
+    - 테스트 실행 시 전체 애플리케이션이 로드되기 때문에 속도가 느릴 수 있음.
+    - @SpringBootTest를 사용 시 Spring 컨텍스트가 로드되고 애플리케이션의 전체 빈을 활용하여 **통합테스트** 가능.
+    - 애플리케이션의 전체 빈을 로드하고, 실제 서비스, 리포지토리, 데이터베이스, 웹 계층 등이 잘 연결되고 동작하는지 확인.
+    - 통합 테스트를 통해 시스템의 다양한 레이어가 서로 잘 동작하는지 검증.
     - springboot context loader를 실제 어플리케이션처럼 테스트용으로 만들어줌.
-    - context(설정 등)를 실제 환경과 동일하게 모든 기능을 생성해 빈들을 등록한 것을 이용해 테스트 가능.   
-      따라서 의존성 주입을 이용해 테스트가능.
+    - context(설정 등)를 실제 환경과 동일하게 모든 기능을 생성해 빈들을 등록한 것을 이용해 테스트 가능하므로 의존성 주입을 이용해 테스트가능.
       ~~~
       private AccountService accountService = new AccountService(new AccountRepository());
       ~~~
@@ -412,49 +428,159 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
       @Autowired
       private AccountService accountService;
       ~~~
-    - Junit을 그대로 이용해서는 Mockito 기능 사용불가.
-      Mockito 확장팩을 테스트 클래스에 달아줌.
-      @SpringBootTest -> @ExtendWith(MockitoExtension.class) 로 변경
+    - org.springframework.boot:spring-boot-starter-test 에 포함된 기능.
 
-- main함수가 아니지만 실행가능한 이유 : Junit 프레임워크가 대신 실행해주기 때문.
-
+3. @WebMvcTest (웹 계층 통합테스트)
+   - 웹 계층(컨트롤러)만 테스트할 때 사용.   
+     주로 컨트롤러, 필터, 인터셉터 등과 관련된 동작을 확인할 때 사용.
+   - HTTP 요청과 컨트롤러 간의 상호작용을 테스트.
+   - 컨트롤러와 관련된 빈만 로드하며, 서비스나 리포지토리 같은 비즈니스 계층은 mocking을 통해 가짜 객체로 대체.
+   - 기존 @WebMvcTest 어노테이션을 사용하면 MockMvc를 자동 생성해 주입해주었지만
+     스프링부트 3.4 버전 이후로는 직접 MockMvc를 생성해주어야 하므로 해당 어노테이션은 사실상 아무런 역할도 하지 않음.
 
 ### < 테스트코드작성 mocking >
-- Mock을 사용해 테스트하면
-  동일 테스트코드를 함께 실행해도 하나는 성공하고 하나는 실패하는 문제 해결가능.   
-  DB에 데이터가 바뀌든 의존하고 있는 repository의 로직이 변경되든 관계없이
-  내가 맡은 역할만 테스트가능.
-- 참고블로그 https://soonmin.tistory.com/85   
-- 테스트는 given-when-then(BDD 스타일) 패턴으로 작성한다. 
-  willReturn(),willThrow() 등 메서드를 통해 mock 객체(userRepositoy)의 예상 동작을 미리 정의해준다.
-  exception을 검사하고 싶을 때는 assertThrows와 함께 사용하면 된다.
-  should() 메서드로 해당 메서드가 제대로 호출되었는지 검증한다.   
-- Mockito 와 BDDMockito
-    - 참고블로그 https://soso-shs.tistory.com/109
+- Mock을 사용해 테스트 하는 이유
+  - 동일 테스트코드를 함께 실행해도 하나는 성공하고 하나는 실패하는 문제 해결가능.   
+  - DB에 데이터가 바뀌든 의존하고 있는 repository의 로직이 변경되든 관계없이 내가 맡은 역할만 테스트가능.
 
+- given-when-then(BDD 스타일) 패턴
+    - 테스트는 given-when-then(BDD 스타일) 패턴으로 작성한다.
+    1. 예상 동작 정의
+        - willReturn(),willThrow() 등 메서드를 통해 mock 객체(userRepositoy)의 예상 동작을 미리 정의해준다.
+    2. exception을 검사
+        - assertThrows와 함께 사용하면 된다.
+    3. 메서드 호출 여부 검증
+        - should() 메서드로 해당 메서드가 제대로 호출되었는지 검증한다.
+
+- Mockito 와 BDDMockito 라이브러리
+  1. Mockito
+     - JAVA 오픈소스 프레임워크로 단위테스트를 위해 모의 객체(Mock Object)를 생성하고 관리하는데 사용.
+     - 모의 객체를 생성하여 모의 객체의 행위를 정의함으로써 의존 객체로부터 독립적으로 테스트를 수행가능.
+  2. BDDMockito (BDD, Behavior Driven Development)
+     - BDD 스타일을 따름.
+     - 테스트 코드의 가독성을 높이기 위해 given-when-then 패턴을 따름.
+  - 참고블로그 https://soso-shs.tistory.com/109
+
+- 참고블로그 https://soonmin.tistory.com/85
+
+1. Mock
+   - mock 객체를 생성.
+   - mock으로 생성된 모의 객체는 stub을 통해 예상동작 정의가능.
+   
+   1. 명시적으로 mock 객체 생성
+      - 테스트 메서드 내에서 직접 mock 객체를 생성하고 사용.
+      - Mockito.mock() 방식은 더 세밀하게 제어가능.
+      ~~~
+       @Test
+       void createMock() {
+           // Mockito.mock(UserService.class) : UserService 타입의 mock 객체 생성
+           // 생성된 mock 객체는 createMock() 테스트 메서드 내에서만 사용됨.
+       
+           UserService mockUserService = Mockito.mock(UserService.class);
+       }
+      ~~~
+      
+   2. @Mock 어노테이션을 이용해 객체를 자동으로 mock 처리
+      - 클래스 레벨에서 필드로 선언한 후 **해당 객체를 직접 초기화하지 않고** Mockito가 자동으로 mock 객체를 주입.
+      - @Mock은 코드가 깔끔.
+      - 여러 테스트 메서드에서 동일한 mock 객체를 공유할 수 있어 편리.
+      - @Mock 어노테이션 사용 시 MockitoAnnotations.initMocks(this)를 사용해 어노테이션을 초기화 필수.
+      - 최신 버전의 Mockito에서는 **@ExtendWith(MockitoExtension.class)**를 사용해 초기화 가능.
+      ~~~
+       @Mock
+       UserService mockUserService;
+      ~~~
+
+2. Stub
+   - 생성된 mock 객체의 예상 동작 정의
+   - 아래의 두 구문은 동일한 기능 수행.
+   1. **given().willReturn()**
+      - given()은 Mockito 2.x 버전부터 BDDMockito 스타일로 도입된 구문.
+      - given-when-then 스타일의 테스트 코드 작성 시 선호.
+      - stub(가설) : 생성된 mock 객체의 예상 동작을 정의 (mock 객체 리턴내용 지정)
+      ~~~
+      given(memberRepository.findByTel1AndTel2AndTel3(any(), any(), any()))
+           .willReturn(Optional.empty());
+      ~~~
+   2. when().thenReturn()
+      - when()은 Mockito 1.x 버전부터 존재하는 기본적인 구문.
+      - 일반적으로 사용.
+      ~~~
+      User user = new User("mockUser", 30, false);
+      when(mockUserService.getUser()).thenReturn(user);
+      ~~~
+
+3. Spy
+   - Spy로 만든 mock 객체는 원본 동작을 유지 또는 새로운 정의 가능.
+   - 실제 객체를 감싸서 해당 객체의 메서드를 모니터링하거나, 특정 메서드만 스텁(stub)하거나 모킹(mocking) 가능하게 함.
+   - Stub 하지 않으면 원본 동작대로 실행.
+     ~~~
+     @Test
+     void mockTest2() {
+         UserService mockUserService = Mockito.spy(UserService.class); // spy
+         User realUser = mockUserService.getUser();
+
+         assertThat(realUser.getName()).isEqualTo("realUser");
+     }   
+     ~~~
+   - Stub 을 해주면 정의한 동작대로 실행.
+     ~~~
+     @Test
+     void mockTest1() {
+         UserService mockUserService = Mockito.spy(UserService.class); // spy
+         User user = new User("mockUser", 30, false);
+         when(mockUserService.getUser()).thenReturn(user);
+
+         User mockUser = mockUserService.getUser();
+
+         assertThat(mockUser.getName()).isEqualTo("mockUser");
+     }
+     ~~~
+   1. 명시적으로 Spy로 mock 객체 생성
+   2. @Spy
+   
+4. Verification
+   - mock 객체의 메서드 호출을 확인하는 것을 의미
+   ~~~
+   @Test
+   void mockTest1() {
+       UserService mockUserService = Mockito.mock(UserService.class);
+       mockUserService.getUser();
+
+      // verification (1회 호출 검증)
+      verify(mockUserService).getUser();  
+      
+      // Verification (2회 호출 검증)
+      // verify(mockUserService, times(2)).getUser();
+   }
+   ~~~
+
+- @ExtendWith(MockitoExtension.class)
+   - 애너테이션이 적용된 클래스는 **Mockito의 기능을 자동으로 활성화.**
+   - 필드에 있는 @Mock, @InjectMocks 등은 Mockito가 자동으로 초기화하고, 관련 객체 주입.
+   - JUnit 5에서 MockitoExtension을 사용 시, 테스트 클래스에 @ExtendWith(MockitoExtension.class) 애너테이션을 추가 필요.
+   - MockitoExtension.class
+     - JUnit 5에서 Mockito를 사용 시 필요한 확장(Extension).
+     - MockitoExtension.class 사용 시 @Mock, @InjectMocks, @Captor 등의 Mockito 애너테이션을 자동으로 초기화해주고, 테스트 클래스에서 mock 객체를 관리해주는 역할.
+   - 테스트코드 mock 생성 예시 (MemberServiceTest.java)
+     MemberService는 MemberRepository에 의존하고있다.
+     MemberRepository에 가짜로 생성해 MemberService에 의존성을 추가해준다.   
+     DB에서 독립적인 테스트가 가능해진다.
+     ~~~      
+     @ExtendWith(MockitoExtension.class)  // JUnit 5에서 MockitoExtension 활성화
+     public class MemberServiceTest {
+         // @Mock: MemberRepository를 가짜로 생성해 memberRepository에 담아준다.
+         @Mock
+         private MemberRepository memberRepository; // mock 객체
+     
+         // @InjectMocks : Mock으로 생성해준 memberRepository를 memberService에 inject(의존성주입).      
+         @InjectMocks
+         private MemberService memberService; // mock 객체를 주입 받을 대상
+         
+         ...
+     }
+     ~~~
     
-    - MemberServiceTest.java
-        MemberService는 MemberRepository에 의존하고있다.
-        MemberRepository에 가짜로 생성해 MemberService에 의존성을 추가해준다.
-        
-        @Mock
-        private MemberRepository memberRepository;
-        -> MemberRepository를 가짜로 생성해 memberRepository에 담아준다.
-          (injection, 의존성주입과 비슷하게 생성해준다.)
-        
-        @InjectMocks
-        private MemberService memberService;
-        -> Mock으로 생성해준 memberRepository를 memberService에 inject.
-
-- given() 
-  - stub(가설)
-  - 생성된 mock 객체의 예상 동작을 정의 (mock 객체 리턴내용 지정)
-  ~~~
-    given(memberRepository.findByTel1AndTel2AndTel3(any(), any(), any()))
-        .willReturn(Optional.empty());
-  ~~~
-
-
 ### < 테스트코드작성 ArgumentCaptor >
 - 참고블로그 https://hanrabong.com/entry/Test-ArgumentCaptor%EB%9E%80
 - capture()
@@ -467,6 +593,62 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
 - verify() 
   - 서비스 내부 로직이 실행됐는지 여부 체크
   - memberRepository.save() 실행 여부 체크
+
+
+### < Reflection - private 메서드 테스트코드 작성 >
+- 리플렉션을 사용 시 클래스의 메서드나 필드에 직접 접근할 수 없더라도 접근 제어자에 관계없이 해당 클래스의 메서드나 필드를 검사하거나 수정가능.
+- 자바의 java.lang.reflect 패키지에서 제공되는 클래스를 사용.
+- 프로그램 실행 중에 클래스, 메서드, 필드 등을 동적으로 다룰 수 있는 기능.
+- 리플렉션을 사용할 때는 정말 필요한 경우에만 사용하고, 과도하게 사용하지 않아야함.
+
+- 리플렉션을 사용할 때의 주의점
+  - 성능 저하
+    - 리플렉션은 일반적인 메서드 호출보다 성능이 낮음.
+  - 컴파일 시점 검사 불가능
+    - 리플렉션을 사용하면 컴파일 타임에 오류를 잡기 어렵고, 런타임 시에만 오류가 발생가능.
+  - 불완전한 설계
+    - 리플렉션을 지나치게 많이 사용하면 코드가 복잡해지고, 객체 지향 설계 원칙에 어긋날 수 있음.
+
+1. 메서드 호출
+   - Class.getDeclaredMethod() 또는 Class.getMethod() 
+     - 해당 클래스의 메서드 **객체를 가져옴.**
+   - setAccessible(true)
+     - private 메서드에 **접근가능하도록 변경.**
+   - Method.invoke()
+     - 해당 메서드를 **실행.**
+   ~~~
+    class JwtAuthenticationProviderTest {
+    
+        private JwtAuthenticationProvider jwtAuthenticationProvider;
+    
+        @BeforeEach
+        void setUp() {
+            // 테스트용 JwtAuthenticationProvider 객체 생성
+            jwtAuthenticationProvider = new JwtAuthenticationProvider("bXlTZWNyZXRLZXk=");  // Base64로 인코딩된 비밀키
+        }
+    
+        @Test
+        void getDecodedSecretKey_shouldReturnValidSecretKey_usingReflection() throws Exception {
+            // 리플렉션을 사용하여 private 메서드 접근
+            Method method = JwtAuthenticationProvider.class.getDeclaredMethod("getDecodedSecretKey");
+            method.setAccessible(true);  // private 메서드 접근을 허용
+    
+            // 메서드 호출
+            SecretKey secretKey = (SecretKey) method.invoke(jwtAuthenticationProvider);
+    
+            // then
+            assertNotNull(secretKey, "SecretKey should not be null");
+            assertTrue(secretKey instanceof SecretKey, "Returned object should be an instance of SecretKey");
+        }
+    }   
+   ~~~
+
+2. 필드값 변경
+   - Field.setAccessible(true)
+     - private 필드에 접근가능하도록 변경.
+   - Field.set()
+     - 값을 수정.
+
 
 
 ### < Controller 테스트케이스 작성 - 도저히 안되서 Chat gpt를 통해 작성 >

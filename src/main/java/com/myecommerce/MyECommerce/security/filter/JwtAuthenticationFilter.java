@@ -2,6 +2,8 @@ package com.myecommerce.MyECommerce.security.filter;
 
 
 import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
+import com.myecommerce.MyECommerce.exception.MemberException;
+import com.myecommerce.MyECommerce.exception.errorcode.MemberErrorCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,6 +50,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 2. 토큰값 만료시간 유효성 검증
         if (tokenProvider.isValidTokenExpirationTime(token)) {
+            // 토큰 블랙리스트 확인
+            if(tokenProvider.isBlackList(token)) {
+                throw new MemberException(MemberErrorCode.ALREADY_SIGN_OUT_USER);
+            }
+
             // 3. JWT 토큰정보 -> 스프링 시큐리티 인증정보로 변환
             //    : SignInService.loadUserByUsername() 메서드를 통해 조회 후 인증정보 생성
             Authentication auth = tokenProvider.getSpringSecurityAuthentication(token);

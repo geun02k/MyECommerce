@@ -2,6 +2,7 @@ package com.myecommerce.MyECommerce.config;
 
 import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.service.member.SignInAuthenticationService;
+import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -29,6 +30,7 @@ public class JwtAuthenticationProvider {
     private static final long TOKEN_VALID_TIME = 1000L * 60 * 60 * 24;
 
     private final SignInAuthenticationService authenticationService;
+    private final RedisSingleDataService redisSingleDataService;
 
     /** 토큰생성 */
     public String createToken(MemberDto member) {
@@ -133,4 +135,8 @@ public class JwtAuthenticationProvider {
         return Objects.requireNonNull(this.parseClaims(token)).getExpiration();
     }
 
+    // 토큰 블랙리스트 등록여부 반환
+    public boolean isBlackList(String token) {
+        return redisSingleDataService.getSingleData(token) != null;
+    }
 }

@@ -25,9 +25,12 @@ public enum MemberErrorCode implements CommonErrorCode {
 
     // login validation check
     USER_NOT_FOUND(HttpStatus.BAD_REQUEST.value(), "존재하지 않는 사용자입니다."),
-    MISMATCH_PASSWORD(HttpStatus.BAD_REQUEST.value(), "비밀번호가 일치하지 않습니다.")
+    MISMATCH_PASSWORD(HttpStatus.BAD_REQUEST.value(), "비밀번호가 일치하지 않습니다."),
+
+    // logout validation check
+    ALREADY_SIGN_OUT_USER(HttpStatus.BAD_REQUEST.value(), "이미 로그아웃된 사용자입니다.")
     ;
-    ;
+
 
     private final int statusCode;
     private final String errorMessage;

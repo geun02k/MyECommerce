@@ -50,7 +50,7 @@ public class JwtAuthenticationProvider {
      * @param token 토큰값
      * @return true/false
      */
-    public boolean checkTokenExpirationTime(String token) {
+    public boolean isValidTokenExpirationTime(String token) {
         // 토큰값이 비어있으면 유효하지 않은 토큰 -> false 반환
         if(!StringUtils.hasText(token)) return false;
 

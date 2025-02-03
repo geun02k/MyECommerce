@@ -47,7 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = resolveTokenFromRequest(request);
 
         // 2. 토큰값 만료시간 유효성 검증
-        if (tokenProvider.checkTokenExpirationTime(token)) {
+        if (tokenProvider.isValidTokenExpirationTime(token)) {
             // 3. JWT 토큰정보 -> 스프링 시큐리티 인증정보로 변환
             //    : SignInService.loadUserByUsername() 메서드를 통해 조회 후 인증정보 생성
             Authentication auth = tokenProvider.getSpringSecurityAuthentication(token);

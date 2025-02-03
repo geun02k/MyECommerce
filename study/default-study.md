@@ -957,3 +957,64 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
     - Lettuce Client를 이용해 Redis 데이터베이스에 접근하고 데이터를 저장, 조회하는 등의 작업을 수행가능.
     - Redis 서버와 연결하여 데이터를 처리하기 위해 해당 서버의 호스트와 포트 정보를 설정 필요.
 
+3. redis 실행하기
+   redis를 설치했음을 가정한다.
+   - redis 서버 실행
+     - C:\Program Files\Redis\redis-server.exe
+   - redis client 실행
+     - C:\Program Files\Redis\redis-cli.exe
+   - redis insight
+     - redis 데이터베이스를 시각화하고 관리하기 위한 GUI 도구. (redis client로 보면 될듯)
+  - 참고 블로그   
+    https://seodaeya.tistory.com/248
+
+3. Java에서 redis client (Lettuce 선택)
+   - redis client를 통해 할 수 있는 작업을 Java로 작성가능하도록 한다.
+   1. Lettuce
+      - 동기, 비동기 통신을 모두 지원하는 non-blocking 자바 레디스 클라이언트.
+      - 대량의 요청과 응답 처리에 있어서, Lettuce가 더욱 유리하다. TPS, CPU, Connection 수, 응답속도 등 모든 면에서 Lettuce가 우위이기 때문이다.
+   2. Jedis
+      - 사용 편의성을 위해 설계된 레디스 자바 클라이언트.
+      - 동기식으로만 작동.
+      - 타 redis client에 비해 가벼움.
+  - 참고블로그    
+    https://devforme.tistory.com/46
+
+- 참고블로그   
+  https://adjh54.tistory.com/459   
+  https://adjh54.tistory.com/448
+
+- redis 사용 명령어
+  https://jang8584.tistory.com/290
+
+
+### < redis 설정파일 >
+1. RedisConnectionFactory 인터페이스
+   - Redis와의 연결을 위한 Connection을 생성하고 관리.
+
+2. LettuceConnectionFactory
+   - 해당 클래스는 RedisConnectionFactory 인터페이스를 구현한 클래스.
+   
+3. RedisTemplate<String, Object>
+   - Spring Data Redis에서 제공하는 클래스. 
+   - Redis 데이터베이스에 접근하고 데이터를 처리하는 데 사용. 
+   - 타입 안전성을 제공하고, 직렬화 및 역직렬화를 처리하며, Redis의 기본적인 데이터 구조를 지원.
+
+- 발생오류
+  > ava.lang.IllegalArgumentException: template not initialized; call afterPropertiesSet() before using it
+at org.springframework.util.Assert.isTrue(Assert.java:116) ~[spring-core-6.2.1.jar:6.2.1]
+at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:394) ~[spring-data-redis-3.4.1.jar:3.4.1]
+at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:378) ~[spring-data-redis-3.4.1.jar:3.4.1]
+at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:117) ~[spring-data-redis-3.4.1.jar:3.4.1]
+at org.springframework.data.redis.core.DefaultValueOperations.set(DefaultValueOperations.java:208) ~[spring-data-redis-3.4.1.jar:3.4.1]
+at org.springframework.data.redis.core.ValueOperations.set(ValueOperations.java:75) ~[spring-data-redis-3.4.1.jar:3.4.1]
+at com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.saveSingleData(RedisSingleDataService.java:18) ~[main/:na]
+
+- 발생원인
+  - RedisTemplate 또는 유사한 Spring Bean이 초기화되지 않았거나 설정되지 않은 상태에서 사용하려고 시도했을 때 발생
+
+- 해결방법
+  - RedisConfig.java에 설정한 redisTemplate() 메서드 호출 시 오류발생.
+  - 빈으로 등록하지 않아 발생한 오류.
+  - redisTemplate() 위에 @Bean 어노테이션 추가해 해결.
+

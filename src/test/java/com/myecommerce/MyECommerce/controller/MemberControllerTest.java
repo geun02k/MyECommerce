@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -179,6 +179,24 @@ class MemberControllerTest {
                 .getResponse()  // MockHttpServletResponse 객체 반환
                 .getContentAsString();// 응답 본문을 String으로 가져오기
         assertEquals("token", contentAsString);  // 원하는 값과 비교
+    }
+
+    @Test
+    @DisplayName("로그아웃성공")
+    void successSignOut() throws Exception {
+        // given
+
+        // when
+        doNothing().when(memberService).signOut(anyString());
+
+        // then
+        mockMvc.perform(post("/member/signout")
+                        .header("authorization", "Bearer TOKEN"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("SUCCESS"));
+
+        verify(memberService, times(1)).signOut(anyString());
+
     }
 
 }

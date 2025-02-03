@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
@@ -89,6 +90,20 @@ public class JwtAuthenticationProvider {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
+    // request header에서 토큰정보 가져오기
+    public String parseToken(String authorization) {
+        // 인증타입
+        final String TOKEN_PREFIX = "Bearer ";
+
+        // 토큰 유효성 검사
+        if(ObjectUtils.isEmpty(authorization) || !authorization.startsWith(TOKEN_PREFIX)) {
+            return null;
+        }
+
+        // prefix를 제외한 실제 JWT 토큰값만 반환
+        return authorization.substring(TOKEN_PREFIX.length());
+    }
+
     // 토큰으로부터 클레임정보 가져오기
     private Claims parseClaims(String token) {
         try {
@@ -111,6 +126,11 @@ public class JwtAuthenticationProvider {
     public String getUserIdFromToken(String token) {
         return Objects.requireNonNull(this.parseClaims(token))
                 .get("userId", String.class);
+    }
+
+    // 토큰에서 만료시간 추출
+    public Date getExpirationDateFromToken(String token) {
+        return Objects.requireNonNull(this.parseClaims(token)).getExpiration();
     }
 
 }

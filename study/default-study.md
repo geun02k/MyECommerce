@@ -359,6 +359,7 @@ https://velog.io/@chae_ag/Model-DTO-VO-DAO-%EA%B0%80-%EB%AC%B4%EC%97%87%EC%9D%B8
     - 긍정형 전방 탐색(lookahead)를 의미하며 특정 패턴이 뒤따라야 한다는 조건을 확인하지만, 문자열에서 그 부분을 소비하지(매칭으로 소모하지) 않습니다.
 - (?=.[!@#$%^+=-])
     - 문자열에 하나 이상의 지정된 특수 문자가 포함되어 있는지 확인합니다.
+- 정규식 참고블로그 https://gocoding.tistory.com/93
 - 참고블로그 https://ddyes.tistory.com/6
 - 참고블로그 https://kin.naver.com/qna/detail.naver?d1id=1&dirId=1040202&docId=468186271&enc=utf8&kinsrch_src=pc_nx_kin&qb=7KCV6rec7ZGc7ZiE7Iud&rank=1&search_sort=0&section=kin.qna_ency_cafe&spq=0
 - 비밀번호 추가 유효성검사
@@ -937,4 +938,22 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
     ~~~
 
 
+
+---
+### < Redis >
+1. Redis(Remote Dictionary Server)
+   - NoSQL 데이터베이스 중 하나이며 오픈소스 소프트웨어. 
+   - **키-값(Key-Value)** 형태로 데이터를 저장. 
+     다양한 종류의 value 저장 가능. 
+     value로 문자열, 리스트, 셋, 정렬된 셋, 해시 등의 타입을 지원. 
+   - 데이터를 **인-메모리 데이터 저장소**에 저장. 
+     서버의 메인 메모리에 모든 데이터를 저장하므로, 디스크 I/O를 거치는 다른 데이터베이스 시스템보다 훨씬 빠른 성능을 보여줌.
+   - 메모리에 저장되는 데이터 베이스는 디스크에 저장하여 휘발성으로 사용되는 **데이터를 영구적으로 저장**하는 기능을 제공하여 서버가 다운되더라도 데이터를 복구가능.
+
+2. redis 의존성 추가
+  - spring-boot-starter-data-redis
+    - Spring Data Redis를 쉽게 사용할 수 있도록 도와주는 라이브러리.
+    - 내장 Lettuce Client를 사용해 Redis의 데이터를 키-값 형태의 저장소로 이용이 가능.
+    - Lettuce Client를 이용해 Redis 데이터베이스에 접근하고 데이터를 저장, 조회하는 등의 작업을 수행가능.
+    - Redis 서버와 연결하여 데이터를 처리하기 위해 해당 서버의 호스트와 포트 정보를 설정 필요.
 

@@ -391,6 +391,7 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
 우리가 사용하는 대부분의 Service는 하나의 Service가 여러 개의 SerivceImpl을 가지고 있는 경우가 아닌 1:1 구조를 띄고 있다.    
 그러므로 Service를 사용하고, 추후 다형성이 필요해지면 그때 해당 Service에 대해서 인터페이스를 적용해도 늦지 않는 것 같다.    
 
+
 --- 
 ### < 테스트코드 >
 - MyECommerceApplicationTests.java   
@@ -438,6 +439,7 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
    - 컨트롤러와 관련된 빈만 로드하며, 서비스나 리포지토리 같은 비즈니스 계층은 mocking을 통해 가짜 객체로 대체.
    - 기존 @WebMvcTest 어노테이션을 사용하면 MockMvc를 자동 생성해 주입해주었지만
      스프링부트 3.4 버전 이후로는 직접 MockMvc를 생성해주어야 하므로 해당 어노테이션은 사실상 아무런 역할도 하지 않음.
+
 
 ### < 테스트코드작성 mocking >
 - Mock을 사용해 테스트 하는 이유
@@ -581,7 +583,58 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
          ...
      }
      ~~~
-    
+   
+ 
+### < 테스트코드 검증 >
+1. Mockito의 verify()
+   ~~~
+    // then
+    // 토큰이 redis에 1번 등록됨.(1번 수행됨)
+    Date now = new Date();
+    long validTime = expirationDate.getTime() - now.getTime();
+    verify(redisSingleDataService, times(1))
+            .saveSingleData(eq(token), eq("blacklist"), argThat(duration ->
+                    duration.compareTo(Duration.ofMillis(validTime)) >= 0));
+   ~~~
+   - 특정 메서드가 특정 횟수만큼 호출되었는지 검증.
+     ~~~
+     // Mockito.verity(mockObject, times(n)).method()
+     
+     // redisSingleDataService.saveSingleData() 메서드가 호출되었는지 검증.
+     verify(redisSingleDataService, times(1)).saveSingleData();
+     ~~~
+   - eq()
+     - Mockito의 Argument Matcher 중 하나.
+     - 특정 인자가 기대하는 값과 정확히 일치하는지 검증.              .
+     ~~~
+     // 호출이 정확한 값들로 이뤄졌는지 확인. 
+     verify(redisSingleDataService, times(1))
+            .saveSingleData(eq(token), eq("blacklist"), any());
+     ~~~
+   - Mockito의 ArgumentMatcher는 eq()와 같은 기본 메서드 외에도, 임의의 조건을 설정하여 검증할 수 있는 방법을 제공.
+     1. argThat()
+        - 사용자정의 조건을 지정.
+        ~~~
+        // 전달된 duration값이 Duration.ofMillis(validTime)보다 크거나 같은지 비교하는 사용자정의 조건 설정.
+        // compareTo() : 객체간 크기 비교 시 사용.
+        //             : duration이 크면 1 / duration이 작으면 -1 / duration과 값이 동일하면 0
+        argThat(duration -> duration.compareTo(Duration.ofMillis(validTime)) <= 0);
+        ~~~
+     2. ArgumentCaptor를 사용해 값을 캡쳐하고 검증.
+        - 메서드에 전달된 값을 캡쳐한 후 이를 비교.
+        - 실제로 메서드 호출 시 전달된 값을 캡쳐한 후 후속 검증을 통해 조건 검사.
+        ~~~
+        // duration값 캡쳐를 위해 ArgumentCaptor<Duration> 객체생성
+        ArgumentCaptor<Duration> durationCaptor = ArgumentCaptor.forClass(Duration.class);
+
+        // duration값 캡쳐를 위해 duration값 자리에 durationCaptor.capture() 전달.
+        verify(redisSingleDataService, times(1)).saveSingleData(eq(token), eq("blacklist"), durationCaptor.capture());
+
+        // Duration 캡쳐값 가져와 유효시간이 validTime 이상인지 검증
+        Duration capturedDuration = durationCaptor.getValue();
+        assertTrue(capturedDuration.toMillis() <= validTime, "Duration should be less than or equal to validTime");
+        ~~~
+
 ### < 테스트코드작성 ArgumentCaptor >
 - 참고블로그 https://hanrabong.com/entry/Test-ArgumentCaptor%EB%9E%80
 - capture()
@@ -649,7 +702,6 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
      - private 필드에 접근가능하도록 변경.
    - Field.set()
      - 값을 수정.
-
 
 
 ### < Controller 테스트케이스 작성 - 도저히 안되서 Chat gpt를 통해 작성 >

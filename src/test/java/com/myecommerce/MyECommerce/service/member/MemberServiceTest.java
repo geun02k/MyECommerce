@@ -1,11 +1,13 @@
 package com.myecommerce.MyECommerce.service.member;
 
+import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
 import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.mapper.MemberMapper;
 import com.myecommerce.MyECommerce.repository.member.MemberAuthorityRepository;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
+import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,15 +17,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.time.Duration;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class MemberServiceTest {
@@ -33,6 +35,12 @@ class MemberServiceTest {
 
     @Mock
     private MemberMapper memberMapper;
+
+    @Mock
+    private JwtAuthenticationProvider jwtAuthenticationProvider;
+
+    @Mock
+    private RedisSingleDataService redisSingleDataService;
 
     @Mock
     private MemberRepository memberRepository;
@@ -210,5 +218,37 @@ class MemberServiceTest {
         assertEquals(address, searchedMember.getAddress());
         assertEquals(delYn, searchedMember.getDelYn());
         assertEquals(expectRoleList.get(0).getAuthority(), searchedMember.getRoles().get(0).getAuthority());
+    }
+
+    @Test
+    @DisplayName("로그아웃성공")
+    void successSignOut() {
+        // given
+        // 토큰
+        String token = "TOKEN";
+        String authorization = "Bearer " + token;
+
+        long nowTimeMs = new Date().getTime();
+        Date expirationDate = new Date(nowTimeMs + (1000L * 60 * 10)); // 현재시간+10분
+        long validTimeMs = expirationDate.getTime() - nowTimeMs;
+
+        // stub(가설) : jwtAuthenticationProvider.parseToken() 실행 시
+        // TOKEN_PREFIX가 제외된 토큰값인 "TOKEN" 반환 예상.
+        given(jwtAuthenticationProvider.parseToken(authorization))
+                .willReturn(token);
+
+        // stub(가설) : jwtAuthenticationProvider.getExpirationDateFromToken() 실행 시
+        // 토큰의 만료시간인 현재시간+10분 값 반환 예상.
+        given(jwtAuthenticationProvider.getExpirationDateFromToken(token))
+                .willReturn(expirationDate);
+
+        // when
+        memberService.signOut(authorization);
+
+        // then
+        // 토큰이 redis에 1번 등록됨.(1번 수행됨)
+        verify(redisSingleDataService, times(1))
+                .saveSingleData(eq(token), eq("blacklist"), argThat(duration ->
+                        duration.compareTo(Duration.ofMillis(validTimeMs)) <= 0));
     }
 }

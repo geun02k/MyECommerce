@@ -2,6 +2,7 @@ package com.myecommerce.MyECommerce.config;
 
 import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.service.member.SignInAuthenticationService;
+import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -13,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
@@ -28,6 +30,7 @@ public class JwtAuthenticationProvider {
     private static final long TOKEN_VALID_TIME = 1000L * 60 * 60 * 24;
 
     private final SignInAuthenticationService authenticationService;
+    private final RedisSingleDataService redisSingleDataService;
 
     /** 토큰생성 */
     public String createToken(MemberDto member) {
@@ -49,7 +52,7 @@ public class JwtAuthenticationProvider {
      * @param token 토큰값
      * @return true/false
      */
-    public boolean checkTokenExpirationTime(String token) {
+    public boolean isValidTokenExpirationTime(String token) {
         // 토큰값이 비어있으면 유효하지 않은 토큰 -> false 반환
         if(!StringUtils.hasText(token)) return false;
 
@@ -89,6 +92,20 @@ public class JwtAuthenticationProvider {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
+    // request header에서 토큰정보 가져오기
+    public String parseToken(String authorization) {
+        // 인증타입
+        final String TOKEN_PREFIX = "Bearer ";
+
+        // 토큰 유효성 검사
+        if(ObjectUtils.isEmpty(authorization) || !authorization.startsWith(TOKEN_PREFIX)) {
+            return null;
+        }
+
+        // prefix를 제외한 실제 JWT 토큰값만 반환
+        return authorization.substring(TOKEN_PREFIX.length());
+    }
+
     // 토큰으로부터 클레임정보 가져오기
     private Claims parseClaims(String token) {
         try {
@@ -113,4 +130,13 @@ public class JwtAuthenticationProvider {
                 .get("userId", String.class);
     }
 
+    // 토큰에서 만료시간 추출
+    public Date getExpirationDateFromToken(String token) {
+        return Objects.requireNonNull(this.parseClaims(token)).getExpiration();
+    }
+
+    // 토큰 블랙리스트 등록여부 반환
+    public boolean isBlackList(String token) {
+        return redisSingleDataService.getSingleData(token) != null;
+    }
 }

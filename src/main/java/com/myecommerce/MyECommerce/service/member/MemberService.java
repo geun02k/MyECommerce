@@ -1,5 +1,6 @@
 package com.myecommerce.MyECommerce.service.member;
 
+import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
 import com.myecommerce.MyECommerce.dto.MemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
@@ -7,15 +8,17 @@ import com.myecommerce.MyECommerce.exception.MemberException;
 import com.myecommerce.MyECommerce.mapper.MemberMapper;
 import com.myecommerce.MyECommerce.repository.member.MemberAuthorityRepository;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
+import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 
+import java.time.Duration;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.MemberErrorCode.*;
 
@@ -26,6 +29,10 @@ public class MemberService {
     private final PasswordEncoder passwordEncoder;
 
     private final MemberMapper memberMapper;
+
+    private final JwtAuthenticationProvider jwtAuthenticationProvider;
+
+    private final RedisSingleDataService redisSingleDataService;
 
     private final MemberRepository memberRepository;
     private final MemberAuthorityRepository memberAuthorityRepository;
@@ -73,6 +80,17 @@ public class MemberService {
         return memberMapper.toDto(member);
     }
 
+    /** 로그아웃 **/
+    public void signOut(String authorization) {
+        // 1. 헤더에서 토큰정보 가져오기
+        String token = jwtAuthenticationProvider.parseToken(authorization);
+
+        // 2. Access Token 유효시간 가져와 blackList로 저장
+        Date expirationDate = jwtAuthenticationProvider.getExpirationDateFromToken(token);
+        Date now = new Date();
+        long validTime = expirationDate.getTime() - now.getTime();
+        redisSingleDataService.saveSingleData(token, "blacklist", Duration.ofMillis(validTime));
+    }
 
     // 회원가입 validation check
     private void saveMemberValidationCheck(MemberDto member) {

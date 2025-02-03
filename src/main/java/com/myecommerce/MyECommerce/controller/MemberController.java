@@ -8,13 +8,11 @@ import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/member")
@@ -68,6 +66,17 @@ public class MemberController {
 
         // 3. 토큰 반환
         return ResponseEntity.ok(token);
+    }
+
+    /**
+     * 회원 로그아웃 post /member/signout
+     **/
+    @PostMapping("/signout")
+    public ResponseEntity<String> signOut(@RequestHeader Map<String, Object> headers) {
+        // 로그아웃
+        memberService.signOut(headers.get("authorization").toString());
+
+        return ResponseEntity.ok("SUCCESS");
     }
 
     /**

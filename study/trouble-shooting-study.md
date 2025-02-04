@@ -366,3 +366,27 @@ DB에서 공통코드, Enum 사이에서 가장 중요한 부분은 **얼마나 
    - 그러면 JwtAuthenticationProvider에서 loadUserByUsername() 호출 시 MemberService가 아닌 SignInAuthenticationService에 의존하므로 순환관계가 끊긴다.
 
 
+---
+### < 계층별 별도 DTO 생성 >
+>   선택한 controller->service DTO 사용 방법   
+>   Service 레이어에서 도메인으로 변환한 뒤 Repository로 전달   
+    Service에서 DTO를 도메인(Entity)으로 변경하고, Repository는 도메인을 받고, 도메인을 응답한다.
+    이렇게 되면 Repository는 DTO <-> Entity 변환 작업은 하지 않고 DB 관련 작업만 수행하게된다.
+>
+>   Service가 전체적인 비즈니스 플로우를 관리하고,
+    Repository는 온전히 데이터베이스와 소통하는 역할만 수행.
+>
+>   다만, **Service가 Controller에 종속적.**
+    Controller가 받아오는 데이터에 따라 Service가 받는 데이터 형태가 결정되기 때문이다.
+    따라서 **Service가 원하는 방식으로 정보를 받지 못할 수 있다.**
+> 
+>   만약 하나의 서비스가 여러 컨트롤러에서 호출된다면, 
+    서비스가 Entity를 받아야 컨트롤러별 API 형태와 관계 없이 동작할 것이다.
+>
+>   현재 내 프로젝트에서 하나의 서비스는 하나의 컨트롤러에서만 사용된다.
+    **컨트롤러와 서비스의 기능이 1:1로 매칭**되므로 원하는 형태의 데이터를 바로 받아오는 것에 대해 문제가 없다고 판단된다.
+    따라서 **controller -> service로 데이터를 전달하는 과정에 추가적인 DTO 변환 작업 없이 서비스까지 전달**하기로 한다.
+
+- 참고블로그   
+  https://shyun00.tistory.com/214
+

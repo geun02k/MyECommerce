@@ -1,7 +1,8 @@
 package com.myecommerce.MyECommerce.service.member;
 
 import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
-import com.myecommerce.MyECommerce.dto.MemberDto;
+import com.myecommerce.MyECommerce.dto.member.RequestMemberDto;
+import com.myecommerce.MyECommerce.dto.member.ResponseMemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.exception.MemberException;
@@ -43,7 +44,7 @@ public class MemberService {
      * @return 신규 회원가입한 회원정보를 담은 MemberDto 객체
      */
     @Transactional
-    public MemberDto saveMember(MemberDto member, List<MemberAuthority> authorities) {
+    public ResponseMemberDto saveMember(RequestMemberDto member, List<MemberAuthority> authorities) {
         // validation check
         saveMemberValidationCheck(member);
 
@@ -66,7 +67,7 @@ public class MemberService {
     }
 
     /** 로그인 **/
-    public String signIn(MemberDto memberDto) {
+    public String signIn(RequestMemberDto memberDto) {
         // 1. 사용자ID 검증 (사용자 조회)
         Member member = memberRepository.findByUserId(memberDto.getUserId())
                 .orElseThrow(() -> new MemberException(USER_NOT_FOUND));
@@ -93,7 +94,7 @@ public class MemberService {
     }
 
     // 회원가입 validation check
-    private void saveMemberValidationCheck(MemberDto member) {
+    private void saveMemberValidationCheck(RequestMemberDto member) {
         // 회원 객체 존재여부 validation check
         if(ObjectUtils.isEmpty(member)) {
             throw new MemberException(EMPTY_MEMBER_INFO);

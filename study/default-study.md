@@ -1177,3 +1177,64 @@ at com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.saveSingleDa
   https://f-lab.kr/insight/jwt-logout-implementation-20240608   
   https://evga7.tistory.com/141
 
+
+---
+### < DTO >
+1. 도메인
+   - 하나의 비즈니스 업무 영역과 관련된 개념.
+   - 실제 비즈니스 로직이나 규칙, 도메인 정보 등을 포함.
+2. DTO
+   - 계층간의 데이터 전달을 위해 사용하는 객체.
+- 참고블로그
+  https://shyun00.tistory.com/214
+
+
+### < 요청과 응답으로 DTO 사용해야하는 이유 >
+1. Entity 내부 구현 캡슐화해 은닉
+   - Entity
+     - 도메인의 핵심 로직, 속성을 가짐.
+     - 실제 DB 테이블과 매칭되는 클래스.
+   - Entity가 getter, setter를 갖게 되면 controller 같은 비즈니스 로직과 관계없는 곳에서 자원의 속성이 실수로라도 변경될 수 있음.
+   - Entity UI 계층을 노출하는 것은 테이블 설계 화면을 공개하는 것과 같으므로 보안상 바람직하지 않음.
+    
+2. 화면에 필요한 데이터 선별
+   - 요청과 응답으로 Entity 사용 시, 요청하는 화면에서 불필요한 속성까지 전달됨. -> 속도 느려짐.
+   - 요청과 응답으로 Entity 사용 시 다양한 요청과 응답에 따른 속성들을 동적 선택 불가.
+   - 특정 api에 필요한 데이터를 포함한 DTO 별도 생성 시 화면이 요구하는 필요 데이터들만 선별해 용청과 응답가능.
+
+3. 순환참조 예방
+   - JPA로 개발 시 양방향 참조인 경우 순환참조를 조심해야함.
+   - 양방향 참조된 Entity를 응답으로 return 하게되면  
+     entity가 참조하고 있는 객체 지연로딩 -> 로딩된 객체는 또 다시 본인이 참조하고 있는 객체를 호출
+     을 반복하면 무한루프에 빠진다.
+   - 순환참조가 일어나지 않도록 응답의 return으로 DTO를 사용하는 것이 순환참조에서 안전.
+
+4. validation코드와 모델링코드 분리가능.
+   - Entity 클래스는 DB의 테이블과 매칭되는 필드가 속성으로 선언되어 있고, 복잡한 비즈니스 로직이 작성되어있음. 
+     띠리서 속성에 @Column, @JoinColumn , @ManyToOne, @OneToOne 등의 모델링을 위한 코드가 추가됨.
+     여기에 추가로 @NotNull, @NotEmpty @NotBlank 같은 요청에 대한 값에 대한 validation 코드가 들어가면 Entity 클래스는 더 복잡해지고 가독성이 저하됨.
+   - DTO에는 요청에 필요한 validation 정의.
+   - Entity 클래스는 모델링과 비즈니스 로직에만 집중가능.
+
+- DTO를 모든 API마다 구별해서 만들다보면 너무 많은 DTO가 생겨서 관리하기 어렵다고 하기도 한다.
+  그럼에도 불구하고 요청과 응답으로 엔티티를 사용하면, 개발의 편리함을 얻는 대신 애플리케이션의 결함을 얻게 될 수 있다.
+  API 스펙과 엔티티 사이에 의존성이 생기는 문제도 간과할 수 없다
+  UI와 도메인이 서로 의존성을 갖zx지 않고 독립적으로 개발하는 것을 지향하기 때문에 이를 중간에서 연결시켜주는 DTO의 역할은 꽤나 중요
+  요청과 응답으로 DTO를 사용하면 각각의 DTO 클래스가 데이터를 전송하는 클래스로서의 역할을 명확히 가질 수 있게 되고, 이는 하나의 클래스가 하나의 역할을 해야 한다는 객체지향의 정신과도 부합
+
+- 참고블로그   
+  https://shyun00.tistory.com/214
+
+  
+---
+### < request, response DTO 분리 >
+- client->controller에 들어오는 request 정보와 controller->client로 내보내는 response는
+  사용하는 목적이 다르고 전달하는 데이터도 다르기에 분리하는 것이 좋다.
+- DTO는 주고받는 데이터를 정의한 api 명세서와 다름없다.
+- 단건, 복수 건 조회 정도만 동일 DTO 사용으로 운명을 함께할 수 있다.
+
+1. request DTO
+    - validation check 어노테이션을 사용 -> 데이터의 유효성 검사.
+2. response DTO
+    - 단순히 데이터를 반환.
+

@@ -1,7 +1,7 @@
 package com.myecommerce.MyECommerce.controller;
 
-import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
-import com.myecommerce.MyECommerce.dto.MemberDto;
+import com.myecommerce.MyECommerce.dto.member.RequestMemberDto;
+import com.myecommerce.MyECommerce.dto.member.ResponseMemberDto;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.service.member.MemberService;
 import com.myecommerce.MyECommerce.type.MemberAuthorityType;
@@ -25,7 +25,7 @@ public class MemberController {
      * 판매자 회원가입 post /member/signup/seller
      **/
     @PostMapping("/signup/seller")
-    public ResponseEntity<MemberDto> signUpSeller(@Valid @RequestBody MemberDto member) {
+    public ResponseEntity<ResponseMemberDto> signUpSeller(@Valid @RequestBody RequestMemberDto member) {
         // 권한추가
         List<MemberAuthority> authorities = new ArrayList<>();
         authorities.add(MemberAuthority.builder()
@@ -40,7 +40,7 @@ public class MemberController {
      * 고객 회원가입 post /member/signup/customer
      **/
     @PostMapping("/signup/customer")
-    public ResponseEntity<MemberDto> signUpCustomer(@Valid @RequestBody MemberDto member) {
+    public ResponseEntity<ResponseMemberDto> signUpCustomer(@Valid @RequestBody RequestMemberDto member) {
         // 권한추가
         List<MemberAuthority> authorities = new ArrayList<>();
         authorities.add(MemberAuthority.builder()
@@ -55,7 +55,7 @@ public class MemberController {
      * 회원 로그인 post /member/signin
      **/
     @PostMapping("/signin")
-    public ResponseEntity<String> signIn(@RequestBody MemberDto memberDto) {
+    public ResponseEntity<String> signIn(@RequestBody RequestMemberDto memberDto) {
         // 사용자검증 후 JWT 토큰 반환
         return ResponseEntity.ok(memberService.signIn(memberDto));
     }

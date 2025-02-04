@@ -86,21 +86,21 @@ class JwtAuthenticationProviderTest {
         // 토큰이 null이 아니어야 함을 검증
         ObjectMapper objectMapper = new ObjectMapper();
         // claims.get("authorities")는 List<Map> 형태일 것으로 예상
-        List<Map<String, Object>> authoritiesMaps =
+        List<Map<String, Object>> authoritiesMap =
                 (List<Map<String, Object>>) claims.get("roles");
-        // List<Map<String, Object>> -> List<MemberAuthority>로 변환
-        List<MemberAuthority> authorityList =
-                objectMapper.convertValue(authoritiesMaps,
+        // List<Map<String, Object>> -> List<MemberAuthorityType>로 변환
+        List<MemberAuthorityType> authorityList =
+                objectMapper.convertValue(authoritiesMap,
                         // 제네릭 타입을 List<MemberAuthority>로 설정
                         objectMapper.getTypeFactory()
-                                .constructCollectionType(List.class, MemberAuthority.class));
+                                .constructCollectionType(List.class, MemberAuthorityType.class));
 
         assertNotNull(token, "Token should not be null");
         assertEquals(String.valueOf(id), claims.getSubject()); // id
         assertEquals(userId, claims.get("userId").toString()); // userId
         assertEquals(name, claims.get("name").toString()); // name
         assertEquals(1, authorityList.size());
-        assertEquals(MemberAuthorityType.SELLER, authorityList.get(0).getAuthority());
+        assertEquals(MemberAuthorityType.SELLER, authorityList.get(0));
     }
 
     @Test

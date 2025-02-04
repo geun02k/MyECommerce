@@ -31,18 +31,12 @@ public abstract class BaseEntity {
 
     @CreatedDate
     @Column(updatable = false)
-    @JsonSerialize(using = LocalDateTimeSerializer.class) // 직렬화
-    @JsonDeserialize(using = LocalDateTimeDeserializer.class) // 역직렬화
-    @JsonFormat(pattern = "yyyy-MM-dd kk-mm:ss") // 원하는 형태의 LocalDateTime 설정
     private LocalDateTime createDt;
 
     @LastModifiedBy
     private Long updateId;
 
     @LastModifiedDate
-    @JsonSerialize(using = LocalDateTimeSerializer.class) // 직렬화
-    @JsonDeserialize(using = LocalDateTimeDeserializer.class) // 역직렬화
-    @JsonFormat(pattern = "yyyy-MM-dd kk-mm:ss") // 원하는 형태의 LocalDateTime 설정
     private LocalDateTime updateDt;
 
 }

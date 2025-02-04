@@ -1,8 +1,10 @@
 package com.myecommerce.MyECommerce.config;
 
 import com.myecommerce.MyECommerce.entity.member.Member;
+import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.service.member.SignInAuthenticationService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
+import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -19,6 +21,7 @@ import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 
 @Component
@@ -36,11 +39,15 @@ public class JwtAuthenticationProvider {
     public String createToken(Member member) {
         Date now = new Date();
 
+        // 권한목록 생성
+        List<MemberAuthorityType> roles =
+                member.getRoles().stream().map(MemberAuthority::getAuthority).toList();
+
         return Jwts.builder()
                 .subject(String.valueOf(member.getId()))
                 .claim("userId", member.getUserId())
                 .claim("name", member.getName())
-                .claim("roles", member.getRoles())
+                .claim("roles", roles)
                 .issuedAt(now) // 발급시간
                 .expiration(new Date(now.getTime() + TOKEN_VALID_TIME)) // 만료시간
                 .signWith(getDecodedSecretKey()) // 서명 (HMAC SHA-256 알고리즘 이용해 서명)

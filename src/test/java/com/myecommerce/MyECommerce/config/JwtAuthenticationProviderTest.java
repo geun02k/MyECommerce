@@ -1,7 +1,7 @@
 package com.myecommerce.MyECommerce.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.myecommerce.MyECommerce.dto.MemberDto;
+import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import io.jsonwebtoken.Claims;
@@ -66,7 +66,7 @@ class JwtAuthenticationProviderTest {
         // when
         // 실제 토큰을 생성
         String token = jwtAuthenticationProvider.createToken(
-                MemberDto.builder()
+                Member.builder()
                         .id(id)
                         .userId(userId)
                         .name(name)

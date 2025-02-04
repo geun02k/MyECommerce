@@ -154,6 +154,7 @@ class MemberServiceTest {
     @Test
     @DisplayName("로그인성공")
     void successSignIn() {
+        // given
         Long id = 1L;
         String userId = "sky";
         String password = "12345678";
@@ -163,7 +164,6 @@ class MemberServiceTest {
         String address = "서울 동작구 보라매로5가길 16 보라매아카데미타워 7층";
         Character delYn = 'N';
 
-        // given
         // 조회할 회원 DTO 객체 생성
         MemberDto member = MemberDto.builder()
                 .userId(userId)
@@ -193,31 +193,15 @@ class MemberServiceTest {
         given(passwordEncoder.matches(any(), any()))
                 .willReturn(true);
 
-        // stub(가설) : 저장된 회원정보 Entity를 Dto로 변환 예상.
-        given(memberMapper.toDto(any(Member.class)))  // Member -> MemberDto 변환
-                .willReturn(MemberDto.builder()
-                        .id(id)
-                        .userId(userId)
-                        .password(encodedPassword)
-                        .name(name)
-                        .telephone(telephone)
-                        .address(address)
-                        .delYn(delYn)
-                        .roles(expectRoleList)
-                        .build());
+        // stub(가설) : jwtAuthenticationProvider.createToken() 실행 시 JWT 토큰 생성해 문자열로 반환 예상.
+        given(jwtAuthenticationProvider.createToken(any(Member.class)))
+                .willReturn("token");
 
         // when
-        MemberDto searchedMember = memberService.authenticateMember(member);
+        String returnToken = memberService.signIn(member);
 
         // then
-        assertEquals(id, searchedMember.getId());
-        assertEquals(userId, searchedMember.getUserId());
-        assertEquals(encodedPassword, searchedMember.getPassword());
-        assertEquals(name, searchedMember.getName());
-        assertEquals(telephone, searchedMember.getTelephone());
-        assertEquals(address, searchedMember.getAddress());
-        assertEquals(delYn, searchedMember.getDelYn());
-        assertEquals(expectRoleList.get(0).getAuthority(), searchedMember.getRoles().get(0).getAuthority());
+        assertEquals("token", returnToken);
     }
 
     @Test

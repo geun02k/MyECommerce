@@ -19,8 +19,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MemberController {
 
-    private final JwtAuthenticationProvider jwtAuthenticationProvider;
-
     private final MemberService memberService;
 
     /**
@@ -58,14 +56,8 @@ public class MemberController {
      **/
     @PostMapping("/signin")
     public ResponseEntity<String> signIn(@RequestBody MemberDto memberDto) {
-        // 1. 아이디, 패스워드 일치여부 확인
-        MemberDto authenticatedMember = memberService.authenticateMember(memberDto);
-
-        // 2. JWT 토큰 생성
-        String token = jwtAuthenticationProvider.createToken(authenticatedMember);
-
-        // 3. 토큰 반환
-        return ResponseEntity.ok(token);
+        // 사용자검증 후 JWT 토큰 반환
+        return ResponseEntity.ok(memberService.signIn(memberDto));
     }
 
     /**
@@ -73,7 +65,7 @@ public class MemberController {
      **/
     @PostMapping("/signout")
     public ResponseEntity<String> signOut(@RequestHeader Map<String, Object> headers) {
-        // 로그아웃
+        // 토큰 블랙리스트 등록
         memberService.signOut(headers.get("authorization").toString());
 
         return ResponseEntity.ok("SUCCESS");

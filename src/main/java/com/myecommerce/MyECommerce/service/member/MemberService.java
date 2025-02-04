@@ -65,9 +65,9 @@ public class MemberService {
         return memberMapper.toDto(savedMember);
     }
 
-    /** 로그인 검증 */
-    public MemberDto authenticateMember(MemberDto memberDto) {
-        // 1. 사용자ID로 사용자 조회
+    /** 로그인 **/
+    public String signIn(MemberDto memberDto) {
+        // 1. 사용자ID 검증 (사용자 조회)
         Member member = memberRepository.findByUserId(memberDto.getUserId())
                 .orElseThrow(() -> new MemberException(USER_NOT_FOUND));
 
@@ -76,8 +76,8 @@ public class MemberService {
             throw new MemberException(MISMATCH_PASSWORD);
         }
 
-        // 3. 회원정보 반환
-        return memberMapper.toDto(member);
+        // 3. JWT 토큰 생성
+        return jwtAuthenticationProvider.createToken(member);
     }
 
     /** 로그아웃 **/

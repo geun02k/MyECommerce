@@ -1,6 +1,6 @@
 package com.myecommerce.MyECommerce.config;
 
-import com.myecommerce.MyECommerce.dto.MemberDto;
+import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.service.member.SignInAuthenticationService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import io.jsonwebtoken.Claims;
@@ -33,7 +33,7 @@ public class JwtAuthenticationProvider {
     private final RedisSingleDataService redisSingleDataService;
 
     /** 토큰생성 */
-    public String createToken(MemberDto member) {
+    public String createToken(Member member) {
         Date now = new Date();
 
         return Jwts.builder()

@@ -1,7 +1,8 @@
 package com.myecommerce.MyECommerce.service.member;
 
 import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
-import com.myecommerce.MyECommerce.dto.MemberDto;
+import com.myecommerce.MyECommerce.dto.member.RequestMemberDto;
+import com.myecommerce.MyECommerce.dto.member.ResponseMemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.mapper.MemberMapper;
@@ -77,7 +78,7 @@ class MemberServiceTest {
                                     .authority(MemberAuthorityType.SELLER)
                                     .build());
         // 저장할 회원객체생성
-        MemberDto memberDto = MemberDto.builder()
+        RequestMemberDto memberDto = RequestMemberDto.builder()
                 .userId("sky")
                 .password("123456789")
                 .name("김하늘")
@@ -86,7 +87,7 @@ class MemberServiceTest {
                 .build();
 
         // 저장된 회원 DTO객체 생성
-        MemberDto expectMemberDto = MemberDto.builder()
+        ResponseMemberDto expectMemberDto = ResponseMemberDto.builder()
                 .id(1L)
                 .userId("sky")
                 .password("encode12345678")
@@ -122,7 +123,7 @@ class MemberServiceTest {
                 .willReturn("encode12345678");
 
         // stub(가설) : 저장된 회원정보 Dto를 Entity로 변환 예상.
-        given(memberMapper.toEntity(any(MemberDto.class)))  // MemberDto -> Member 변환
+        given(memberMapper.toEntity(any(RequestMemberDto.class)))  // MemberDto -> Member 변환
                 .willReturn(expectMemberEntity);
         // stub(가설) : 저장된 회원정보 Entity를 Dto로 변환 예상.
         given(memberMapper.toDto(any(Member.class)))  // Member -> MemberDto 변환
@@ -137,7 +138,7 @@ class MemberServiceTest {
                 .willReturn(expectAuthorityList.get(0));
 
         // when
-        MemberDto savedMember = memberService.saveMember(memberDto, memberAuthorityList);
+        ResponseMemberDto savedMember = memberService.saveMember(memberDto, memberAuthorityList);
 
         // then
         assertNotNull(savedMember);
@@ -165,7 +166,7 @@ class MemberServiceTest {
         Character delYn = 'N';
 
         // 조회할 회원 DTO 객체 생성
-        MemberDto member = MemberDto.builder()
+        RequestMemberDto member = RequestMemberDto.builder()
                 .userId(userId)
                 .password(password)
                 .build();

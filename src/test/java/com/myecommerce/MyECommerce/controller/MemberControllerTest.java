@@ -1,8 +1,8 @@
 package com.myecommerce.MyECommerce.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
-import com.myecommerce.MyECommerce.dto.MemberDto;
+import com.myecommerce.MyECommerce.dto.member.RequestMemberDto;
+import com.myecommerce.MyECommerce.dto.member.ResponseMemberDto;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.service.member.MemberService;
 import com.myecommerce.MyECommerce.type.MemberAuthorityType;
@@ -52,7 +52,7 @@ class MemberControllerTest {
     void successSignUpSeller() throws Exception {
         // given
         // 저장할 회원객체생성
-        MemberDto memberDto = MemberDto.builder()
+        RequestMemberDto memberDto = RequestMemberDto.builder()
                 .userId("sky")
                 .password("123456789")
                 .name("김하늘")
@@ -64,8 +64,8 @@ class MemberControllerTest {
         authority.setAuthority(MemberAuthorityType.SELLER);
 
         // when
-        when(memberService.saveMember(any(MemberDto.class), anyList()))
-                .thenReturn(MemberDto.builder()
+        when(memberService.saveMember(any(RequestMemberDto.class), anyList()))
+                .thenReturn(ResponseMemberDto.builder()
                         .id(1L)
                         .userId("sky")
                         .password("encode123456789")
@@ -91,7 +91,7 @@ class MemberControllerTest {
     void successSignUpCustomer() throws Exception {
         // given
         // 저장할 회원객체생성
-        MemberDto memberDto = MemberDto.builder()
+        RequestMemberDto memberDto = RequestMemberDto.builder()
                 .userId("sky")
                 .password("123456789")
                 .name("김하늘")
@@ -103,8 +103,8 @@ class MemberControllerTest {
         authority.setAuthority(MemberAuthorityType.CUSTOMER);
 
         // when
-        when(memberService.saveMember(any(MemberDto.class), anyList()))
-                .thenReturn(MemberDto.builder()
+        when(memberService.saveMember(any(RequestMemberDto.class), anyList()))
+                .thenReturn(ResponseMemberDto.builder()
                         .id(1L)
                         .userId("sky")
                         .password("encode123456789")
@@ -132,13 +132,13 @@ class MemberControllerTest {
         String userId = "sky";
         String password = "12345678";
         // 조회할 회원 DTO 객체
-        MemberDto member= MemberDto.builder()
+        RequestMemberDto member= RequestMemberDto.builder()
                 .userId(userId)
                 .password(password)
                 .build();
 
         // when
-        given(memberService.signIn(any(MemberDto.class)))
+        given(memberService.signIn(any(RequestMemberDto.class)))
                 .willReturn("token");
 
         // then

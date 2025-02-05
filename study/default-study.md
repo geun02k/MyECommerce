@@ -1315,3 +1315,27 @@ at com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.saveSingleDa
   https://curiousjinan.tistory.com/entry/spring-controlleradvice-logging
 
 
+---
+### < Spring 어노테이션 >
+1. @RequestHeader
+   - public @interface RequestHeader.java 파일 오픈해서 확인.
+   - 메서드 매개변수가 웹 요청 헤더에 바인딩되어야 함을 나타내는 애너테이션.
+   - 매서드 매개변수가 Map<String, String>, MultiValueMap<String, Strng>, HttpHeaders 이면 Map은 모든 헤더 이름과 값으로 채워짐.
+   ~~~
+    @PostMapping("/signout")
+    public ResponseEntity<String> signOut(@RequestHeader Map<String, String> headers) {
+        String authority = headers.get("authorization");
+        // ...
+    }
+   ~~~
+   1. @Name
+      - The name of the request header to bind to.   
+        요청 헤더에 바인딩할 이름 선택가능.
+      ~~~
+        @PostMapping("/signout")
+        public ResponseEntity<String> signOut(@RequestHeader @Name("Authorization") String authorization) {
+            // ...
+        }
+      ~~~
+
+

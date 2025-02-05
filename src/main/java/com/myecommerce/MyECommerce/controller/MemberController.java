@@ -7,12 +7,12 @@ import com.myecommerce.MyECommerce.service.member.MemberService;
 import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.bind.Name;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/member")
@@ -64,9 +64,9 @@ public class MemberController {
      * 회원 로그아웃 post /member/signout
      **/
     @PostMapping("/signout")
-    public ResponseEntity<String> signOut(@RequestHeader Map<String, Object> headers) {
+    public ResponseEntity<String> signOut(@RequestHeader @Name("Authorization") String authorization) {
         // 토큰 블랙리스트 등록
-        memberService.signOut(headers.get("authorization").toString());
+        memberService.signOut(authorization);
 
         return ResponseEntity.ok("SUCCESS");
     }

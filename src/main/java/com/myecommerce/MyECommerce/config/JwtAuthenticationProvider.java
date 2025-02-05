@@ -95,8 +95,7 @@ public class JwtAuthenticationProvider {
 
     // JWT 서명 검증을 위한 비밀키 생성
     private SecretKey getDecodedSecretKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
     }
 
     // request header에서 토큰정보 가져오기

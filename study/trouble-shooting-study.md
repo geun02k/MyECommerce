@@ -3,6 +3,46 @@
 
 
 ---
+### < 요구사항 명세서 조건을 디테일하게 정리하는 이유 >
+구현할 기능들에 대한 조건들이 나열되어야 기능 구현을 올바르게 했는지 체크할 수 있기 때문입니다.
+
+---
+### < 정확도순 검색 구현방법 - 좀 더 검색해보고 고민해볼 것 >
+1. Java에서 Comparator, Comparable을 이용해 정확도에 따라 내림차순으로 정렬합니다.
+2. AWS OpenSearch에서 preference node를 지정해 정확도 점수로 정렬합니다.
+3. MySQL에서 문자열 검색 결과를 적합도 순으로 정렬합니다.
+    - 참고블로그 : https://m.blog.naver.com/jellyqueen/220426967592
+
+> - 세 가지 방법 중 mysql 문자열 검색 결과를 적합도 순으로 정렬을 선택한 이유.   
+    > pageable 객체를 전달해 쿼리를 조회하므로, 쿼리에서 이미 데이터가 정렬된 상태에서 5건의 결과를 가져와야한다.
+    > 따라서 java에서 like 검색해 일치하는 전체 데이터를 가져와 내림차순 정렬해 5건의 데이터를 가져오는 것보다 쿼리를 통해 정렬하는 것이 더 효율적이라 생각했다.
+
+---
+### < 상품목록 조회 정렬기준 변경에 따른 설정 >
+> - 멘토의 코멘트   
+>   검색시마다 order, review 를 join 하여 count 쿼리하는 것은 전체적으로 성능이 많이 안좋고, 개선이 필요할 것 같습니다.    
+    만일 상품 하나당 주문이 1만건이고, 리뷰도 1천개면 어떻게 될까요?   
+    상품 목록 조회시 응답에는 리뷰 수, 평균 별점의 정보를 내려줄때도 마찬가지입니다.    
+    조회 API 를 호출할때마다 매번 table join 해서 계산하는 방법보다 다른 방법을 찾아볼 수 있을까요?
+
+> - 고민에 대한 결과
+>
+
+---
+### < 장바구니 기능구현 >
+redis 캐시를 사용할지 DB에 사용자별 장바구니 테이블을 사용할지 결정필요.
+생각해보면 로그인, 로그아웃 여부에 관계없이 장바구니 내역을 유지해야하므로 DB에 저장하는 것이 바람직해보인다.
+하지만 redis 캐싱 기능을 사용해보기 위해 redis를 이용해 장바구니 기능을 개발해본다.
+추후 로그인하지 않은 사용자는 redis 캐시를 이용해 장바구니를 지원하고, 로그인한 사용자는 장바구니 DB 정보를 이용해 장바구니를 지원하도록 변경해본다.
+- 추가기능 : 구매자가 장바구니에 상품을 담는 경우 한 달 동안 유지되어야 한다.
+
+---
+### < 주문 시 추가 프로세스 >
+- 추가가능 : 결제 완료 시 결제확인 이메일 발송
+- 추가기능 : PG 결제 외 추가 결제수단 사용가능할 것
+
+
+---
 ### < Dto에 Entity->Dto 변환 메서드를 제거한 이유 >
 - 기존 Dto->Entity로 변환하는 메서드를 작성했다.   
   그러다 보니 Entity->Dto로 변환하는 메서드도 있으면 유용할 듯 해 메서드를 생성했다.   
@@ -283,6 +323,140 @@ DB에서 공통코드, Enum 사이에서 가장 중요한 부분은 **얼마나 
 
 
 ---
+### < Base64로 인코딩만 한 정보는 보안에 취약 >
+Base64 인코딩은 암호화가 아니라 단순히 데이터를 텍스트 형식으로 변환하는 방법입니다.
+암호화 알고리즘을 포함하지 않기 때문에 보안에 취약합니다.
+Base64는 데이터를 인간이 읽을 수 있는 형태로 변환하는 방식일 뿐, 데이터를 보호하거나 보안을 강화하는 기능이 없습니다. 그래서 암호화와는 다릅니다.
+데이터 전송 과정에서 바이너리 데이터를 텍스트로 변환하여 텍스트 기반 프로토콜을 통해 안전하게 전송할 수 있게 도와주지만, 보안을 위한 방법은 아닙니다.
+보안을 위해서는 실제 암호화 알고리즘 (예: AES, RSA 등)을 사용해야 합니다.
+
+1. Base64가 보안에 취약한 이유
+    - 암호화가 아님
+        - Base64는 데이터를 변환할 뿐, 보안을 제공하지 않습니다. 데이터를 Base64로 인코딩하면 원본 데이터가 쉽게 복원될 수 있습니다. 누구나 Base64로 인코딩된 데이터를 쉽게 디코딩할 수 있기 때문에 실제 보안이 되지 않습니다.
+    - 복호화가 쉬움
+        - Base64로 인코딩된 데이터를 복호화하는 것은 매우 간단합니다. 이를 수행하는 도구나 라이브러리가 대부분의 프로그래밍 언어나 시스템에 기본적으로 제공됩니다. 암호화된 데이터와 달리 복호화 과정이 특별한 키나 알고리즘을 필요로 하지 않습니다.
+    - 구성된 데이터는 원본 그대로임.
+        - Base64로 인코딩된 데이터는 원본 데이터의 단순한 변환에 불과합니다.
+        - 예를 들어, "Hello"라는 텍스트를 Base64로 인코딩하면 "SGVsbG8="가 되지만, 이를 다시 디코딩하면 원본 "Hello"를 그대로 얻을 수 있습니다.
+        - 이 때문에 데이터의 내용이 외부에 노출되었을 때 정보 보호가 되지 않습니다.
+
+2. 암호화와 인코딩의 목적
+    - 암호화(Encryption)
+        - 암호화는 **데이터를 보호**하기 위해 사용되며, 데이터를 읽을 수 없게 변환하여 **허가되지 않은 사용자가 이를 해석할 수 없도록** 합니다.
+        - 암호화된 데이터를 복호화하려면 키나 알고리즘을 사용해야 하며, 그 과정이 안전하게 설계되어야 합니다.
+        - 암호화는 보안이 중요한 환경에서 사용됩니다.
+    - 인코딩(Encoding)
+        - 인코딩은 **데이터를 특정 형식으로 변환**하는 방식입니다.
+        - 예를 들어, Base64는 바이너리 데이터를 텍스트로 변환하는 데 사용됩니다.
+        - 이 과정은 **데이터를 읽기 좋게 하거나 시스템에서 처리할 수 있는 형식으로 바꾸는 것**이지, 데이터를 보호하는 목적이 아닙니다.
+        - Base64는 복호화가 아주 간단하며, 암호화처럼 보안을 강화하지 않습니다.   
+          따라서, Base64는 보안 기능을 제공하지 않기 때문에 암호화된 데이터나 중요한 정보를 보호하는 데는 적합하지 않습니다.
+          만약 중요한 정보를 보호하려면, 암호화 알고리즘을 사용해야 합니다.
+
+
+### < 암호화 알고리즘 >
+아래의 링크를 포함해 공부필요   
+https://velog.io/@choidongkuen/Spring-AES-256-%EC%95%94%ED%98%B8%ED%99%94-%EC%95%8C%EA%B3%A0%EB%A6%AC%EC%A6%98%EC%97%90-%EB%8C%80%ED%95%B4
+
+
+### < Jasypt 암호화 라이브러리 >
+Base64로 인코딩한 값이 보안에 취약해 이를 보완하기위해 암호화를 별도 진행해야한다.
+springBoot 환경 설정 파일의 민감정보를 암호화 하여 관리하며, 환경변수를 통해 복호화키를 설정하여 사용할 수 있도록 한다.
+
+1. Jasypt(Java Simplified Encryption)
+    - 자신의 프로젝트(Java 어플리케이션)에서 설정파일의 속성값들을 암호화, 복호화할 수 있는 라이브러리.
+    - api 문서   
+      http://www.jasypt.org/ > http://www.jasypt.org/encrypting-texts.html
+
+2. ASYPT, Jasypt Spring Boot Starter 라이브러리 차이
+    - maven repository에 비슷한 이름의 여러 라이브러리들이 존재해 비교해본다.
+    - readme.md    
+      https://github.com/ulisesbocchio/jasypt-spring-boot
+   
+    1. ASYPT (Java Simplified Encryption) 라이브러리
+        - JASYPT는 Java 애플리케이션에서 암호화 및 복호화를 간단히 구현할 수 있도록 돕는 라이브러리.
+        - 기본적으로 JASYPT는 다양한 암호화 알고리즘을 제공하며, 사용자가 별도의 복잡한 설정 없이 간단히 암호화를 구현할 수 있게 도와줍니다.
+
+        - 단독 라이브러리
+            - **Spring Framework와 관계없이** Java 애플리케이션에서 **독립적으로 사용 가능**합니다.
+        - 간편한 사용
+            - 복잡한 암호화/복호화 과정을 간소화하여, 코드에서 간단히 암호화 기능을 구현할 수 있습니다.
+        - 다양한 암호화 방식 지원
+            - AES, DES 등 다양한 대칭키 및 비대칭키 암호화 방식 지원.
+        - 기본 설정 및 기능 제공
+            - 기본적인 암호화 및 복호화 기능을 간단히 구현할 수 있도록 도와줍니다.
+
+    2. Jasypt Spring Boot Starter 라이브러리
+        - Jasypt Spring Boot Starter는 Spring Boot 애플리케이션에서 JASYPT 라이브러리를 더 쉽게 사용할 수 있도록 도와주는 Spring Boot 특화 라이브러리입니다. Spring Boot와의 통합을 통해, 프로퍼티 파일에 저장된 암호화된 값을 쉽게 처리하고, Spring Boot 애플리케이션 내에서 암호화된 데이터의 관리가 편리해집니다.
+
+        - Spring Boot 통합
+            - **Spring Boot 환경에 최적화**된 라이브러리로, **Spring Boot의 설정 파일 (application.properties, application.yml 등)에서 암호화된 값을 처리**할 수 있도록 지원합니다.
+        - 자동화된 설정
+            - Spring Boot의 자동 설정 기능을 활용하여 암호화 및 복호화 설정을 쉽게 적용할 수 있습니다.
+        - 암호화된 프로퍼티 처리
+            - 데이터베이스 비밀번호나 API 키 등 민감한 정보를 암호화하여 프로퍼티 파일에 저장할 때 유용합니다. Spring Boot 환경에서 암호화된 값을 자동으로 복호화해 사용할 수 있습니다.
+        - 스프링 보안 연동
+            - Jasypt Spring Boot Starter는 Spring Security와도 잘 통합되어, 보안이 중요한 애플리케이션에서 유용하게 사용됩니다.
+
+- Encryptor Configuration
+    - 암호화 알고리즘 (Algorithm)
+        - 3.0 버전 부터 기본 알고리즘이 PBEWithMD5AndDES → PBEWithHMACSHA512AndAES_256로 변경 되었다.
+    - 비공개 키, 인코딩(encoding) 타입, 솔트(salt) 값 생성기 등을 설정
+
+- 암호화 관련 설정
+  ~~~
+    @Configuration
+    @EnableEncryptableProperties //  Spring 환경 전체에서 암호화 가능한 속성을 활성화
+    public class JasyptConfigAES {
+    
+        // jasyptEncryptorAES로 Bean을 등록 -> application.properties의 jasypt bean으로 등록 시 사용.
+        @Bean("jasyptEncryptorAES")
+        public StringEncryptor stringEncryptor() {
+            // PBE (Password Based Encryption)
+            PooledPBEStringEncryptor encryptor = new PooledPBEStringEncryptor();
+            SimpleStringPBEConfig config = new SimpleStringPBEConfig();
+    
+            config.setPassword("my-e-commerce-project-jasypt-secret-key"); // 암호화키 (필수)
+            config.setAlgorithm("PBEWithHMACSHA512AndAES_256"); // 알고리즘
+            config.setKeyObtentionIterations("1000"); // 반복할 해싱 횟수
+            config.setPoolSize("1"); // 인스턴스 pool
+            config.setProviderName("SunJCE");
+            config.setSaltGeneratorClassName("org.jasypt.salt.RandomSaltGenerator"); // salt 생성 클래스
+            config.setIvGeneratorClassName("org.jasypt.iv.RandomIvGenerator");
+            config.setStringOutputType("base64"); // 인코딩 방식
+    
+            encryptor.setConfig(config);
+    
+            return encryptor;
+        }
+    }
+  ~~~
+
+- 암호화
+  - 아래의 메서드를 호출해 암호화 한 값을 application.properties에 등록. 
+  ~~~
+    private String encryptString(String plainText) {
+        StandardPBEStringEncryptor encryptor = new StandardPBEStringEncryptor();
+        encryptor.setPassword("암호화시 사용할 secret key");
+        encryptor.setAlgorithm("PBEWithHMACSHA512AndAES_256");
+        encryptor.setIvGenerator(new RandomIvGenerator());
+ 
+        return encryptor.encrypt(plainText);
+    }
+  ~~~
+
+- 복호화
+  - application.properties에서 ENC()를 통해 작성된 값은 변수호출 시 복호화된 평문으로 반환.
+  - application.properties에서 복호화를 위해서는 application.properties 에 jasypt.encryptor.bean=jasyptEncryptorAES 변수를 설정해 빈등록 필요.
+  ~~~
+    spring.datasource.url=ENC(암호화된값)
+  ~~~
+
+- 참고 블로그   
+  https://goddaehee.tistory.com/321
+
+
+---
 ### < 날짜 데이터 역직렬화 에러해결 >
 - 로그인 시 아래의 오류발생.    
   로그인 시 JWT(Json Web Token) 토큰을 생성하는 과정에서 LocalDateTime 타입을 직렬화할 때 문제 발생.    
@@ -396,3 +570,6 @@ DB에서 공통코드, Enum 사이에서 가장 중요한 부분은 **얼마나 
 - 참고블로그   
   https://shyun00.tistory.com/214
 
+
+개방-폐쇄 원칙
+결합도

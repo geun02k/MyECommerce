@@ -6,9 +6,14 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 
+/** Redis를 직접 controller 하기위한 서비스 **/
 @Service
 @RequiredArgsConstructor
 public class RedisSingleDataService {
+
+    // redis에 로그인 토큰 저장 시 value값
+    // (value값이 많아지면 enum으로 관리하겠지만 하나뿐이라 변수로 선언해 사용)
+    public static final String REDIS_VALUE_FOR_LOGIN = "LOGIN";
 
     private final RedisTemplate<String, Object> redisTemplate;
 

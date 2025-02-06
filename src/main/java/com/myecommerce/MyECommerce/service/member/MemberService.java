@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.MemberErrorCode.*;
+import static com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.REDIS_VALUE_FOR_LOGIN;
 
 @Service
 @RequiredArgsConstructor
@@ -130,13 +131,12 @@ public class MemberService {
 
     // Redis에 로그인 시 생성된 토큰 저장
     private void saveLoginTokenInRedis(String token) {
-        String category = "LOGIN";
 
         Date expirationDate = jwtAuthenticationProvider.getExpirationDateFromToken(token);
         Date now = new Date();
         long validTime = expirationDate.getTime() - now.getTime();
 
         // Token을 LOGIN value를 가지도록 저장
-        redisSingleDataService.saveSingleData(token, category, Duration.ofMillis(validTime));
+        redisSingleDataService.saveSingleData(token, REDIS_VALUE_FOR_LOGIN, Duration.ofMillis(validTime));
     }
 }

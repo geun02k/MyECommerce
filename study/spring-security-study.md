@@ -477,4 +477,28 @@
      즉, null을 인자로 전달하면 @RestControllerAdvice, @ExceptionHandler를 사용하는 클래스에서 예외처리가 가능해진다.
 
 
+---
+### < JWT 인증 필터에서 Custom Exception 발생 시 AuthenticationException 발생하는 이유 >
+- Spring Security에서 JWT 인증 필터에서 custom exception이 발생했을 때, AuthenticationException이 발생하는 이유    
+  Spring Security의 기본 동작 방식 때문입니다. 
+  인증 및 권한 부여 처리를 할 때, AuthenticationException을 사용하여 인증 실패를 처리합니다.
+
+- 원인 후보
+  1. Exception 예외 처리 mismatch
+     - Spring Security에서 인증 관련 예외는 AuthenticationException을 상속한 예외들로 처리됩니다. 
+     - 예를 들어, JWT 인증 필터에서 custom exception을 발생 tl AuthenticationException을 상속받지 않으면 Spring Security가 이를 인증 실패 예외로 인식하지 못하고 기본 예외를 던질 수 있습니다.
+  2. 필터 설정에서 예외 처리 누락
+     - custom exception을 발생시키고 싶다면, 이를 처리할 수 있는 예외 처리 로직을 필터에서 명시적으로 설정해야 할 수 있습니다. 
+     - 예외가 발생했을 때 Spring Security가 기본적으로 처리하는 AuthenticationException이 아니라 custom exception을 처리하도록 해야 합니다.
+
+예외 처리 핸들러 미설정: custom exception을 처리하기 위해서는 ExceptionTranslationFilter와 같은 예외 처리 필터가 예외를 제대로 처리할 수 있도록 설정되어야 합니다. 만약 custom exception이 발생하더라도 ExceptionTranslationFilter가 이를 AuthenticationException으로 변환하여 처리할 수 있도록 설정이 되어 있지 않으면, 기본적으로 AuthenticationException이 발생할 수 있습니다.
+
+- My mistake
+  > redis에 정보가 없을 때 발생시키는 custom exception은 AuthenticationException을 상속하지 않는다.
+  > 따라서 Spring Security 인증에 대한 기본 Exception인 AuthenticationException을 발생시킨다.    
+  > 어짜피 spring security 인증정보를 filterChain을 통해 넘겨주지 않으면
+  > AuthenticationException 예외를 발생시켜 custom exception handler에서 정의한대로 예외처리를 수행할테니
+  > custom exception 발생 로직을 제거하는 것으로 해결한다.     
+  > 만약 custom exception을 발생시키고 싶으면 MemberException이 아니라 
+  > AuthenticationException을 상속받는 새로운 custom exception을 생성하고 해당 예외를 던져 에외처리를 수행하도록 한다.     
 

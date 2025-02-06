@@ -2,8 +2,6 @@ package com.myecommerce.MyECommerce.security.filter;
 
 
 import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
-import com.myecommerce.MyECommerce.exception.MemberException;
-import com.myecommerce.MyECommerce.exception.errorcode.MemberErrorCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,20 +49,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 2. 토큰값 만료시간 유효성 검증
         if (tokenProvider.isValidTokenExpirationTime(token)) {
             // 토큰 블랙리스트 확인
-            if(tokenProvider.isBlackList(token)) {
-                throw new MemberException(MemberErrorCode.ALREADY_SIGN_OUT_USER);
+            if(!tokenProvider.isBlackList(token)) {
+                // 3. JWT 토큰정보 -> 스프링 시큐리티 인증정보로 변환
+                //    : SignInService.loadUserByUsername() 메서드를 통해 조회 후 인증정보 생성
+                Authentication auth = tokenProvider.getSpringSecurityAuthentication(token);
+                // 4. 시큐리티 컨텍스트에 인증정보 추가
+                SecurityContextHolder.getContext().setAuthentication(auth);
+
+                // 사용자 요청 경로 로그 남기기
+                log.info(String.format("[%s] -> %s authenticated -> ",
+                        tokenProvider.getUserIdFromToken(token),
+                        request.getRequestURI()));
             }
-
-            // 3. JWT 토큰정보 -> 스프링 시큐리티 인증정보로 변환
-            //    : SignInService.loadUserByUsername() 메서드를 통해 조회 후 인증정보 생성
-            Authentication auth = tokenProvider.getSpringSecurityAuthentication(token);
-            // 4. 시큐리티 컨텍스트에 인증정보 추가
-            SecurityContextHolder.getContext().setAuthentication(auth);
-
-            // 사용자 요청 경로 로그 남기기
-            log.info(String.format("[%s] -> %s authenticated -> ",
-                    tokenProvider.getUserIdFromToken(token),
-                    request.getRequestURI()));
         }
 
         // 다음 필터가 연속적으로 실행될 수 있도록 함.

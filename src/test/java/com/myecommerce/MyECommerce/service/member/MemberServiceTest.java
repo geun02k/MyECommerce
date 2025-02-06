@@ -177,6 +177,13 @@ class MemberServiceTest {
                 .authority(MemberAuthorityType.SELLER)
                 .build());
 
+        // 반환될 토큰 값
+        String token = "TOKEN";
+
+        long nowTimeMs = new Date().getTime();
+        Date expirationDate = new Date(nowTimeMs + (1000L * 60 * 10)); // 현재시간+10분
+        long validTimeMs = expirationDate.getTime() - nowTimeMs;
+
         // stub(가설) : memberRepository.findByUserId() 실행 시 빈값 반환 예상.
         given(memberRepository.findByUserId(any()))
                 .willReturn(Optional.ofNullable(Member.builder()
@@ -196,13 +203,24 @@ class MemberServiceTest {
 
         // stub(가설) : jwtAuthenticationProvider.createToken() 실행 시 JWT 토큰 생성해 문자열로 반환 예상.
         given(jwtAuthenticationProvider.createToken(any(Member.class)))
-                .willReturn("token");
+                .willReturn(token);
+
+        // stub(가설) : jwtAuthenticationProvider.getExpirationDateFromToken() 실행 시
+        // 토큰의 만료시간인 현재시간+10분 값 반환 예상.
+        given(jwtAuthenticationProvider.getExpirationDateFromToken(token))
+                .willReturn(expirationDate);
 
         // when
         String returnToken = memberService.signIn(member);
 
         // then
-        assertEquals("token", returnToken);
+        // 토큰이 redis에 1번 등록됨.(1번 수행됨)
+        verify(redisSingleDataService, times(1))
+                .saveSingleData(eq(token), eq("LOGIN"), argThat(duration ->
+                        duration.compareTo(Duration.ofMillis(validTimeMs)) <= 0));
+        // 생성된 토큰이 반환 토큰값과 동일.
+        assertEquals(token, returnToken);
+
     }
 
     @Test
@@ -213,27 +231,22 @@ class MemberServiceTest {
         String token = "TOKEN";
         String authorization = "Bearer " + token;
 
-        long nowTimeMs = new Date().getTime();
-        Date expirationDate = new Date(nowTimeMs + (1000L * 60 * 10)); // 현재시간+10분
-        long validTimeMs = expirationDate.getTime() - nowTimeMs;
-
         // stub(가설) : jwtAuthenticationProvider.parseToken() 실행 시
         // TOKEN_PREFIX가 제외된 토큰값인 "TOKEN" 반환 예상.
         given(jwtAuthenticationProvider.parseToken(authorization))
                 .willReturn(token);
 
-        // stub(가설) : jwtAuthenticationProvider.getExpirationDateFromToken() 실행 시
-        // 토큰의 만료시간인 현재시간+10분 값 반환 예상.
-        given(jwtAuthenticationProvider.getExpirationDateFromToken(token))
-                .willReturn(expirationDate);
+        // stub(가설) : redisSingleDataService.getAndDeleteSingleData() 실행 시
+        // key값인 token의 value값인 "LOGIN" 반환 예상
+        given(redisSingleDataService.getAndDeleteSingleData(token))
+                .willReturn("LOGIN");
 
         // when
         memberService.signOut(authorization);
 
         // then
-        // 토큰이 redis에 1번 등록됨.(1번 수행됨)
+        // redis에 등록된 토큰 삭제 후 조회 1번 수행됨
         verify(redisSingleDataService, times(1))
-                .saveSingleData(eq(token), eq("blacklist"), argThat(duration ->
-                        duration.compareTo(Duration.ofMillis(validTimeMs)) <= 0));
+                .getAndDeleteSingleData(eq(token));
     }
 }

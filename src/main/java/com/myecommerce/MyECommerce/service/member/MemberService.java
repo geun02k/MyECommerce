@@ -78,7 +78,13 @@ public class MemberService {
         }
 
         // 3. JWT 토큰 생성
-        return jwtAuthenticationProvider.createToken(member);
+        String token = jwtAuthenticationProvider.createToken(member);
+
+        // 4. Redis에 유효한 토큰 저장
+        this.saveLoginTokenInRedis(token);
+
+        // 5. 토큰 반환
+        return token;
     }
 
     /** 로그아웃 **/
@@ -86,11 +92,10 @@ public class MemberService {
         // 1. 헤더에서 토큰정보 가져오기
         String token = jwtAuthenticationProvider.parseToken(authorization);
 
-        // 2. Access Token 유효시간 가져와 blackList로 저장
-        Date expirationDate = jwtAuthenticationProvider.getExpirationDateFromToken(token);
-        Date now = new Date();
-        long validTime = expirationDate.getTime() - now.getTime();
-        redisSingleDataService.saveSingleData(token, "blacklist", Duration.ofMillis(validTime));
+        // 2. Redis에서 유효한 토큰 삭제
+        if (ObjectUtils.isEmpty(redisSingleDataService.getAndDeleteSingleData(token))) {
+            throw new MemberException(ALREADY_SIGN_OUT_USER);
+        }
     }
 
     // 회원가입 validation check
@@ -123,4 +128,15 @@ public class MemberService {
         }
     }
 
+    // Redis에 로그인 시 생성된 토큰 저장
+    private void saveLoginTokenInRedis(String token) {
+        String category = "LOGIN";
+
+        Date expirationDate = jwtAuthenticationProvider.getExpirationDateFromToken(token);
+        Date now = new Date();
+        long validTime = expirationDate.getTime() - now.getTime();
+
+        // Token을 LOGIN value를 가지도록 저장
+        redisSingleDataService.saveSingleData(token, category, Duration.ofMillis(validTime));
+    }
 }

@@ -7,7 +7,6 @@ import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -141,8 +140,8 @@ public class JwtAuthenticationProvider {
         return Objects.requireNonNull(this.parseClaims(token)).getExpiration();
     }
 
-    // 토큰 블랙리스트 등록여부 반환
-    public boolean isBlackList(String token) {
+    // redis에 토큰 등록여부 반환
+    public boolean isValidLoginTokenInRedis(String token) {
         return redisSingleDataService.getSingleData(token) != null;
     }
 }

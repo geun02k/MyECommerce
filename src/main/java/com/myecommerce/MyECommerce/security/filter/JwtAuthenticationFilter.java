@@ -48,8 +48,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 2. 토큰값 만료시간 유효성 검증
         if (tokenProvider.isValidTokenExpirationTime(token)) {
-            // 토큰 블랙리스트 확인
-            if(!tokenProvider.isBlackList(token)) {
+            // redis에 등록된 유효한 토큰인지 확인
+            if(tokenProvider.isValidLoginTokenInRedis(token)) {
                 // 3. JWT 토큰정보 -> 스프링 시큐리티 인증정보로 변환
                 //    : SignInService.loadUserByUsername() 메서드를 통해 조회 후 인증정보 생성
                 Authentication auth = tokenProvider.getSpringSecurityAuthentication(token);

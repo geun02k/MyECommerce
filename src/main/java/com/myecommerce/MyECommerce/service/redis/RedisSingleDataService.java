@@ -17,9 +17,9 @@ public class RedisSingleDataService {
         redisConfig.redisTemplate().opsForValue().set(key, value, duration);
     }
 
-    /** Redis 단일 데이터 삭제 **/
-    public void deleteSingleData(String key) {
-        redisConfig.redisTemplate().delete(key);
+    /** Redis 단일 데이터 삭제&조회 **/
+    public Object getAndDeleteSingleData(String key) {
+        return redisConfig.redisTemplate().opsForValue().getAndDelete(key);
     }
 
     /** Redis 단일 테이터 조회 **/

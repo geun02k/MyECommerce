@@ -1,6 +1,35 @@
 # MY E-COMMERCE PROJECT STUDY
 2025 간단한 이커머스 서비스를 만들면서 공부한 내용
 
+
+---
+### < Spring core >
+1. Spring Core
+    - Spring Framework의 핵심 모듈로, 애플리케이션 개발에 필요한 기본적인 기능들을 제공.
+    - 프레임워크의 기본적인 구조와 핵심적인 기능을 담당.
+    - Spring Framework의 기반 모듈로, 다른 모듈들이 제공하는 기능들(예: Spring MVC, Spring Data, Spring Security 등)이 모두 이 Core 기능 위에 구축됨.
+    - 복잡한 애플리케이션을 보다 간결하고 확장성 있게 만들 수 있도록 함.
+
+    1. 의존성 주입 (Dependency Injection, DI)
+        - Spring Core는 의존성 주입을 지원하여 객체 간의 결합도를 낮추고, 테스트 및 유지보수를 쉽게 만듭니다.
+        - DI는 객체가 자신이 의존하는 다른 객체들을 외부에서 주입받는 방식입니다. 이를 통해 객체 생성과 의존 관계를 관리할 수 있습니다.
+
+    2. 컨테이너 (Bean Factory, ApplicationContext)
+        - Spring Core는 Bean Factory와 ApplicationContext를 제공하여 객체를 관리합니다.
+        - Spring의 컨테이너는 애플리케이션에서 필요한 객체들을 생성하고 관리하며, 이 객체들은 '빈(Bean)'이라고 불립니다.
+        - ApplicationContext는 BeanFactory를 확장한 형태로, 추가적인 기능(예: AOP, 메시지 리소스)을 제공합니다.
+
+    3. AOP (Aspect-Oriented Programming)
+        - Spring Core는 AOP를 지원하여 코드의 비즈니스 로직과는 별개로 공통적인 관심사를 처리할 수 있도록 합니다.
+        - 예를 들어, 로깅, 보안, 트랜잭션 관리 등은 AOP를 통해 비즈니스 로직과 분리하여 처리할 수 있습니다.
+
+    4. 트랜잭션 관리
+        - Spring은 트랜잭션 관리 기능을 제공하여, 데이터베이스 작업의 일관성을 유지하고 오류 발생 시 롤백할 수 있게 도와줍니다.
+
+    5. 자원 관리
+        - Spring Core는 객체의 생성, 초기화, 소멸 등의 생명 주기를 관리하며, 객체가 필요한 자원을 효율적으로 관리할 수 있도록 도와줍니다.
+
+
 ---
 ### < 스프링부트 의존성추가 >
 1. Gradle에서 종속성 추가 시 사용가능한 키워드
@@ -1439,6 +1468,12 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
             // ...
         }
       ~~~
+   2. Spring core에 있는 상수를 사용
+     ~~~
+       public ResponseEntity<String> signOut(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+           // ...
+       } 
+     ~~~
 
 
 ---

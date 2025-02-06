@@ -1070,6 +1070,108 @@ at com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.saveSingleDa
   - redisTemplate() 위에 @Bean 어노테이션 추가해 해결.
 
 
+### < 설정클래스(설정파일)을 직접 의존성 주입하는 방식에 대한 우려 >
+1. 설정클래스(설정파일)을 직접 의존성 주입
+   - 보통 설정 파일(또는 설정 클래스)을 직접 의존성 주입하는 것은 권장되지 않습니다. 
+   - 그 이유는 설정 파일은 주로 애플리케이션의 설정을 구성하고 빈을 등록하는 역할을 하기 때문입니다. 
+   - 설정 파일은 일반적으로 스프링 컨테이너에 의해 자동으로 관리되며, 해당 설정이 적용된 빈을 다른 클래스에서 사용할 수 있도록 하는 것이 목표입니다.
+   - 설정 파일을 직접적으로 의존성 주입하는 것은 애플리케이션의 설계 원칙에 위배될 수 있고, 유지보수 및 확장성 측면에서 바람직하지 않습니다. 
+   - **설정 클래스에서 관리하는 빈을 다른 컴포넌트에서 주입받는 것이 권장**되는 방법입니다.
+
+2. 설정파일을 직접 의존성 주입하는 방법이 권장되지 않는 이유
+   1. 설정 파일의 책임
+      - 설정 클래스는 주로 빈 등록과 환경 설정을 담당합니다. 
+      - 직접적으로 비즈니스 로직을 담당하는 클래스에 의존성을 주입하는 것은 관심사의 분리 원칙을 위반할 수 있습니다. 
+      - 설정 클래스는 애플리케이션의 설정을 제공하는 역할에 집중해야 합니다.
+   2. 스프링 컨테이너의 관리
+      - 스프링 컨테이너는 설정 클래스를 관리하고, 이를 기반으로 필요한 빈을 자동으로 생성하여 주입합니다. 
+      - 설정 클래스를 직접적으로 주입하는 대신, 스프링 컨테이너가 관리하는 빈(예: RedisTemplate)을 주입받는 것이 더 자연스럽고, 
+        이를 통해 의존성 주입이 잘 이루어집니다.
+   3. 재사용성
+      - 설정 클래스를 다른 서비스나 컴포넌트에서 직접 주입받는다면, 해당 설정을 사용할 때마다 불필요하게 설정 파일을 직접 의존하게 됩니다. 
+      - 반면, 설정 클래스에서 필요한 빈을 @Bean으로 등록해 두면, 스프링 컨테이너가 해당 빈을 관리하고
+        필요한 클래스에서 이 빈만 주입받아 사용하면 됩니다.
+
+3. 설정파일의 직접 의존성 주입을 피하는 방식
+   - 설정 클래스를 의존성 주입하는 대신, 설정 클래스는 단지 빈을 등록하고 관리하는 역할만 합니다. 
+   - 예를 들어, RedisConfig 클래스를 통해 RedisTemplate을 생성하고, 다른 클래스에서 이를 주입받아 사용하는 방식이 이상적입니다. 
+   - 이렇게 설정 클래스에서 RedisTemplate을 @Bean으로 등록한 후, RedisTemplate을 사용하는 다른 서비스 클래스에서는 다음과 같이 주입받습니다.
+
+4. 편리한 테스트 및 유지보수
+   - 설정 클래스를 직접 주입받지 않고, 빈을 주입받는 방식은 단위 테스트와 유지보수 측면에서도 더 유리합니다. 
+   - 설정 클래스는 구현 세부사항을 숨기고, 빈을 주입하는 방식으로 구성 요소들의 독립성을 높이는 데 유리합니다.
+
+
+5. Redis 설정파일 직접 의존하지 않도록 변경하기    
+RedisTemplate을 @Bean으로 등록했기 때문에 RedisSingleDataService에서 redisConfig.redisTemplate()처럼 직접 주입하는 것이 아니라, 
+필요한 곳에서 RedisTemplate을 주입하는 방식이 더 나은 설계입니다.    
+
+현재 RedisConfig 클래스에서 @Bean을 사용하여 redisTemplate을 생성 및 등록하고 있습니다.     
+스프링의 의존성 주입 방식 중 redisTemplate을 다른 컴포넌트에서 사용하기 위해서 설정 클래스에서 빈을 등록합니다.   
+
+설정 클래스인 RedisConfig를 다른 컴포넌트에서 의존성으로 주입받는 대신, 
+redisTemplate을 직접 필요한 클래스에서 주입받도록 합니다.
+RedisConfig를 다른 클래스에서 직접 주입받는 것보다 RedisTemplate을 주입받는 것이 더 자연스럽고, 더 직관적인 방식입니다.
+
+**설정 클래스에서 @Bean으로 RedisTemplate을 정의**했기 때문에, 이를 **필요한 클래스에서 @Autowired나 생성자 주입을 통해 주입받는 것이 좋습니다.**
+RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으로 관리되기 때문에 다른 클래스에서 이를 주입받아 사용하면 됩니다. 
+따라서 RedisTemplate을 사용하면 되는데 굳이 RedisConfig 클래스를 의존성 주입으로 사용할 필요는 없습니다.
+
+- redis 설정
+    ~~~
+    @Configuration
+    public class RedisConfig {
+    
+        @Value("${spring.data.redis.host}")
+        private String host;
+        @Value("${spring.data.redis.port}")
+        private int port;
+    
+        /** Lettuce를 사용한 Connection 객체 생성 **/
+        @Bean
+        public RedisConnectionFactory redisConnectionFactory() {
+            final RedisStandaloneConfiguration redisStandaloneConfig = new RedisStandaloneConfiguration();
+    
+            // ...
+            
+            return new LettuceConnectionFactory(redisStandaloneConfig);
+        }
+    
+        /** RedisTemplate 설정
+         *  : Redis에 저장할 데이터형식 제공 **/
+        @Bean
+        public RedisTemplate<String, Object> redisTemplate() {
+            RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
+    
+            // 사용할 Connection 설정
+            redisTemplate.setConnectionFactory(redisConnectionFactory());
+             
+            // ...
+             
+            return redisTemplate;
+        }
+    }
+    ~~~
+- redis 사용부분 올바르게 수정
+    ~~~
+    @Service
+    @RequiredArgsConstructor
+    public class RedisSingleDataService {
+        // 설정파일이 아닌 bean에 의존하도록 의존성주입
+        // 기존 : private final RedisConfig redisConfig;
+        private final RedisTemplate<String, Object> redisTemplate;
+    
+        /** Redis 단일 데이터 등록 **/
+        public void saveSingleData(String key, Object value, Duration duration) {
+            // 기존 : redisConfig.redisTemplate().opsForValue().set(key, value, duration);        
+            redisTemplate.opsForValue().set(key, value, duration);
+        }
+    
+        // ... 
+    }
+    ~~~
+
+
 ---
 ### < JWT 이용한 로그아웃 >
 1. 로그인, 로그아웃 구현방식
@@ -1338,4 +1440,8 @@ at com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.saveSingleDa
         }
       ~~~
 
+
+---
+개방-폐쇄 원칙
+결합도
 

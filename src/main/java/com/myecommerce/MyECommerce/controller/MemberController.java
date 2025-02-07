@@ -1,25 +1,23 @@
 package com.myecommerce.MyECommerce.controller;
 
-import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
-import com.myecommerce.MyECommerce.dto.MemberDto;
+import com.myecommerce.MyECommerce.dto.member.RequestMemberDto;
+import com.myecommerce.MyECommerce.dto.member.ResponseMemberDto;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.service.member.MemberService;
 import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/member")
 @RequiredArgsConstructor
 public class MemberController {
-
-    private final JwtAuthenticationProvider jwtAuthenticationProvider;
 
     private final MemberService memberService;
 
@@ -27,7 +25,7 @@ public class MemberController {
      * 판매자 회원가입 post /member/signup/seller
      **/
     @PostMapping("/signup/seller")
-    public ResponseEntity<MemberDto> signUpSeller(@Valid @RequestBody MemberDto member) {
+    public ResponseEntity<ResponseMemberDto> signUpSeller(@Valid @RequestBody RequestMemberDto member) {
         // 권한추가
         List<MemberAuthority> authorities = new ArrayList<>();
         authorities.add(MemberAuthority.builder()
@@ -42,7 +40,7 @@ public class MemberController {
      * 고객 회원가입 post /member/signup/customer
      **/
     @PostMapping("/signup/customer")
-    public ResponseEntity<MemberDto> signUpCustomer(@Valid @RequestBody MemberDto member) {
+    public ResponseEntity<ResponseMemberDto> signUpCustomer(@Valid @RequestBody RequestMemberDto member) {
         // 권한추가
         List<MemberAuthority> authorities = new ArrayList<>();
         authorities.add(MemberAuthority.builder()
@@ -57,24 +55,18 @@ public class MemberController {
      * 회원 로그인 post /member/signin
      **/
     @PostMapping("/signin")
-    public ResponseEntity<String> signIn(@RequestBody MemberDto memberDto) {
-        // 1. 아이디, 패스워드 일치여부 확인
-        MemberDto authenticatedMember = memberService.authenticateMember(memberDto);
-
-        // 2. JWT 토큰 생성
-        String token = jwtAuthenticationProvider.createToken(authenticatedMember);
-
-        // 3. 토큰 반환
-        return ResponseEntity.ok(token);
+    public ResponseEntity<String> signIn(@RequestBody RequestMemberDto memberDto) {
+        // 사용자검증 후 JWT 토큰 반환
+        return ResponseEntity.ok(memberService.signIn(memberDto));
     }
 
     /**
      * 회원 로그아웃 post /member/signout
      **/
     @PostMapping("/signout")
-    public ResponseEntity<String> signOut(@RequestHeader Map<String, Object> headers) {
-        // 로그아웃
-        memberService.signOut(headers.get("authorization").toString());
+    public ResponseEntity<String> signOut(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        // 토큰 블랙리스트 등록
+        memberService.signOut(authorization);
 
         return ResponseEntity.ok("SUCCESS");
     }

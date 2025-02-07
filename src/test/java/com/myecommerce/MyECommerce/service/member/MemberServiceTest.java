@@ -1,7 +1,8 @@
 package com.myecommerce.MyECommerce.service.member;
 
 import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
-import com.myecommerce.MyECommerce.dto.MemberDto;
+import com.myecommerce.MyECommerce.dto.member.RequestMemberDto;
+import com.myecommerce.MyECommerce.dto.member.ResponseMemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.mapper.MemberMapper;
@@ -77,7 +78,7 @@ class MemberServiceTest {
                                     .authority(MemberAuthorityType.SELLER)
                                     .build());
         // 저장할 회원객체생성
-        MemberDto memberDto = MemberDto.builder()
+        RequestMemberDto memberDto = RequestMemberDto.builder()
                 .userId("sky")
                 .password("123456789")
                 .name("김하늘")
@@ -86,7 +87,7 @@ class MemberServiceTest {
                 .build();
 
         // 저장된 회원 DTO객체 생성
-        MemberDto expectMemberDto = MemberDto.builder()
+        ResponseMemberDto expectMemberDto = ResponseMemberDto.builder()
                 .id(1L)
                 .userId("sky")
                 .password("encode12345678")
@@ -122,7 +123,7 @@ class MemberServiceTest {
                 .willReturn("encode12345678");
 
         // stub(가설) : 저장된 회원정보 Dto를 Entity로 변환 예상.
-        given(memberMapper.toEntity(any(MemberDto.class)))  // MemberDto -> Member 변환
+        given(memberMapper.toEntity(any(RequestMemberDto.class)))  // MemberDto -> Member 변환
                 .willReturn(expectMemberEntity);
         // stub(가설) : 저장된 회원정보 Entity를 Dto로 변환 예상.
         given(memberMapper.toDto(any(Member.class)))  // Member -> MemberDto 변환
@@ -137,7 +138,7 @@ class MemberServiceTest {
                 .willReturn(expectAuthorityList.get(0));
 
         // when
-        MemberDto savedMember = memberService.saveMember(memberDto, memberAuthorityList);
+        ResponseMemberDto savedMember = memberService.saveMember(memberDto, memberAuthorityList);
 
         // then
         assertNotNull(savedMember);
@@ -154,6 +155,7 @@ class MemberServiceTest {
     @Test
     @DisplayName("로그인성공")
     void successSignIn() {
+        // given
         Long id = 1L;
         String userId = "sky";
         String password = "12345678";
@@ -163,9 +165,8 @@ class MemberServiceTest {
         String address = "서울 동작구 보라매로5가길 16 보라매아카데미타워 7층";
         Character delYn = 'N';
 
-        // given
         // 조회할 회원 DTO 객체 생성
-        MemberDto member = MemberDto.builder()
+        RequestMemberDto member = RequestMemberDto.builder()
                 .userId(userId)
                 .password(password)
                 .build();
@@ -175,6 +176,13 @@ class MemberServiceTest {
                 .id(id)
                 .authority(MemberAuthorityType.SELLER)
                 .build());
+
+        // 반환될 토큰 값
+        String token = "TOKEN";
+
+        long nowTimeMs = new Date().getTime();
+        Date expirationDate = new Date(nowTimeMs + (1000L * 60 * 10)); // 현재시간+10분
+        long validTimeMs = expirationDate.getTime() - nowTimeMs;
 
         // stub(가설) : memberRepository.findByUserId() 실행 시 빈값 반환 예상.
         given(memberRepository.findByUserId(any()))
@@ -193,31 +201,26 @@ class MemberServiceTest {
         given(passwordEncoder.matches(any(), any()))
                 .willReturn(true);
 
-        // stub(가설) : 저장된 회원정보 Entity를 Dto로 변환 예상.
-        given(memberMapper.toDto(any(Member.class)))  // Member -> MemberDto 변환
-                .willReturn(MemberDto.builder()
-                        .id(id)
-                        .userId(userId)
-                        .password(encodedPassword)
-                        .name(name)
-                        .telephone(telephone)
-                        .address(address)
-                        .delYn(delYn)
-                        .roles(expectRoleList)
-                        .build());
+        // stub(가설) : jwtAuthenticationProvider.createToken() 실행 시 JWT 토큰 생성해 문자열로 반환 예상.
+        given(jwtAuthenticationProvider.createToken(any(Member.class)))
+                .willReturn(token);
+
+        // stub(가설) : jwtAuthenticationProvider.getExpirationDateFromToken() 실행 시
+        // 토큰의 만료시간인 현재시간+10분 값 반환 예상.
+        given(jwtAuthenticationProvider.getExpirationDateFromToken(token))
+                .willReturn(expirationDate);
 
         // when
-        MemberDto searchedMember = memberService.authenticateMember(member);
+        String returnToken = memberService.signIn(member);
 
         // then
-        assertEquals(id, searchedMember.getId());
-        assertEquals(userId, searchedMember.getUserId());
-        assertEquals(encodedPassword, searchedMember.getPassword());
-        assertEquals(name, searchedMember.getName());
-        assertEquals(telephone, searchedMember.getTelephone());
-        assertEquals(address, searchedMember.getAddress());
-        assertEquals(delYn, searchedMember.getDelYn());
-        assertEquals(expectRoleList.get(0).getAuthority(), searchedMember.getRoles().get(0).getAuthority());
+        // 토큰이 redis에 1번 등록됨.(1번 수행됨)
+        verify(redisSingleDataService, times(1))
+                .saveSingleData(eq(token), eq("LOGIN"), argThat(duration ->
+                        duration.compareTo(Duration.ofMillis(validTimeMs)) <= 0));
+        // 생성된 토큰이 반환 토큰값과 동일.
+        assertEquals(token, returnToken);
+
     }
 
     @Test
@@ -228,27 +231,22 @@ class MemberServiceTest {
         String token = "TOKEN";
         String authorization = "Bearer " + token;
 
-        long nowTimeMs = new Date().getTime();
-        Date expirationDate = new Date(nowTimeMs + (1000L * 60 * 10)); // 현재시간+10분
-        long validTimeMs = expirationDate.getTime() - nowTimeMs;
-
         // stub(가설) : jwtAuthenticationProvider.parseToken() 실행 시
         // TOKEN_PREFIX가 제외된 토큰값인 "TOKEN" 반환 예상.
         given(jwtAuthenticationProvider.parseToken(authorization))
                 .willReturn(token);
 
-        // stub(가설) : jwtAuthenticationProvider.getExpirationDateFromToken() 실행 시
-        // 토큰의 만료시간인 현재시간+10분 값 반환 예상.
-        given(jwtAuthenticationProvider.getExpirationDateFromToken(token))
-                .willReturn(expirationDate);
+        // stub(가설) : redisSingleDataService.getAndDeleteSingleData() 실행 시
+        // key값인 token의 value값인 "LOGIN" 반환 예상
+        given(redisSingleDataService.getAndDeleteSingleData(token))
+                .willReturn("LOGIN");
 
         // when
         memberService.signOut(authorization);
 
         // then
-        // 토큰이 redis에 1번 등록됨.(1번 수행됨)
+        // redis에 등록된 토큰 삭제 후 조회 1번 수행됨
         verify(redisSingleDataService, times(1))
-                .saveSingleData(eq(token), eq("blacklist"), argThat(duration ->
-                        duration.compareTo(Duration.ofMillis(validTimeMs)) <= 0));
+                .getAndDeleteSingleData(eq(token));
     }
 }

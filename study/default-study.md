@@ -1,6 +1,35 @@
 # MY E-COMMERCE PROJECT STUDY
 2025 간단한 이커머스 서비스를 만들면서 공부한 내용
 
+
+---
+### < Spring core >
+1. Spring Core
+    - Spring Framework의 핵심 모듈로, 애플리케이션 개발에 필요한 기본적인 기능들을 제공.
+    - 프레임워크의 기본적인 구조와 핵심적인 기능을 담당.
+    - Spring Framework의 기반 모듈로, 다른 모듈들이 제공하는 기능들(예: Spring MVC, Spring Data, Spring Security 등)이 모두 이 Core 기능 위에 구축됨.
+    - 복잡한 애플리케이션을 보다 간결하고 확장성 있게 만들 수 있도록 함.
+
+    1. 의존성 주입 (Dependency Injection, DI)
+        - Spring Core는 의존성 주입을 지원하여 객체 간의 결합도를 낮추고, 테스트 및 유지보수를 쉽게 만듭니다.
+        - DI는 객체가 자신이 의존하는 다른 객체들을 외부에서 주입받는 방식입니다. 이를 통해 객체 생성과 의존 관계를 관리할 수 있습니다.
+
+    2. 컨테이너 (Bean Factory, ApplicationContext)
+        - Spring Core는 Bean Factory와 ApplicationContext를 제공하여 객체를 관리합니다.
+        - Spring의 컨테이너는 애플리케이션에서 필요한 객체들을 생성하고 관리하며, 이 객체들은 '빈(Bean)'이라고 불립니다.
+        - ApplicationContext는 BeanFactory를 확장한 형태로, 추가적인 기능(예: AOP, 메시지 리소스)을 제공합니다.
+
+    3. AOP (Aspect-Oriented Programming)
+        - Spring Core는 AOP를 지원하여 코드의 비즈니스 로직과는 별개로 공통적인 관심사를 처리할 수 있도록 합니다.
+        - 예를 들어, 로깅, 보안, 트랜잭션 관리 등은 AOP를 통해 비즈니스 로직과 분리하여 처리할 수 있습니다.
+
+    4. 트랜잭션 관리
+        - Spring은 트랜잭션 관리 기능을 제공하여, 데이터베이스 작업의 일관성을 유지하고 오류 발생 시 롤백할 수 있게 도와줍니다.
+
+    5. 자원 관리
+        - Spring Core는 객체의 생성, 초기화, 소멸 등의 생명 주기를 관리하며, 객체가 필요한 자원을 효율적으로 관리할 수 있도록 도와줍니다.
+
+
 ---
 ### < 스프링부트 의존성추가 >
 1. Gradle에서 종속성 추가 시 사용가능한 키워드
@@ -1070,6 +1099,108 @@ at com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.saveSingleDa
   - redisTemplate() 위에 @Bean 어노테이션 추가해 해결.
 
 
+### < 설정클래스(설정파일)을 직접 의존성 주입하는 방식에 대한 우려 >
+1. 설정클래스(설정파일)을 직접 의존성 주입
+   - 보통 설정 파일(또는 설정 클래스)을 직접 의존성 주입하는 것은 권장되지 않습니다. 
+   - 그 이유는 설정 파일은 주로 애플리케이션의 설정을 구성하고 빈을 등록하는 역할을 하기 때문입니다. 
+   - 설정 파일은 일반적으로 스프링 컨테이너에 의해 자동으로 관리되며, 해당 설정이 적용된 빈을 다른 클래스에서 사용할 수 있도록 하는 것이 목표입니다.
+   - 설정 파일을 직접적으로 의존성 주입하는 것은 애플리케이션의 설계 원칙에 위배될 수 있고, 유지보수 및 확장성 측면에서 바람직하지 않습니다. 
+   - **설정 클래스에서 관리하는 빈을 다른 컴포넌트에서 주입받는 것이 권장**되는 방법입니다.
+
+2. 설정파일을 직접 의존성 주입하는 방법이 권장되지 않는 이유
+   1. 설정 파일의 책임
+      - 설정 클래스는 주로 빈 등록과 환경 설정을 담당합니다. 
+      - 직접적으로 비즈니스 로직을 담당하는 클래스에 의존성을 주입하는 것은 관심사의 분리 원칙을 위반할 수 있습니다. 
+      - 설정 클래스는 애플리케이션의 설정을 제공하는 역할에 집중해야 합니다.
+   2. 스프링 컨테이너의 관리
+      - 스프링 컨테이너는 설정 클래스를 관리하고, 이를 기반으로 필요한 빈을 자동으로 생성하여 주입합니다. 
+      - 설정 클래스를 직접적으로 주입하는 대신, 스프링 컨테이너가 관리하는 빈(예: RedisTemplate)을 주입받는 것이 더 자연스럽고, 
+        이를 통해 의존성 주입이 잘 이루어집니다.
+   3. 재사용성
+      - 설정 클래스를 다른 서비스나 컴포넌트에서 직접 주입받는다면, 해당 설정을 사용할 때마다 불필요하게 설정 파일을 직접 의존하게 됩니다. 
+      - 반면, 설정 클래스에서 필요한 빈을 @Bean으로 등록해 두면, 스프링 컨테이너가 해당 빈을 관리하고
+        필요한 클래스에서 이 빈만 주입받아 사용하면 됩니다.
+
+3. 설정파일의 직접 의존성 주입을 피하는 방식
+   - 설정 클래스를 의존성 주입하는 대신, 설정 클래스는 단지 빈을 등록하고 관리하는 역할만 합니다. 
+   - 예를 들어, RedisConfig 클래스를 통해 RedisTemplate을 생성하고, 다른 클래스에서 이를 주입받아 사용하는 방식이 이상적입니다. 
+   - 이렇게 설정 클래스에서 RedisTemplate을 @Bean으로 등록한 후, RedisTemplate을 사용하는 다른 서비스 클래스에서는 다음과 같이 주입받습니다.
+
+4. 편리한 테스트 및 유지보수
+   - 설정 클래스를 직접 주입받지 않고, 빈을 주입받는 방식은 단위 테스트와 유지보수 측면에서도 더 유리합니다. 
+   - 설정 클래스는 구현 세부사항을 숨기고, 빈을 주입하는 방식으로 구성 요소들의 독립성을 높이는 데 유리합니다.
+
+
+5. Redis 설정파일 직접 의존하지 않도록 변경하기    
+RedisTemplate을 @Bean으로 등록했기 때문에 RedisSingleDataService에서 redisConfig.redisTemplate()처럼 직접 주입하는 것이 아니라, 
+필요한 곳에서 RedisTemplate을 주입하는 방식이 더 나은 설계입니다.    
+
+현재 RedisConfig 클래스에서 @Bean을 사용하여 redisTemplate을 생성 및 등록하고 있습니다.     
+스프링의 의존성 주입 방식 중 redisTemplate을 다른 컴포넌트에서 사용하기 위해서 설정 클래스에서 빈을 등록합니다.   
+
+설정 클래스인 RedisConfig를 다른 컴포넌트에서 의존성으로 주입받는 대신, 
+redisTemplate을 직접 필요한 클래스에서 주입받도록 합니다.
+RedisConfig를 다른 클래스에서 직접 주입받는 것보다 RedisTemplate을 주입받는 것이 더 자연스럽고, 더 직관적인 방식입니다.
+
+**설정 클래스에서 @Bean으로 RedisTemplate을 정의**했기 때문에, 이를 **필요한 클래스에서 @Autowired나 생성자 주입을 통해 주입받는 것이 좋습니다.**
+RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으로 관리되기 때문에 다른 클래스에서 이를 주입받아 사용하면 됩니다. 
+따라서 RedisTemplate을 사용하면 되는데 굳이 RedisConfig 클래스를 의존성 주입으로 사용할 필요는 없습니다.
+
+- redis 설정
+    ~~~
+    @Configuration
+    public class RedisConfig {
+    
+        @Value("${spring.data.redis.host}")
+        private String host;
+        @Value("${spring.data.redis.port}")
+        private int port;
+    
+        /** Lettuce를 사용한 Connection 객체 생성 **/
+        @Bean
+        public RedisConnectionFactory redisConnectionFactory() {
+            final RedisStandaloneConfiguration redisStandaloneConfig = new RedisStandaloneConfiguration();
+    
+            // ...
+            
+            return new LettuceConnectionFactory(redisStandaloneConfig);
+        }
+    
+        /** RedisTemplate 설정
+         *  : Redis에 저장할 데이터형식 제공 **/
+        @Bean
+        public RedisTemplate<String, Object> redisTemplate() {
+            RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
+    
+            // 사용할 Connection 설정
+            redisTemplate.setConnectionFactory(redisConnectionFactory());
+             
+            // ...
+             
+            return redisTemplate;
+        }
+    }
+    ~~~
+- redis 사용부분 올바르게 수정
+    ~~~
+    @Service
+    @RequiredArgsConstructor
+    public class RedisSingleDataService {
+        // 설정파일이 아닌 bean에 의존하도록 의존성주입
+        // 기존 : private final RedisConfig redisConfig;
+        private final RedisTemplate<String, Object> redisTemplate;
+    
+        /** Redis 단일 데이터 등록 **/
+        public void saveSingleData(String key, Object value, Duration duration) {
+            // 기존 : redisConfig.redisTemplate().opsForValue().set(key, value, duration);        
+            redisTemplate.opsForValue().set(key, value, duration);
+        }
+    
+        // ... 
+    }
+    ~~~
+
+
 ---
 ### < JWT 이용한 로그아웃 >
 1. 로그인, 로그아웃 구현방식
@@ -1176,4 +1307,188 @@ at com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.saveSingleDa
   https://engineerinsight.tistory.com/232   
   https://f-lab.kr/insight/jwt-logout-implementation-20240608   
   https://evga7.tistory.com/141
+
+
+---
+### < DTO >
+1. 도메인
+   - 하나의 비즈니스 업무 영역과 관련된 개념.
+   - 실제 비즈니스 로직이나 규칙, 도메인 정보 등을 포함.
+2. DTO
+   - 계층간의 데이터 전달을 위해 사용하는 객체.
+- 참고블로그
+  https://shyun00.tistory.com/214
+
+
+### < 요청과 응답으로 DTO 사용해야하는 이유 >
+1. Entity 내부 구현 캡슐화해 은닉
+   - Entity
+     - 도메인의 핵심 로직, 속성을 가짐.
+     - 실제 DB 테이블과 매칭되는 클래스.
+   - Entity가 getter, setter를 갖게 되면 controller 같은 비즈니스 로직과 관계없는 곳에서 자원의 속성이 실수로라도 변경될 수 있음.
+   - Entity UI 계층을 노출하는 것은 테이블 설계 화면을 공개하는 것과 같으므로 보안상 바람직하지 않음.
+    
+2. 화면에 필요한 데이터 선별
+   - 요청과 응답으로 Entity 사용 시, 요청하는 화면에서 불필요한 속성까지 전달됨. -> 속도 느려짐.
+   - 요청과 응답으로 Entity 사용 시 다양한 요청과 응답에 따른 속성들을 동적 선택 불가.
+   - 특정 api에 필요한 데이터를 포함한 DTO 별도 생성 시 화면이 요구하는 필요 데이터들만 선별해 용청과 응답가능.
+
+3. 순환참조 예방
+   - JPA로 개발 시 양방향 참조인 경우 순환참조를 조심해야함.
+   - 양방향 참조된 Entity를 응답으로 return 하게되면  
+     entity가 참조하고 있는 객체 지연로딩 -> 로딩된 객체는 또 다시 본인이 참조하고 있는 객체를 호출
+     을 반복하면 무한루프에 빠진다.
+   - 순환참조가 일어나지 않도록 응답의 return으로 DTO를 사용하는 것이 순환참조에서 안전.
+
+4. validation코드와 모델링코드 분리가능.
+   - Entity 클래스는 DB의 테이블과 매칭되는 필드가 속성으로 선언되어 있고, 복잡한 비즈니스 로직이 작성되어있음. 
+     띠리서 속성에 @Column, @JoinColumn , @ManyToOne, @OneToOne 등의 모델링을 위한 코드가 추가됨.
+     여기에 추가로 @NotNull, @NotEmpty @NotBlank 같은 요청에 대한 값에 대한 validation 코드가 들어가면 Entity 클래스는 더 복잡해지고 가독성이 저하됨.
+   - DTO에는 요청에 필요한 validation 정의.
+   - Entity 클래스는 모델링과 비즈니스 로직에만 집중가능.
+
+- DTO를 모든 API마다 구별해서 만들다보면 너무 많은 DTO가 생겨서 관리하기 어렵다고 하기도 한다.
+  그럼에도 불구하고 요청과 응답으로 엔티티를 사용하면, 개발의 편리함을 얻는 대신 애플리케이션의 결함을 얻게 될 수 있다.
+  API 스펙과 엔티티 사이에 의존성이 생기는 문제도 간과할 수 없다
+  UI와 도메인이 서로 의존성을 갖zx지 않고 독립적으로 개발하는 것을 지향하기 때문에 이를 중간에서 연결시켜주는 DTO의 역할은 꽤나 중요
+  요청과 응답으로 DTO를 사용하면 각각의 DTO 클래스가 데이터를 전송하는 클래스로서의 역할을 명확히 가질 수 있게 되고, 이는 하나의 클래스가 하나의 역할을 해야 한다는 객체지향의 정신과도 부합
+
+- 참고블로그   
+  https://shyun00.tistory.com/214
+
+  
+---
+### < request, response DTO 분리 >
+- client->controller에 들어오는 request 정보와 controller->client로 내보내는 response는
+  사용하는 목적이 다르고 전달하는 데이터도 다르기에 분리하는 것이 좋다.
+- DTO는 주고받는 데이터를 정의한 api 명세서와 다름없다.
+- 단건, 복수 건 조회 정도만 동일 DTO 사용으로 운명을 함께할 수 있다.
+
+1. request DTO
+    - validation check 어노테이션을 사용 -> 데이터의 유효성 검사.
+2. response DTO
+    - 단순히 데이터를 반환.
+
+
+---
+### < 로그 레벨 결정 >
+- 로그 레벨
+  - 해당 로그 메시지가 얼마나 중요한지 알려주는 정보.
+  - 정보 노이즈 및 경고 피로를 줄이는 데 도움이 될 수 있음.
+- 정상적이지 않은 모든 상황에서 전부 ERROR 레벨로 처리하게 되면 불필요하게 많은 알람들로 인해 정작 봐야할 심각한 에러 로그들을 놓칠 수 있다.
+
+1. DEBUG
+   - 개발 혹은 테스트 단계에서 해당 기능들이 올바르게 작동하는지 확인하기 위한 로그 레벨.
+   - 개발 및 테스트 과정에서 문제를 추적하고 해결하는 데 도움을 준다.
+   - **운영 환경에서는 남기고 싶지 않은 로그 메세지**를 위한 레벨.
+2. INFO
+   - 애플리케이션에서 정상 작동에 대한 정보로 어떤 일이 발생했음을 나타내는 표준 로그 레벨.
+   - **애플리케이션 상태, 설정 또는 외부 리소스와의 상호 작용과 같은 상태 확인을 위한 이벤트**를 나타냄.
+     - ex) 인증 API의 백엔드 시스템에서 인증이 성공했는지 여부에 따라 사용자가 인증을 요청한 정보.
+     - ex) 애플리케이션이 시작되거나 종료되는 시점, 중요한 작업이 완료되거나 실행되는 시점 (예: 배치 작업, 정기 작업) 등의 경우.
+   - **시스템을 파악하는데 유익한 정보**여야만 한다.
+3. WARN
+   - 애플리케이션에서 잠재적으로 문제가 될 수 있는 상황일때 남기는 로그 레벨.
+     - ex) 사용자가 로그인에 실패하는 것은 ID, PW 등을 오입력하여 언제든 발생할 수 있는 일반적인 문제 상황.
+           이럴때는 WARN 레벨로 책정하고, 로그인이 5번 연속 실패하는 등 특정 기준치를 넘길 경우 ERROR 레벨로 남기는 것이 좋다.
+     - ex) 예상치 못한 입력 (사용자가 유효하지 않은 입력을 제공한 경우 - 예: 이메일 형식이 아닌 입력), 리소스 제한 (파일 업로드 사이즈 초과 등)과 같은 경고.
+           이런 경우 사용자에게 노출되는 메세지에 상세한 가이드가 필요한 것이지, 로그 레벨이 ERROR일 필요가 없다.
+   - **개발자가 조치를 취할 수 있도록 주의를 기울일 필요가 있는 상황.**
+4. ERROR
+   - 애플리케이션에서 발생한 심각한 오류나 예외 상황을 나타내는 로그 레벨.
+   - 기능 자체가 제대로 작동하지 못하는 문제일 때 남겨야 하며 **즉시 조치가 필요할 때**를 의미.
+     - ex) 데이터베이스 연결이 실패한 경우, 내부 시스템의 문제로 결제가 실패하는 경우 등 즉시 조치를 취해야 한다.
+
+- **운영에서 필요한 것은 WARN 레벨과 ERROR 레벨을 구분**하는 것.
+  - 예외 상황, 오류 상황이 모두 ERROR 일 수는 없다.
+    일반적이지 않은 예외 상황이 개발자가 제어할 수 없는 상황이라면 이는 WARN으로 두는 것이 좋다.
+  1. 외부 API 연동
+     - WARN
+       - 외부 API 의 에러 발생율은 개발자가 컨트롤 불가.
+         한 두번의 실패가 큰 영향을 끼치는 상황이 아니라면 외부 API는 WARN으로 레벨 사용.
+     - ERROR
+       - 결제 등 비즈니스상 치명적인 API의 경우     
+         그 외 외부 결제사의 문제라면 이는 ERROR로 로그를 남겨 빠르게 인지후, 해당 결제사가 정상이 될 때까지는 미노출시키는 등의 작업 필요. 
+         (단, 잔고 부족, 인증 실패 등 고객의 실수인 경우는 WARN)
+       - 재시도 전략이 없는 상태에서 하루 1번, 한달에 1번 정도로 요청 자체가 주기적으로 적은 횟수만 수행하는 경우      
+         Retry 호출, 메세지큐 등 재시도 전략이 있는게 아니면서 딱 1번씩만 호출하는 경우 재시도를 해야하기 때문에 ERROR로 로그
+
+- 모니터링 기준 설정    
+  로그 레벨 중 WARN과 ERROR을 구분하면 진짜 봐야할 중요한 문제들만 볼 수 있다.
+  둘의 레벨을 구분하면 아래와 같이 모니터링 기준을 가져갈 수 있다.
+  - INFO: 기존대비 +-50%이상 차이날 경우 알람
+  - WARN: 분당 20개이상일 경우 알람
+  - ERROR: 분당 5개이상일 경우 알람
+
+- Exception Handler에서 에러경중에 맞는 로그 출력하기.
+  - CustomException 클래스를 만들고, 예외의 심각도에 따라 로그 레벨을 설정가능.
+  - warn과 error를 구분할 수 있는 필드를 추가.
+      ~~~
+      public class CustomException extends RuntimeException {
+      private boolean isCritical; // WARN, ERROR
+    
+          public CustomException(String message, boolean isCritical) {
+              super(message);
+              this.isCritical = isCritical;
+          }
+    
+          public boolean isCritical() {
+              return isCritical;
+          }
+      }
+      ~~~
+    
+- 참고블로그   
+  https://jojoldu.tistory.com/712    
+  https://velog.io/@midas/Exception-%EC%B2%98%EB%A6%AC-%EB%B0%A9%EB%B2%95
+
+- 추가공부권장 (AOP와 log)   
+  https://curiousjinan.tistory.com/entry/spring-controlleradvice-logging
+
+
+---
+### < Spring 어노테이션 >
+1. @RequestHeader
+   - public @interface RequestHeader.java 파일 오픈해서 확인.
+   - 메서드 매개변수가 웹 요청 헤더에 바인딩되어야 함을 나타내는 애너테이션.
+   - 매서드 매개변수가 Map<String, String>, MultiValueMap<String, Strng>, HttpHeaders 이면 Map은 모든 헤더 이름과 값으로 채워짐.
+   ~~~
+    @PostMapping("/signout")
+    public ResponseEntity<String> signOut(@RequestHeader Map<String, String> headers) {
+        String authority = headers.get("authorization");
+        // ...
+    }
+   ~~~
+   1. @Name
+      - The name of the request header to bind to.   
+        요청 헤더에 바인딩할 이름 선택가능.
+      ~~~
+        @PostMapping("/signout")
+        public ResponseEntity<String> signOut(@RequestHeader @Name("Authorization") String authorization) {
+            // ...
+        }
+      ~~~
+   2. Spring core에 있는 상수를 사용
+     ~~~
+       public ResponseEntity<String> signOut(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+           // ...
+       } 
+     ~~~
+
+
+---
+### < 상수 선언 >
+1. final
+   - 변수에 final 선언 시 해당 변수는 한 번만 초기화 가능.
+2. static
+   - 컴파일 시점에 데이터의 메모리 할당.
+   - 동적 데이터와 달리 프로그램 실행 직후부터 종료시까지 메모리 수명 유지.
+3. 상수 선언 시 static final로 선언하는 이유
+   - 상수는 모든 클래스 인스턴스에서 똑같이 써야할 값이고, 처음부터 끝까지 바뀌지 않아야 할 값.
+   - 상수를 static으로 선언하지 않은 경우, 클래스의 모든 인스턴스에 해당 상수에 대한 메모리를 할당.
+   - 변하지 않고 계속 일관된 값을 제공 -> 데이터의 의미와 용도 고정.
+   - 인스턴스 생성마다 매번 같은 메모리를 잡지 않아 효율적.
+
+- 참고블로그
+  https://velog.io/@tjddus0302/Java-%EC%83%81%EC%88%98%EB%8A%94-%EC%99%9C-static-final%EB%A1%9C-%EC%84%A0%EC%96%B8%ED%95%A0%EA%B9%8C
 

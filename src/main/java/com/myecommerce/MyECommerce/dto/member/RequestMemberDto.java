@@ -1,4 +1,4 @@
-package com.myecommerce.MyECommerce.dto;
+package com.myecommerce.MyECommerce.dto.member;
 
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import jakarta.validation.constraints.*;
@@ -11,7 +11,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MemberDto {
+public class RequestMemberDto {
 
     private Long id;
 

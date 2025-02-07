@@ -34,7 +34,7 @@ public class CommonExceptionHandler {
                 .errorMessage(e.getErrorMessage())
                 .build();
 
-        log.error(e.getErrorMessage(), e);
+        log.warn(e.getErrorMessage(), e);
 
         // 응답 객체 반환
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
@@ -59,7 +59,7 @@ public class CommonExceptionHandler {
                 .errorMessage(errorCode.getErrorMessage() + defaultErrorMessage)
                 .build();
 
-        log.error(errorCode.getErrorMessage(), e);
+        log.warn(errorCode.getErrorMessage(), e);
 
         // 응답 객체 반환
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
@@ -81,7 +81,7 @@ public class CommonExceptionHandler {
                 .errorMessage(errorCode.getErrorMessage())
                 .build();
 
-        log.error(errorCode.getErrorMessage(), e);
+        log.warn(errorCode.getErrorMessage(), e);
 
         // 응답 객체 반환
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
@@ -103,7 +103,7 @@ public class CommonExceptionHandler {
                 .errorMessage(errorCode.getErrorMessage())
                 .build();
 
-        log.error(errorCode.getErrorMessage(), e);
+        log.warn(errorCode.getErrorMessage(), e);
 
         // 응답 객체 반환
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
@@ -123,7 +123,7 @@ public class CommonExceptionHandler {
                 .errorMessage(errorCode.getErrorMessage())
                 .build();
 
-        log.error(errorCode.getErrorMessage(), e);
+        log.warn(errorCode.getErrorMessage(), e);
 
         // 응답 객체 반환
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.

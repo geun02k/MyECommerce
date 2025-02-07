@@ -1,11 +1,12 @@
 package com.myecommerce.MyECommerce.config;
 
-import com.myecommerce.MyECommerce.dto.MemberDto;
+import com.myecommerce.MyECommerce.entity.member.Member;
+import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.service.member.SignInAuthenticationService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
+import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,7 @@ import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 
 @Component
@@ -33,14 +35,18 @@ public class JwtAuthenticationProvider {
     private final RedisSingleDataService redisSingleDataService;
 
     /** 토큰생성 */
-    public String createToken(MemberDto member) {
+    public String createToken(Member member) {
         Date now = new Date();
+
+        // 권한목록 생성
+        List<MemberAuthorityType> roles =
+                member.getRoles().stream().map(MemberAuthority::getAuthority).toList();
 
         return Jwts.builder()
                 .subject(String.valueOf(member.getId()))
                 .claim("userId", member.getUserId())
                 .claim("name", member.getName())
-                .claim("roles", member.getRoles())
+                .claim("roles", roles)
                 .issuedAt(now) // 발급시간
                 .expiration(new Date(now.getTime() + TOKEN_VALID_TIME)) // 만료시간
                 .signWith(getDecodedSecretKey()) // 서명 (HMAC SHA-256 알고리즘 이용해 서명)
@@ -88,8 +94,7 @@ public class JwtAuthenticationProvider {
 
     // JWT 서명 검증을 위한 비밀키 생성
     private SecretKey getDecodedSecretKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
     }
 
     // request header에서 토큰정보 가져오기
@@ -135,8 +140,8 @@ public class JwtAuthenticationProvider {
         return Objects.requireNonNull(this.parseClaims(token)).getExpiration();
     }
 
-    // 토큰 블랙리스트 등록여부 반환
-    public boolean isBlackList(String token) {
+    // redis에 토큰 등록여부 반환
+    public boolean isValidLoginTokenInRedis(String token) {
         return redisSingleDataService.getSingleData(token) != null;
     }
 }

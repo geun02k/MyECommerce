@@ -1,7 +1,8 @@
 package com.myecommerce.MyECommerce.service.member;
 
 import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
-import com.myecommerce.MyECommerce.dto.MemberDto;
+import com.myecommerce.MyECommerce.dto.member.RequestMemberDto;
+import com.myecommerce.MyECommerce.dto.member.ResponseMemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.exception.MemberException;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.MemberErrorCode.*;
+import static com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.REDIS_VALUE_FOR_LOGIN;
 
 @Service
 @RequiredArgsConstructor
@@ -43,7 +45,7 @@ public class MemberService {
      * @return 신규 회원가입한 회원정보를 담은 MemberDto 객체
      */
     @Transactional
-    public MemberDto saveMember(MemberDto member, List<MemberAuthority> authorities) {
+    public ResponseMemberDto saveMember(RequestMemberDto member, List<MemberAuthority> authorities) {
         // validation check
         saveMemberValidationCheck(member);
 
@@ -65,9 +67,9 @@ public class MemberService {
         return memberMapper.toDto(savedMember);
     }
 
-    /** 로그인 검증 */
-    public MemberDto authenticateMember(MemberDto memberDto) {
-        // 1. 사용자ID로 사용자 조회
+    /** 로그인 **/
+    public String signIn(RequestMemberDto memberDto) {
+        // 1. 사용자ID 검증 (사용자 조회)
         Member member = memberRepository.findByUserId(memberDto.getUserId())
                 .orElseThrow(() -> new MemberException(USER_NOT_FOUND));
 
@@ -76,8 +78,14 @@ public class MemberService {
             throw new MemberException(MISMATCH_PASSWORD);
         }
 
-        // 3. 회원정보 반환
-        return memberMapper.toDto(member);
+        // 3. JWT 토큰 생성
+        String token = jwtAuthenticationProvider.createToken(member);
+
+        // 4. Redis에 유효한 토큰 저장
+        this.saveLoginTokenInRedis(token);
+
+        // 5. 토큰 반환
+        return token;
     }
 
     /** 로그아웃 **/
@@ -85,15 +93,14 @@ public class MemberService {
         // 1. 헤더에서 토큰정보 가져오기
         String token = jwtAuthenticationProvider.parseToken(authorization);
 
-        // 2. Access Token 유효시간 가져와 blackList로 저장
-        Date expirationDate = jwtAuthenticationProvider.getExpirationDateFromToken(token);
-        Date now = new Date();
-        long validTime = expirationDate.getTime() - now.getTime();
-        redisSingleDataService.saveSingleData(token, "blacklist", Duration.ofMillis(validTime));
+        // 2. Redis에서 유효한 토큰 삭제
+        if (ObjectUtils.isEmpty(redisSingleDataService.getAndDeleteSingleData(token))) {
+            throw new MemberException(ALREADY_SIGN_OUT_USER);
+        }
     }
 
     // 회원가입 validation check
-    private void saveMemberValidationCheck(MemberDto member) {
+    private void saveMemberValidationCheck(RequestMemberDto member) {
         // 회원 객체 존재여부 validation check
         if(ObjectUtils.isEmpty(member)) {
             throw new MemberException(EMPTY_MEMBER_INFO);
@@ -122,4 +129,14 @@ public class MemberService {
         }
     }
 
+    // Redis에 로그인 시 생성된 토큰 저장
+    private void saveLoginTokenInRedis(String token) {
+
+        Date expirationDate = jwtAuthenticationProvider.getExpirationDateFromToken(token);
+        Date now = new Date();
+        long validTime = expirationDate.getTime() - now.getTime();
+
+        // Token을 LOGIN value를 가지도록 저장
+        redisSingleDataService.saveSingleData(token, REDIS_VALUE_FOR_LOGIN, Duration.ofMillis(validTime));
+    }
 }

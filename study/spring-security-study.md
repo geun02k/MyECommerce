@@ -218,11 +218,11 @@
       - 데이터의 무결성을 확인하는 서명.
       - 헤더와 페이로드를 비밀키로 서명해 무결성 보장.
 
-3. 비밀키 암호화
-   - JWT 토큰 생성 시 사용할 암호화된 비밀키 생성.
-     - 토큰 생성시 HS512알고리즘 사용을 위해 512비트(64바이트 이상)의 시크릿키 사용.   
-     - 보안을 위해 평문보다는 base64로 인코딩한 값을 사용.   
-     - 터미널에서 암호화된 문자열 생성가능.   
+3. 비밀키 인코딩
+   - JWT 토큰 생성 시 사용할 디코딩된 비밀키 생성. (암호화x)
+     - 토큰 생성시 HS512알고리즘 사용을 위해 512비트(64바이트 이상)의 문자열을 사용해 JWT 토큰의 비밀키 생성   
+     - 평문보다는 base64로 인코딩한 값을 사용. (더 좋은 방법은 암호화해 인코딩한 값을 사용하는 것)
+     - 터미널에서 인코딩된 문자열 생성가능.   
        - 평문키 파일을 생성해 base64로 인코딩된 문자열을 포함한 새파일 생성.
        ~~~
          C:\workspace\reservation\src\main\resources\token>certutil -encode jwt-secret-key.txt jwt_secret_key_encoding_b64   
@@ -240,7 +240,7 @@
 5. JWT 서명 검증을 위한 비밀키 생성 (JwtAuthenticationProvider.java)
    - JWT 생성 시 사용할 비밀키 생성
      - JWT 서명 검증을 위해 비밀키 생성 필요.
-     - 만약 비밀키로 사용할 문자열이 암호화된 상태라면 해당 문자열을 디코딩해 평문으로 변경해 준 뒤 사용해야 한다.
+     - 만약 비밀키로 사용할 문자열이 인코딩된 상태라면 해당 문자열을 디코딩해 평문으로 변경해 준 뒤 사용해야 한다.
        그리고 해당 평문키를 HMAC-SHA 알고리즘을 이용해 키를 생성해 사용한다.
      ~~~
      private SecretKey getDecodedSecretKey() {
@@ -251,7 +251,7 @@
      1. secret key 문자열을 UTF-8 바이트 배열로 변환.
      2. Keys.hmacShakeyFor() 메서드를 사용해서 HMAC-SHA 알고리즘에 맞는 키 객체 생성.
      - 비밀키를 생성하는데 encoding이 아닌 decoding하는 이유
-       - 비밀키인 문자열이 이미 보안을 위한 base64로 암호화된 상태였다.   
+       - 비밀키인 문자열이 base64로 인코딩된 상태였다.   
          이를 평문으로 변경하기 위해 base64로 디코딩하는 과정이 필요하기 때문이다.
 
 6. JWT 토큰생성 (JwtAuthenticationProvider.java)
@@ -477,4 +477,28 @@
      즉, null을 인자로 전달하면 @RestControllerAdvice, @ExceptionHandler를 사용하는 클래스에서 예외처리가 가능해진다.
 
 
+---
+### < JWT 인증 필터에서 Custom Exception 발생 시 AuthenticationException 발생하는 이유 >
+- Spring Security에서 JWT 인증 필터에서 custom exception이 발생했을 때, AuthenticationException이 발생하는 이유    
+  Spring Security의 기본 동작 방식 때문입니다. 
+  인증 및 권한 부여 처리를 할 때, AuthenticationException을 사용하여 인증 실패를 처리합니다.
+
+- 원인 후보
+  1. Exception 예외 처리 mismatch
+     - Spring Security에서 인증 관련 예외는 AuthenticationException을 상속한 예외들로 처리됩니다. 
+     - 예를 들어, JWT 인증 필터에서 custom exception을 발생 tl AuthenticationException을 상속받지 않으면 Spring Security가 이를 인증 실패 예외로 인식하지 못하고 기본 예외를 던질 수 있습니다.
+  2. 필터 설정에서 예외 처리 누락
+     - custom exception을 발생시키고 싶다면, 이를 처리할 수 있는 예외 처리 로직을 필터에서 명시적으로 설정해야 할 수 있습니다. 
+     - 예외가 발생했을 때 Spring Security가 기본적으로 처리하는 AuthenticationException이 아니라 custom exception을 처리하도록 해야 합니다.
+
+예외 처리 핸들러 미설정: custom exception을 처리하기 위해서는 ExceptionTranslationFilter와 같은 예외 처리 필터가 예외를 제대로 처리할 수 있도록 설정되어야 합니다. 만약 custom exception이 발생하더라도 ExceptionTranslationFilter가 이를 AuthenticationException으로 변환하여 처리할 수 있도록 설정이 되어 있지 않으면, 기본적으로 AuthenticationException이 발생할 수 있습니다.
+
+- My mistake
+  > redis에 정보가 없을 때 발생시키는 custom exception은 AuthenticationException을 상속하지 않는다.
+  > 따라서 Spring Security 인증에 대한 기본 Exception인 AuthenticationException을 발생시킨다.    
+  > 어짜피 spring security 인증정보를 filterChain을 통해 넘겨주지 않으면
+  > AuthenticationException 예외를 발생시켜 custom exception handler에서 정의한대로 예외처리를 수행할테니
+  > custom exception 발생 로직을 제거하는 것으로 해결한다.     
+  > 만약 custom exception을 발생시키고 싶으면 MemberException이 아니라 
+  > AuthenticationException을 상속받는 새로운 custom exception을 생성하고 해당 예외를 던져 에외처리를 수행하도록 한다.     
 

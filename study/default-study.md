@@ -229,55 +229,79 @@
        } 
    }
    ~~~
+   
 5. JPA Entity 검증 (Bean Validation 안티 패턴)
    - 검증을 위한 마지막 방어선은 지속성 계층임.
    - 일반적으로 지속성 계층에서 가장 늦게 검증을 하지 않는다.    
      비즈니스 코드가 잠재적으로 유효하지 않은 객체와 함께 작동하여 예상치 못한 오류를 초래할 수 있기 때문임.
 
-6. SpringBoot 사용한 사용자정의 검증 (어노테이션)
+6. SpringBoot 사용한 사용자정의 검증 (어노테이션 생성)
    - 어노테이션 생성
-   ~~~
-    @Target({ FIELD })
-    @Retention(RUNTIME)
-    @Constraint(validatedBy = IpAddressValidator.class)
-    @Documented
-    public @interface IpAddress {
+     ~~~
+      @Target({ FIELD })
+      @Retention(RUNTIME)
+      @Constraint(validatedBy = IpAddressValidator.class)
+      @Documented
+      public @interface IpAddress {
     
-        String message() default "{IpAddress.invalid}";
+          String message() default "{IpAddress.invalid}";
     
-        Class<?>[] groups() default { };
+          Class<?>[] groups() default { };
     
-        Class<? extends Payload>[] payload() default { };
+          Class<? extends Payload>[] payload() default { };
     
-    }   
-   ~~~
+      }
+     ~~~
+     - @Constraint
+       - validatedBy 옵션을 이용해 ConstraintValidator를 구현한 클래스 참조를 명시. 런타임에 ConstraintValidatorFactory를 구현한
+   
    - 검증 구현
-   ~~~
-    class IpAddressValidator implements ConstraintValidator<IpAddress, String> {
+     ~~~
+      class IpAddressValidator implements ConstraintValidator<IpAddress, String> {
     
-        @Override
-        public boolean isValid(String value, ConstraintValidatorContext context) {
-            Pattern pattern =
-                Pattern.compile("^([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})$");
-            Matcher matcher = pattern.matcher(value);
-            try {
-                if (!matcher.matches()) {
-                    return false;
-                } else {
-                    for (int i = 1; i <= 4; i++) {
-                        int octet = Integer.valueOf(matcher.group(i));
-                        if (octet > 255) {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-            } catch (Exception e) {
-                return false;
-            }
-        }
-    }   
-   ~~~
+          @Override
+          public boolean isValid(String value, ConstraintValidatorContext context) {
+              Pattern pattern =
+                  Pattern.compile("^([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})$");
+              Matcher matcher = pattern.matcher(value);
+              try {
+                  if (!matcher.matches()) {
+                      return false;
+                  } else {
+                      for (int i = 1; i <= 4; i++) {
+                          int octet = Integer.valueOf(matcher.group(i));
+                          if (octet > 255) {
+                              return false;
+                          }
+                      }
+                      return true;
+                  }
+              } catch (Exception e) {
+                  return false;
+              }
+          }
+      }   
+     ~~~
+     - ConstraintValidator
+       - 구현체는 ConstraintValidator 인터페이스를 상속받아 구현.
+     - ConstraintValidator<A, T>
+       - 주어진 객체 유형 T에 대해 제약 조건 A를 검증하는 논리를 정의.
+       - T는 파라미터화되지 않은 유형으로 해결되어야 함. (A : 구현이 처리하는 애너테이션 유형)
+       - T의 제네릭 파라미터는 한정되지 않은 와일드카드 유형이어야 함. (T : 구현이 지원하는 대상 유형)
+       - 정의한 어노테이션 인터페이스, Validation에 사용할 Type의 class type.
+     - isValid()
+       - ConstraintValidator 인터페이스에 정의된 필수 구현 메서드.
+       - 실제 Validation에 사용할 코드는 isValid 를 통해 구현.
+     - initialize()
+       - ConstraintValidator 인터페이스에 정의된 메서드.
+       - isValid(Object, ConstraintValidatorContext) 호출을 준비하기 위해 검증기를 초기화.
+       - 검증 인스턴스가 사용되기 전에 반드시 우선호출됨.
+       - 주어진 제약 선언에 대한 제약 애너테이션이 전달
+       - default(인터페이스 메서드에 기본 구현을 제공하는 키워드)로 기본 구현은 아무 작업도 수행하지 않는(no-op) 구현 
+     - @SupportedValidationTarget 
+       - 제약 검증기가 교차 매개변수 제약을 지원하는지 표시하는 데 사용가능.
+     - 참고블로그 https://jsy1110.github.io/2022/enum-class-validation/
+   
    - 어노테이션 사용
    ~~~
     class InputWithCustomValidator {

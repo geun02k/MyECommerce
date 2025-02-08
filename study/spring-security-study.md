@@ -502,3 +502,14 @@
   > 만약 custom exception을 발생시키고 싶으면 MemberException이 아니라 
   > AuthenticationException을 상속받는 새로운 custom exception을 생성하고 해당 예외를 던져 에외처리를 수행하도록 한다.     
 
+
+---
+### < DB 생성자, 수정자 ID 자동입력 > 
+- 생성자, 수정자 자동등록을 위해 추가
+  - @CreatedBy,  @LastModifiedBy 어노테이션 사용을 위해 추가.
+  - 해당 AuditorAware 인터페이스 구현하지 않으면 생성자, 수정자 자동입력불가.
+
+- 참고 블로그
+  : https://eoneunal.tistory.com/33
+
+

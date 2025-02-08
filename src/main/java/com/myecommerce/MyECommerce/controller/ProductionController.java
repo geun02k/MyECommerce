@@ -7,6 +7,7 @@ import com.myecommerce.MyECommerce.service.production.ProductionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +22,7 @@ public class ProductionController {
      * 상품, 상품옵션목록 등록 post /production
      **/
     @PostMapping
+    @PreAuthorize("hasAuthority('SELLER')")
     public ResponseEntity<ResponseProductionDto> registerProduction(
             @RequestBody @Valid RequestProductionDto production,
             @AuthenticationPrincipal Member member) {

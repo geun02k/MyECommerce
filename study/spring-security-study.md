@@ -78,6 +78,10 @@
     스프링 시큐리티 구성 : 스프링 시큐리티 구성을 위한 WegbSecurityConfigurer 빈 생성 / 구성 클래스에서 configure() 메서드를 오버라이딩하여 웹 보안 설정 구성가능.   
     다양한 보안 기능 추가 ex) 폼 기반 인증, 로그인 페이지 구성, 권한 설정 등 가능.   
 
+- @EnableMethodSecurity
+  - 메소드레벨에서 인증권한 설정을 위해 추가.
+  - controller에서 @PreAuthorize("hasAuthority('SELLER')") 등의 어노테이션을 통해 해당 권한에 대해서만 API 접근을 허용하도록 설정가능.
+
 - permitAll()
     - 해당경로에 대해 인증없이 무조건적으로 권한허용.
     - 회원가입, 로그인의 경우는 토큰없이 접근가능해야함. (JWT 토큰은 로그인 후 생성되므로.)

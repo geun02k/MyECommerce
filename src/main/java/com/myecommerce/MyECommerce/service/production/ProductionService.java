@@ -5,6 +5,7 @@ import com.myecommerce.MyECommerce.dto.production.ResponseProductionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.production.Production;
 import com.myecommerce.MyECommerce.entity.production.ProductionOption;
+import com.myecommerce.MyECommerce.exception.ProductionException;
 import com.myecommerce.MyECommerce.mapper.ProductionMapper;
 import com.myecommerce.MyECommerce.mapper.ProductionOptionMapper;
 import com.myecommerce.MyECommerce.repository.production.ProductionOptionRepository;
@@ -15,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.ALREADY_REGISTERED_CODE;
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.ALREADY_REGISTERED_OPTION_CODE;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 
 @Service
@@ -31,6 +34,12 @@ public class ProductionService {
     @Transactional
     public ResponseProductionDto saveProduction(RequestProductionDto requestProductionDto,
                                                 Member member) {
+        // 판매자별 동일 상품코드 중복등록방지
+        productionRepository.findBySellerAndCode(member.getId(), requestProductionDto.getCode())
+                .ifPresent(existingProduction -> {
+                    throw new ProductionException(ALREADY_REGISTERED_CODE);
+                });
+
         // 상품 dto -> entity 변환 및 상품등록 기본데이터 셋팅
         Production production = this.setProductionEntityDataFromDto(
                 requestProductionDto, member);
@@ -44,7 +53,15 @@ public class ProductionService {
         Production savedProduction = productionRepository.save(production);
         // 상품옵션목록 등록
         optionEntityList.forEach(option -> {
+            // JPA 연관관계를 위해 옵션에 상품객체 셋팅
             option.setProduction(savedProduction);
+            // 상품코드 하위의 옵션코드 중복 체크
+            productionOptionRepository.findByProductionIdAndOptionCode(
+                    savedProduction.getId(), option.getOptionCode())
+                    .ifPresent(existingOption -> {
+                        throw new ProductionException(ALREADY_REGISTERED_OPTION_CODE);
+                    });
+            // 상품옵션등록
             productionOptionRepository.save(option);
         });
 

@@ -513,3 +513,18 @@
   : https://eoneunal.tistory.com/33
 
 
+---
+### < 스프링 시큐리티를 이용해 로그인 사용자정보 가져오기 >
+User Principal은 현재 접근하는 주체의 정보와 권한을 담는 인터페이스를 의미합니다.
+Spring Security에서 로그인한 사용자의 정보를 받아오기 위해서는 @AuthenticationPrincipal 어노테이션을 사용할 수 있습니다.
+@AuthenticationPrincipal은 다음과 같은 용도로 사용할 수 있습니다.
+- Account의 많은 정보를 얻고 싶을 때
+- Controller의 맵핑 메서드의 파라미터의 코드를 효율적으로 줄이고 싶을 때
+- 정보 객체로 사용되는 객체는 UserDetails를 구현하는 User를 상속받아야 하는 경우
+
+- User Principal 코드구현 참고 블로그   
+  https://januaryman.tistory.com/165
+
+- 참고 블로그   
+  https://charliezip.tistory.com/25
+

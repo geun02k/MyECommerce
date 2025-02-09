@@ -656,6 +656,27 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
      }
      ~~~
    
+
+### < repository의 메서드를 stub하지 않아도 테스트코드 오류가 발생하지 않는 이유 >
+1. 궁금증 발생원인
+   - ProductionService.saveProduction() 메서드에서 productionRepository.findBySellerAndCode() 메서드를 서비스 로직에 추가했는데 
+     테스트코드에서 해당 메서드 호출 시 오류가 발생하지 않았다. (기존 다른 테스트코드 작성시에는 repository의 메서드 호출 시 stub 하지 않으면 오류가 발생했다.)
+
+2. 테스트코드 정상 수행된 이유
+   - productionRepository.findBySellerAndCode() 메서드가 실제로 호출되지 않아서입니다. 
+   - Mockito에서 @Mock 어노테이션을 사용해 ProductionRepository를 모킹했기 때문에, 해당 메서드는 실제로 실행되지 않고, 대신 빈 값을 반환하거나 아무 일도 일어나지 않게 됩니다.
+   - productionRepository.findBySellerAndCode() 메서드는 Optional<Production>을 반환하고, 해당 값이 존재할 경우 예외를 던지는 코드입니다.
+   - Mockito는 기본적으로 모킹된 객체가 호출되면 빈 값 (예: null 또는 Optional.empty())을 반환하기 때문에 ifPresent 블록이 실행되지 않습니다.
+   - 즉, productionRepository.findBySellerAndCode(sellerId, productionCode) 메서드를 모킹하지 않더라도, Mockito는 이 메서드가 호출되는 대신 아무 작업도 하지 않으므로, 예외가 발생하지 않는 것입니다.
+   > 결론     
+   > 모킹되지 않으면 기본값인 빈 값(null 또는 Optional.empty())이 반환됨.    
+   > 만약 메서드가 빈값을 반환해도 되는 경우, 테스트의 명확성과 일관성을 보장하기 위해 명시적으로 모킹해주는 것이 더 좋을 방법일 수 있음.    
+   > 테스트의 정확성을 위해서 Optional.empty()와 Optional.of(existingProduction) 두 가지 경우를 모두 테스트해 보는 것이 좋음.    
+
+3. 올바른 테스트코드 작성방법
+   - productionRepository.findBySellerAndCode() 메서드를 명시적으로 모킹해야 합니다.
+   - 예를 들어, 해당 메서드가 Optional.empty()를 반환하도록 설정하거나, 이미 존재하는 상품을 반환하도록 설정할 수 있습니다.
+
  
 ### < 테스트코드 검증 >
 1. Mockito의 verify()

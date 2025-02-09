@@ -21,10 +21,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.Collections;
+import java.util.Optional;
 
 import static com.myecommerce.MyECommerce.type.ProductionCategoryType.WOMEN_CLOTHING;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -142,6 +144,13 @@ class ProductionServiceTest {
         // stub(가설) : productionMapper.toEntity() 실행 시 requestOptionDto에 대한 Entity 반환 예상.
         given(productionOptionMapper.toEntity(requestOptionDto))
                 .willReturn(optionEntity);
+
+        // stub(가설) : productionRepository.findBySellerAndCode() 실행 시 빈 optional 객체 반환 예상.
+        given(productionRepository.findBySellerAndCode(any(Long.class), any(String.class)))
+                .willReturn(Optional.empty());
+        // stub(가설) : productionOptionRepository.findByProductionIdAndOptionCode() 실행 시 빈 optional 객체 반환 예상.
+        given(productionOptionRepository.findByProductionIdAndOptionCode(any(Long.class), any(String.class)))
+                .willReturn(Optional.empty());
 
         // stub(가설) : productionRepository.save() 실행 시 expectedProductionEntity 반환 예상.
         given(productionRepository.save(productionEntity))

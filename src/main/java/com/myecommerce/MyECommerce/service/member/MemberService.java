@@ -70,7 +70,7 @@ public class MemberService {
     /** 로그인 **/
     public String signIn(RequestMemberDto memberDto) {
         // 1. 사용자ID 검증 (사용자 조회)
-        Member member = memberRepository.findByUserId(memberDto.getUserId())
+        Member member = memberRepository.findByUserIdAndDelYn(memberDto.getUserId(), 'N')
                 .orElseThrow(() -> new MemberException(USER_NOT_FOUND));
 
         // 2. 비밀번호 검증

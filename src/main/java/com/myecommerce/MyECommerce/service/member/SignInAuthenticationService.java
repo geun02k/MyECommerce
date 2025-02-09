@@ -24,7 +24,7 @@ public class SignInAuthenticationService implements UserDetailsService {
      */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return memberRepository.findByUserId(username)
+        return memberRepository.findByUserIdAndDelYn(username, 'N')
                 .orElseThrow(() -> new MemberException(USER_NOT_FOUND));
     }
 

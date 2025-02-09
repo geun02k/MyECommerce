@@ -12,5 +12,5 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     Optional<Member> findByTelephone(String telephone);
 
     // 사용자ID에 대한 회원정보 조회
-    Optional<Member> findByUserId(String userId);
+    Optional<Member> findByUserIdAndDelYn(String userId, Character delYn);
 }

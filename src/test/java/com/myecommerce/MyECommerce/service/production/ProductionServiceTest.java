@@ -166,7 +166,7 @@ class ProductionServiceTest {
 
         // when
         ResponseProductionDto response =
-                productionService.saveProduction(requestProductionDto, member);
+                productionService.registerProduction(requestProductionDto, member);
 
         // then
         verify(productionRepository, times(1))

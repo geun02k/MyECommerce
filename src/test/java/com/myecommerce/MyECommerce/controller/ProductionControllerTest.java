@@ -99,7 +99,7 @@ class ProductionControllerTest {
                 .options(null)
                 .build();
 
-        given(productionService.saveProduction(
+        given(productionService.registerProduction(
                 any(RequestProductionDto.class), any(Member.class)))
                 .willReturn(response);
 

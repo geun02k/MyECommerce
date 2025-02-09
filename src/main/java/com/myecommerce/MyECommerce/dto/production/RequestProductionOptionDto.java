@@ -27,7 +27,4 @@ public class RequestProductionOptionDto {
     @Min(value = 1, message = "해당 옵션의 판매가능 수량을 입력해주세요.")
     private int quantity;
 
-    @Min(value = 1, message = "해당 옵션의 순서를 입력해주세요.")
-    private int seq;
-
 }

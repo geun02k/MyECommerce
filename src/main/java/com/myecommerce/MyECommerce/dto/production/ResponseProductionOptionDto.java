@@ -23,8 +23,6 @@ public class ResponseProductionOptionDto {
 
     private int quantity;
 
-    private int seq;
-
     private Member member;
 
     private Long createId;

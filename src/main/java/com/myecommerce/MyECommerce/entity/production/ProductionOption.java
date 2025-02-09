@@ -34,10 +34,6 @@ public class ProductionOption extends BaseEntity {
     @ColumnDefault("0")
     private int quantity;
 
-    @Column(nullable = false)
-    @ColumnDefault("1")
-    private int seq;
-
     @ManyToOne
     @JoinColumn(name="productionId") // 테이블 매핑 시 foreign key 지정
     private Production production;

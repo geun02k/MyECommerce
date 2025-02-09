@@ -1,8 +1,6 @@
 package com.myecommerce.MyECommerce.service.production;
 
-import com.myecommerce.MyECommerce.dto.production.RequestProductionDto;
-import com.myecommerce.MyECommerce.dto.production.RequestProductionOptionDto;
-import com.myecommerce.MyECommerce.dto.production.ResponseProductionDto;
+import com.myecommerce.MyECommerce.dto.production.*;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.production.Production;
 import com.myecommerce.MyECommerce.entity.production.ProductionOption;
@@ -17,8 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.ALREADY_REGISTERED_CODE;
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.ALREADY_REGISTERED_OPTION_CODE;
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.*;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 
 @Service
@@ -69,7 +66,7 @@ public class ProductionService {
             // 상품옵션목록의 JPA 연관관계를 위해 옵션에 상품객체 셋팅
             optionEntity.setProduction(savedProduction);
             // 상품옵션목록 중복체크
-            checkIfOptionCodeExists(optionEntityList);
+            checkIfOptionCodeExists(optionEntity);
             // 상품옵션목록 등록
             productionOptionRepository.save(optionEntity);
         });
@@ -82,14 +79,12 @@ public class ProductionService {
                 });
     }
 
-    private void checkIfOptionCodeExists(List<ProductionOption> optionList) {
+    private void checkIfOptionCodeExists(ProductionOption option) {
         // 상품코드 하위의 옵션코드 중복 체크
-        optionList.forEach(option -> {
-            productionOptionRepository.findByProductionIdAndOptionCode(
-                            option.getProduction().getId(), option.getOptionCode())
-                    .ifPresent(existingOption -> {
-                        throw new ProductionException(ALREADY_REGISTERED_OPTION_CODE);
-                    });
-        });
+        productionOptionRepository.findByProductionIdAndOptionCode(
+                        option.getProduction().getId(), option.getOptionCode())
+                .ifPresent(existingOption -> {
+                    throw new ProductionException(ALREADY_REGISTERED_OPTION_CODE);
+                });
     }
 }

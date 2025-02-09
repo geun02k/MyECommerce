@@ -71,7 +71,6 @@ class ProductionControllerTest {
                 .optionName(optionName)
                 .price(price)
                 .quantity(quantity)
-                .seq(seq)
                 .build();
         // 요청 상품 DTO
         RequestProductionDto requestProductionDto =

@@ -71,7 +71,6 @@ class ProductionServiceTest {
                 .optionName(optionName)
                 .price(price)
                 .quantity(quantity)
-                .seq(seq)
                 .build();
         // 요청 상품 DTO
         RequestProductionDto requestProductionDto =
@@ -102,7 +101,6 @@ class ProductionServiceTest {
                 .optionName(optionName)
                 .price(price)
                 .quantity(quantity)
-                .seq(seq)
                 .build();
 
         // 저장된 상품 Entity
@@ -123,7 +121,6 @@ class ProductionServiceTest {
                 .optionName(optionEntity.getOptionName())
                 .price(optionEntity.getPrice())
                 .quantity(optionEntity.getQuantity())
-                .seq(optionEntity.getSeq())
                 .production(expectedProductionEntity)
                 .build();
         // 저장된 상품 DTO
@@ -187,7 +184,6 @@ class ProductionServiceTest {
         assertEquals(reqOptFromReqProduction.getOptionName(), expectedOptionEntity.getOptionName());
         assertEquals(reqOptFromReqProduction.getPrice(), expectedOptionEntity.getPrice());
         assertEquals(reqOptFromReqProduction.getQuantity(), expectedOptionEntity.getQuantity());
-        assertEquals(reqOptFromReqProduction.getSeq(), expectedOptionEntity.getSeq());
         assertEquals(expectedProductionEntity, expectedOptionEntity.getProduction());
         assertEquals(expectedOptionEntity.getId(), expectedOptionEntity.getProduction().getId());
     }

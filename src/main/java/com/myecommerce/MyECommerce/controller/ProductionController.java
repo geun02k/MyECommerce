@@ -28,7 +28,7 @@ public class ProductionController {
             @AuthenticationPrincipal Member member) {
 
         return ResponseEntity.ok(
-                productionService.saveProduction(production, member));
+                productionService.registerProduction(production, member));
     }
 
     /**

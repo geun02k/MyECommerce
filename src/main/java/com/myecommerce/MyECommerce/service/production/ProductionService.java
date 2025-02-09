@@ -32,7 +32,7 @@ public class ProductionService {
 
     /** 상품등록 **/
     @Transactional
-    public ResponseProductionDto saveProduction(RequestProductionDto requestProductionDto,
+    public ResponseProductionDto registerProduction(RequestProductionDto requestProductionDto,
                                                 Member member) {
         // 판매자별 동일 상품코드 중복등록방지
         productionRepository.findBySellerAndCode(member.getId(), requestProductionDto.getCode())

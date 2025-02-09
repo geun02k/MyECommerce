@@ -184,8 +184,8 @@ class MemberServiceTest {
         Date expirationDate = new Date(nowTimeMs + (1000L * 60 * 10)); // 현재시간+10분
         long validTimeMs = expirationDate.getTime() - nowTimeMs;
 
-        // stub(가설) : memberRepository.findByUserId() 실행 시 빈값 반환 예상.
-        given(memberRepository.findByUserId(any()))
+        // stub(가설) : memberRepository.findByUserIdAndDelYn() 실행 시 빈값 반환 예상.
+        given(memberRepository.findByUserIdAndDelYn(any(), any()))
                 .willReturn(Optional.ofNullable(Member.builder()
                         .id(id)
                         .userId(userId)

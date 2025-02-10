@@ -60,21 +60,7 @@ public class ProductionService {
         return productionMapper.toDto(savedProduction);
     }
 
-    private void saveProductionOption(List<RequestProductionOptionDto> options, Production savedProduction) {
-        // 상품옵션목록 dto -> entity 변환
-        List<ProductionOption> optionEntityList = options.stream()
-                .map(productionOptionMapper::toEntity)
-                .toList();
-
-        optionEntityList.forEach(optionEntity -> {
-            // 상품옵션목록의 JPA 연관관계를 위해 옵션에 상품객체 셋팅
-            optionEntity.setProduction(savedProduction);
-            // 상품옵션목록 중복체크
-            checkIfOptionCodeExists(optionEntity);
-            // 상품옵션목록 등록
-            productionOptionRepository.save(optionEntity);
-        });
-
+    // 상품 insert
     private Production saveProduction(Production production, Member member) {
         production.setSeller(member.getId());
         production.setSaleStatus(ON_SALE);
@@ -84,6 +70,7 @@ public class ProductionService {
         return productionRepository.save(production);
     }
 
+    // 상품옵션 insert
     private void saveProductionOption(List<ProductionOption> optionList, Production savedProduction) {
         optionList.forEach(option -> {
             // 상품옵션목록의 JPA 연관관계를 위해 옵션에 상품객체 셋팅
@@ -93,6 +80,7 @@ public class ProductionService {
         });
     }
 
+    // 상품 중복체크
     private void checkIfProductionCodeExists(Long sellerId, String code) {
         productionRepository.findBySellerAndCode(sellerId, code)
                 .ifPresent(existingProduction -> {
@@ -100,6 +88,7 @@ public class ProductionService {
                 });
     }
 
+    // 상품옵션 중복체크
     private void checkIfOptionCodeExists(List<ProductionOption> options, String productionCode) {
         // 중복코드 제거된 옵션코드목록 set
         Set<String> optionCodeSet = options.stream()

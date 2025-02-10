@@ -1,8 +1,6 @@
 package com.myecommerce.MyECommerce.service.production;
 
-import com.myecommerce.MyECommerce.dto.production.RequestProductionDto;
-import com.myecommerce.MyECommerce.dto.production.RequestProductionOptionDto;
-import com.myecommerce.MyECommerce.dto.production.ResponseProductionDto;
+import com.myecommerce.MyECommerce.dto.production.*;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.production.Production;
 import com.myecommerce.MyECommerce.entity.production.ProductionOption;
@@ -20,7 +18,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static com.myecommerce.MyECommerce.type.ProductionCategoryType.WOMEN_CLOTHING;
@@ -145,9 +145,10 @@ class ProductionServiceTest {
         // stub(가설) : productionRepository.findBySellerAndCode() 실행 시 빈 optional 객체 반환 예상.
         given(productionRepository.findBySellerAndCode(any(Long.class), any(String.class)))
                 .willReturn(Optional.empty());
-        // stub(가설) : productionOptionRepository.findByProductionIdAndOptionCode() 실행 시 빈 optional 객체 반환 예상.
-        given(productionOptionRepository.findByProductionIdAndOptionCode(any(Long.class), any(String.class)))
-                .willReturn(Optional.empty());
+        // stub(가설) : productionOptionRepository.findByProductionIdAndOptionCodeIn() 실행 시 null 반환 예상.
+        given(productionOptionRepository.findByProductionCodeAndOptionCodeIn(
+                any(String.class), any(List.class)))
+                .willReturn(new ArrayList());
 
         // stub(가설) : productionRepository.save() 실행 시 expectedProductionEntity 반환 예상.
         given(productionRepository.save(productionEntity))

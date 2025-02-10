@@ -3,6 +3,64 @@
 
 
 ---
+### < JPA >
+- Java Persistence API
+- 자바에서 **객체 관계 매핑(ORM)**을 처리하기 위한 표준 API.
+- 객체지향 언어인 자바와 관계형 데이터베이스 간의 데이터를 변환하고, 관리하는 데 도움을 주는 기술.
+- 데이터베이스와 자바 객체 간의 매핑을 자동화하여, 
+  개발자가 SQL 쿼리를 직접 작성하지 않고도 객체를 데이터베이스에 저장하고 조회가능.
+  객체-관계 매핑(ORM) JPA는 자바 클래스(엔티티 클래스)와 관계형 데이터베이스의 테이블 간의 매핑을 설정합니다. 이 매핑을 통해 데이터베이스의 레코드가 자바 객체로, 자바 객체가 데이터베이스의 레코드로 변환됩니다.
+
+1. JPA 핵심개념
+   1. Entity(엔티티) 
+      - 데이터베이스의 테이블에 대응되는 자바 클래스. 
+      - 엔티티 클래스는 @Entity 어노테이션을 사용하여 정의. 
+      - 각 엔티티는 하나 이상의 필드(속성)를 갖고, 이 속성은 데이터베이스의 컬럼에 대응.
+   2. **EntityManager** 
+      - JPA에서 엔티티를 관리하는 주요 인터페이스. 
+      - 엔티티를 영속화(persist)하고 조회(find), 삭제(remove)하는 등의 작업 수행하며 이를 통해 데이터베이스와의 상호작용 가능.
+   3. **영속성 컨텍스트(Persistence Context)** 
+      - EntityManager가 관리하는 엔티티 객체들의 상태를 보관하는 공간. 
+      - 엔티티가 영속성 컨텍스트에 들어가면 JPA가 이를 데이터베이스와 동기화하여 관리합.
+   4. **JPQL(Java Persistence Query Language)** 
+      - JPA에서 사용하는 쿼리 언어. 
+      - SQL과 비슷하지만 데이터베이스의 테이블이 아니라 자바 객체를 대상으로 쿼리를 작성.    
+        즉, 엔티티 객체를 대상으로 SELECT, INSERT, UPDATE, DELETE 등의 작업을 수행가능.
+
+2. JPA의 주요 기능
+   1. 객체와 관계형 데이터베이스 간의 매핑 
+      - JPA는 자바 클래스와 데이터베이스 테이블 간의 매핑을 자동으로 처리.    
+        예를 들어, 자바 클래스의 필드는 데이터베이스 테이블의 컬럼에 매핑됨.
+   2. 트랜잭션 관리 
+      - JPA는 트랜잭션을 관리.
+      - 엔티티의 상태를 영속화하고 변경 사항을 데이터베이스에 반영할 때 트랜잭션 단위로 처리.
+   3. 캐시 기능 
+      - JPA는 영속성 컨텍스트 내에서 엔티티를 캐싱하여, 
+        동일한 엔티티를 여러 번 조회할 때 데이터베이스에 대한 불필요한 쿼리를 줄임.
+   4. 쿼리 기능 
+      - JPA는 JPQL을 사용하여 객체 지향적으로 데이터를 조회하고 수정가능. 
+      - Criteria API를 사용하여 타입 안전한 쿼리 작성이 가능.
+   5. 지연 로딩 및 즉시 로딩 
+      - JPA는 연관된 엔티티의 로딩 전략을 설정가능. 
+      - 기본적으로 지연 로딩(Lazy Loading) 방식이 사용되며, 필요할 때만 연관된 데이터를 로딩. 
+      - 즉시 로딩(Eager Loading)은 연관된 데이터를 즉시 로딩.
+
+3. JPA와 Hibernate
+   - JPA는 표준 API이고, Hibernate는 JPA의 구현체. 
+   - Hibernate는 JPA 규격을 구현하는 라이브러리.
+   - JPA의 모든 기능을 지원.
+   - Hibernate 외에도 EclipseLink, OpenJPA와 같은 다른 구현체들이 있지만, Hibernate가 가장 널리 사용.
+
+4. JPA 사용 시의 장점
+   1. 생산성 향상 
+      - JPA는 SQL을 직접 작성하지 않고도 객체와 관계형 데이터베이스 간의 데이터를 쉽게 처리할 수 있어 개발 생산성을 높임.
+   2. 유지보수 용이 
+      - 엔티티 클래스를 사용하여 객체 지향적인 방식으로 데이터를 처리하므로, 비즈니스 로직과 데이터베이스 로직을 분리할 수 있어 유지보수가 용이.
+   3. DB 벤더 독립성 
+      - JPA는 특정 데이터베이스에 의존하지 않기 때문에, 데이터베이스가 변경되어도 코드 수정 없이 쉽게 대체가능.
+
+
+---
 ###  <공통으로 사용하는 추적정보를 위한 BaseEntity 생성 >
 1. @MappedSuperclass
     > - 객체 입장에서 공통 매핑 정보 필요 시 사용.
@@ -102,4 +160,189 @@
 - @JsonBackReference
   - "대상" 객체에 사용되며, 직렬화 시 이 객체의 참조는 미포함. 
   - 이 객체를 직렬화할 때 해당 객체가 참조하는 다른 객체는 직렬화에서 제외됨.
+
+
+---
+### < 연관관계에 있는 두 Entity의 데이터 조회 >
+- 에러발생 소스코드
+    ~~~
+    @Repository
+    public interface ProductionOptionRepository extends JpaRepository<ProductionOption, Long> {
+        // 판매자 상품의 동일 상품옵션코드 조회
+        @Query(" SELECT PRD.ID AS PRODUCTION_ID, " +
+                "       PRD.SELLER," +
+                "       PRD.CODE AS PRODUCTION_CODE, " +
+                "       OPTION.ID AS OPTION_ID," +
+                "       OPTION.OPTION_CODE" +
+                " FROM RPODUCTION PRD" +
+                " LEFT JOIN PRODUCTION_OPTION OPTION" +
+                " ON PRD.ID = OPTION.PRODUCTION_ID" +
+                " WHERE PRD.CODE = ?1" +
+                " AND OPTION.OPTION_CODE IN (?2)")
+        Optional<List<ProductionOption>> findByProductionIdAndOptionCodeIn(String productionCode, String optionCodes);
+    }
+    ~~~
+  
+- 해결코드
+    ~~~
+    @Repository
+    public interface ProductionOptionRepository extends JpaRepository<ProductionOption, Long> {
+        @Query(" SELECT PRD " +
+                " FROM Production PRD" +
+                " LEFT JOIN FETCH PRD.options OPTION" +
+                " WHERE PRD.code = ?1" +
+                " AND OPTION.optionCode IN (?2)")
+        List<Production> findByProductionCodeAndOptionCodeIn(String productionCode, List<String> optionCodes);
+    }
+    ~~~
+
+1. 발생에러
+    - Caused by: org.hibernate.query.sqm.UnknownEntityException:
+      Could not resolve root entity 'RPODUCTION'
+
+2. 발생원인
+   - Hibernate가 RPODUCTION이라는 엔티티를 찾을 수 없다는 오류를 발생시키고 있습니다. 이는 다음과 같은 이유로 발생할 수 있습니다.
+   - 실제로 존재하는 엔티티 클래스와 RPODUCTION 테이블의 이름이 다른 경우 발생가능.
+
+3. 해결방법
+   1. 엔티티 클래스와 JPQL에서 사용하는 이름 불일치하므로 이를 수정해줘야한다.
+      - JPQL 쿼리에서 사용하는 엔티티 이름은 반드시 클래스명이어야 하며, 대소문자를 구분합니다. 
+        예를 들어, 실제 엔티티 클래스명이 Production이라면 RPODUCTION이 아니라 Production을 사용해야 합니다.
+      - 따라서 RPODUCTION을 Production으로 변경해야 합니다. 
+        만약 엔티티 클래스명이 Production이라면, 쿼리에서 엔티티 이름도 대소문자를 맞춰야 합니다.
+   
+   2. JPA List 타입 반환 시 Optional 사용x
+      - Optional은 보통 **단일 값을 반환 시 사용**되며, 값이 없을 경우에 대비한 안전한 처리 방식.
+      - 하나의 객체를 조회할 때 사용되며, 값이 없을 경우 Optional.empty()로 반환.
+      - 리스트는 기본적으로 비어 있을 수 있습니다. 만약 리스트가 비어 있다면, 그것은 단순히 아무 항목도 없는 상태일 뿐, 값이 "없다"라는 의미와는 다릅니다. 
+      - JPA에서는 컬렉션이 비어 있을 경우 자동으로 빈 리스트를 반환하기 때문에, Optional을 사용할 필요가 없습니다.
+      - 사용한다고해서 오류가 발생하지는 않지만 List의 경우는 isEmpty()로 검증 시 값이 없을 때 true로 작동하지 않음.
+      
+   3. Production 엔티티 전체를 반환하려면, 
+      SELECT 구문에서 Production과 ProductionOption을 엔티티로 반환하도록 해야함.
+      - 발생에러
+        - Entity 클래스명, 필드명을 사용해도 아래의 오류 발생.
+        > org.springframework.core.convert.ConversionFailedException: 
+          Failed to convert from type [java.lang.Object[]] to type [com.myecommerce.MyECommerce.entity.production.Production] for value [{...}]
+     - LEFT JOIN FETCH를 사용하여 Production과 ProductionOption을 함께 로딩.
+     - Production 엔티티를 직접 반환하므로, Production 객체를 그대로 반환할 수 있습니다.
+     - LEFT JOIN FETCH를 사용하면 productionOptions 컬렉션이 지연 로딩 대신 즉시 로딩됨.
+   
+   4. Entity의 연관관계를 맺어줬는데도 JOIN해 조회가 불가한 문제
+      - 발생에러
+        > org.springframework.dao.InvalidDataAccessApiUsageException:
+          org.hibernate.query.SemanticException:
+          Entity join did not specify a join condition
+          [SqmEntityJoin(com.myecommerce.MyECommerce.entity.production.ProductionOption(OPTION))]
+          (specify a join condition with 'on' or use 'cross join')
+    
+      - 발생원인
+        - 본래 위의 오류는 Hibernate에서 엔티티 간의 JOIN을 사용할 때, 조인 조건을 명시하지 않았다는 의미입니다. 
+          즉, LEFT JOIN FETCH를 사용했으나, Production과 ProductionOption 사이의 조인 조건이 명확하지 않기 때문에 발생합니다. 
+          따라서 JOIN 시 ON 조건을 명시해 해결할 수 있습니다. 
+        - 하지만 JPA에서 두 테이블의 연관관계를 설정해놓았다면, 일반적으로 ON 절을 명시적으로 사용할 필요는 없습니다.
+          연관 관계가 이미 엔티티 간에 설정되어 있다면, JPA는 이를 기반으로 내부적으로 JOIN을 처리합니다. 
+          ON 절은 주로 연관 관계가 없거나, 더 복잡한 조건을 추가할 때 사용됩니다.
+          LEFT JOIN FETCH와 같은 fetch join을 사용할 때는 연관 관계가 이미 설정되어 있으면 ON 절을 명시할 필요는 없습니다.
+        - 이번 경우에는 ON절을 작성하면 쿼리가 정상 동작하고 ON절을 작성하지 않으면 쿼리에서 오류를 발생시킵니다.
+        - 주된 문제는 **LEFT JOIN FETCH 사용 시 연관 관계를 정확히 지정하지 않았기 때문**입니다.
+          즉, ProductionOption에 Production에 대한 연관 관계가 설정되어 있어야 합니다.
+          만약 설정이 없다면 조인에 문제가 발생할 수 있습니다.
+      
+      - 해결방법
+        - Entity에서 연관 관계 자체는 잘 설정되어 있지만, 쿼리의 **LEFT JOIN FETCH**에서 ProductionOption과 Production을 정확히 어떻게 조인할지를 명시적으로 지정해야 합니다.   
+          즉, **LEFT JOIN FETCH가 제대로 작동하려면 ProductionOption에서 Production을 참조하고 있어야 합니다.**
+        - LEFT JOIN FETCH에서 ProductionOption을 Production과 연결할 때, ProductionOption이 Production을 참조하는 필드 production을 명확하게 사용해야 합니다.
+        - 이렇게 PRD.ptions와 같이 LEFT JOIN FETCH에서 PRD의 옵션들을 명시적으로 참조하는 방식으로 변경 시 해결 가능했습니다.
+          Production 엔티티에서 options라는 필드가 ProductionOption 리스트를 참조하고 있으므로, prd.options로 ProductionOption과의 연관 관계를 가져와야 합니다.   
+          Production과 ProductionOption을 조인하는 부분으로, prd.options를 사용하여 두 테이블을 연결합니다.
+          해당 방식이 좀 더 명확하고, option이 Production에 종속적인 구조라면 잘 동작하게 됩니다.
+        ~~~
+        // - 연관관계를 명시적으로 작성한 것의 예시
+        //   : Production Entity의 필드로 List<ProductionOption> 타입의 options 변수가 존재할 경우
+        SELECT PRD
+        FROM Production PRD
+        LEFT JOIN FETCH PRD.options OPTION
+        ~~~
+
+
+---
+### < FETCH >
+- JPA에서 FETCH는 지연 로딩을 피하고 즉시 로딩을 하겠다는 의미. 
+- 기본적으로 JPA는 연관된 엔티티를 지연 로딩 방식으로 처리하는데, 
+  FETCH를 사용하면 연관된 엔티티들을 즉시 로딩하여 한 번의 쿼리로 결과를 가져오게 됨.
+
+1. LEFT JOIN FETCH
+   - LEFT JOIN FETCH는 SQL의 LEFT JOIN과 JPA의 FETCH 전략을 결합한 것.
+   - SQL에서 LEFT JOIN을 사용하면서 동시에 JPA의 FETCH 전략을 적용하여, 연관된 엔티티를 즉시 로딩하는 방식. 
+   - 주로 @OneToMany, @ManyToMany 관계에서 사용.
+     - Post가 여러 Comment를 가지는 경우 Comment들을 한 번의 쿼리로 가져올 수 있음.
+   - 연관된 엔티티가 너무 많으면 쿼리가 비효율적일 수 있으므로 필요에 따라 적절한 사용이 필요함.
+   - 연관된 엔티티를 한 번의 쿼리로 가져오기에 N+1 문제를 해결가능.
+   ~~~
+   SELECT p 
+   FROM Post p 
+   LEFT JOIN FETCH p.comments // Post.java Entity에서 comments로 선언한 필드 = List<Comments> comments;
+   ~~~
+
+---
+### < 연관관계의 Entity 조회방식 >
+1. JPA 단순조회
+    - 연관 관계가 잘 설정되어 있다면, **별도의 쿼리를 작성하지 않고 JPA가 자동으로 연관된 엔티티를 로드(조회)**.
+2. JPQL 또는 @Query
+    - **특정 조건에 맞는 데이터를 조회**하고자 할 때는 JPQL이나 @Query를 사용.
+    - 연관관계가 있는 두 엔티티가 존재할 때 Production(one)과 관련된 특정 ProductionOption(many)만 조회하고 싶을 때는
+      직접 **@Query**를 사용하여 JPQL을 작성할 수 있습니다.
+3. @EntityGraph 또는 연관관게 설정 시 FetchType.EAGER 옵션 사용
+    - 연관된 엔티티를 명시적으로 로드하려면 **@EntityGraph**나 **FetchType.EAGER**를 활용할 수 있습니다.
+    - @EntityGraph를 사용한 성능 최적화
+        - 특정 연관 관계를 명시적으로 로딩(조회)하려면 **@EntityGraph**를 사용하는 방법도 있습니다.
+        - @EntityGraph는 연관된 엔티티를 명시적으로 로드할 수 있도록 해주며, 이를 통해 성능 최적화도 가능합니다.
+        - @EntityGraph를 사용하면 연관관계에 있는 Production 엔티티의 필드인 List<ProductionOption> 타입의 options 변수를 명시적으로 로딩하도록 설정할 수 있습니다.
+          이 방법은 EAGER 로딩의 성능 문제를 피하면서, 특정 필드만을 즉시 로딩할 수 있게 도와줍니다.
+   ~~~
+    // EntityGraph를 사용한 연관 관계 로딩
+    
+    @EntityGraph(attributePaths = {"options"})
+    @Query("SELECT prd FROM Production prd WHERE prd.code = ?1")
+    List<Production> findByProductionCodeWithOptions(String productionCode);
+   ~~~
+   
+  
+---
+### < JPA 연관관계에서 지연로딩, 즉시로딩 >
+- 엔티티를 언제 로드할지를 정의하는 방식.
+- JPA는 기본적으로 @OneToMany, @ManyToOne 관계를 인식하고, 조회 시 연관된 엔티티도 함께 가져올 수 있도록 설정가능. 
+- 이 때 FetchType.LAZY(지연 로딩)와 FetchType.EAGER(즉시 로딩) 설정에 따라 로딩 방식이 상이함.
+- 로딩의 기본값
+  - @OneToMany, @ManyToMany 관계 : 기본적으로 지연 로딩이 기본값으로 설정.
+  - @OneToOne, @ManyToOne 관계 : EAGER 로딩이 기본값인 경우가 많음.
+
+1. 지연로딩
+   - 지연 로딩은 **연관된 엔티티를 필요할 때 로딩**하는 방식.
+   - 부모 엔티티를 조회할 때 연관된 자식 엔티티는 초기에는 로드되지 않으며, 실제로 자식 엔티티에 접근할 때 로드됨.
+   - 성능
+       - 지연 로딩은 필요할 때만 데이터를 로드하므로 성능에 유리하지만, 이를 잘못 사용하면 N+1 문제가 발생할 수 있습니다.
+   - N+1 문제
+     - 부모 엔티티 하나를 조회한 뒤 연관된 자식 엔티티를 조회하려고 할 때, 
+       자식 엔티티들을 각각 개별적으로 추가 쿼리로 조회하게 되어 성능 문제가 발생가능.    
+       이를 해결하려면 fetch join을 사용하거나, 
+       @EntityGraph를 사용하여 연관된 엔티티를 한 번의 쿼리로 모두 로드할 수 있습니다.
+
+2. 즉시로딩
+   - 즉시 로딩은 연관된 엔티티를 즉시 로딩하는 방식.
+   - 별도의 쿼리를 작성할 필요 없이 연관된 엔티티를 자동으로 로드 가능
+   - **부모 엔티티를 조회 시 연관된 자식 엔티티도 함께 즉시 로드.**     
+     ex) EAGER 로딩을 사용하면, Production을 조회할 때 **ProductionOption**이 자동으로 로드(조회).
+   - 성능
+     - 즉시 로딩은 연관된 데이터를 항상 함께 로드하기 때문에 N+1 문제를 방지할 수 있지만,
+       불필요하게 많은 데이터를 한 번에 조회하게 될 수 있어 성능에 부담을 줄 수 있습니다.
+
+~~~
+@Entity
+public class Order {
+    @OneToMany(fetch = FetchType.EAGER)
+    private List<OrderItem> items;
+}
+~~~    
 

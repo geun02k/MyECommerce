@@ -120,13 +120,16 @@
         - 목록 필드는 비워둘 수 없음을 나타냅니다. (null, 빈문자 허용x)
     - @NotBlank
         - 문자열 필드는 빈 문자열이어서는 안 됩니다. (null, 빈문자, 공백 허용x / 최소한 하나의 문자가 있어야 함)
+        - 문자열에 대한 유효성 검사를 수행하는 어노테이션이므로 BigDecimal과 같은 숫자 타입에는 사용이 불가능.
     - @Min, @Max
         - 숫자 필드는 값이 특정 값보다 크거나 작을 때만 유효함을 나타냅니다.
     - @Pattern
         - 문자열 필드는 특정 정규 표현식과 일치할 때만 유효함을 나타냅니다.
     - @Email
         - 문자열 필드는 유효한 이메일 주소여야 함을 나타냅니다.
-
+    - @Size 
+        - 해당 제약 조건은 문자열, 배열, 컬렉션 타입 등에 대해 길이 검사(validation)을 수행.
+        - Enum 타입인 경우, @Size는 이 타입에 대해 미작동.
 3. 검증 가능한 HTTP 요청
    1. Request Body
       - 검증 실패 시 MethodArgumentNotValidException 예외를 발생시키며, HTTP 상태코드 400으로 응답 반환.
@@ -229,55 +232,84 @@
        } 
    }
    ~~~
+   - @Valid 적용 객체의 필드 객체에 대해서도 유효성 검증을 수행하는 방법 
+     - @Valid 어노테이션은 객체 내부에 포함된 객체에 대해서도 유효성 검증을 수행하려면, 필드에 대해서도 @Valid 어노테이션을 명시해야 합니다.     
+       간단히 말해서, @Valid는 재귀적으로 유효성 검증을 하지 않기 때문에
+       중첩된 DTO(예: 상품 옵션 DTO)가 있는 경우, 그 DTO에도 @Valid를 적용해야만 유효성 검증이 수행됩니다.
+    - ex) RequestProductionDto.java
+   
 5. JPA Entity 검증 (Bean Validation 안티 패턴)
    - 검증을 위한 마지막 방어선은 지속성 계층임.
    - 일반적으로 지속성 계층에서 가장 늦게 검증을 하지 않는다.    
      비즈니스 코드가 잠재적으로 유효하지 않은 객체와 함께 작동하여 예상치 못한 오류를 초래할 수 있기 때문임.
 
-6. SpringBoot 사용한 사용자정의 검증 (어노테이션)
+6. SpringBoot 사용한 사용자정의 검증 (어노테이션 생성)
    - 어노테이션 생성
-   ~~~
-    @Target({ FIELD })
-    @Retention(RUNTIME)
-    @Constraint(validatedBy = IpAddressValidator.class)
-    @Documented
-    public @interface IpAddress {
+     ~~~
+      @Target({ FIELD })
+      @Retention(RUNTIME)
+      @Constraint(validatedBy = IpAddressValidator.class)
+      @Documented
+      public @interface IpAddress {
     
-        String message() default "{IpAddress.invalid}";
+          String message() default "{IpAddress.invalid}";
     
-        Class<?>[] groups() default { };
+          Class<?>[] groups() default { };
     
-        Class<? extends Payload>[] payload() default { };
+          Class<? extends Payload>[] payload() default { };
     
-    }   
-   ~~~
+      }
+     ~~~
+     - @Constraint
+       - validatedBy 옵션을 이용해 ConstraintValidator를 구현한 클래스 참조를 명시. 런타임에 ConstraintValidatorFactory를 구현한
+   
    - 검증 구현
-   ~~~
-    class IpAddressValidator implements ConstraintValidator<IpAddress, String> {
+     ~~~
+      class IpAddressValidator implements ConstraintValidator<IpAddress, String> {
     
-        @Override
-        public boolean isValid(String value, ConstraintValidatorContext context) {
-            Pattern pattern =
-                Pattern.compile("^([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})$");
-            Matcher matcher = pattern.matcher(value);
-            try {
-                if (!matcher.matches()) {
-                    return false;
-                } else {
-                    for (int i = 1; i <= 4; i++) {
-                        int octet = Integer.valueOf(matcher.group(i));
-                        if (octet > 255) {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-            } catch (Exception e) {
-                return false;
-            }
-        }
-    }   
-   ~~~
+          @Override
+          public boolean isValid(String value, ConstraintValidatorContext context) {
+              Pattern pattern =
+                  Pattern.compile("^([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})$");
+              Matcher matcher = pattern.matcher(value);
+              try {
+                  if (!matcher.matches()) {
+                      return false;
+                  } else {
+                      for (int i = 1; i <= 4; i++) {
+                          int octet = Integer.valueOf(matcher.group(i));
+                          if (octet > 255) {
+                              return false;
+                          }
+                      }
+                      return true;
+                  }
+              } catch (Exception e) {
+                  return false;
+              }
+          }
+      }   
+     ~~~
+     - ConstraintValidator
+       - 구현체는 ConstraintValidator 인터페이스를 상속받아 구현.
+     - ConstraintValidator<A, T>
+       - 주어진 객체 유형 T에 대해 제약 조건 A를 검증하는 논리를 정의.
+       - T는 파라미터화되지 않은 유형으로 해결되어야 함. (A : 구현이 처리하는 애너테이션 유형)
+       - T의 제네릭 파라미터는 한정되지 않은 와일드카드 유형이어야 함. (T : 구현이 지원하는 대상 유형)
+       - 정의한 어노테이션 인터페이스, Validation에 사용할 Type의 class type.
+     - isValid()
+       - ConstraintValidator 인터페이스에 정의된 필수 구현 메서드.
+       - 실제 Validation에 사용할 코드는 isValid 를 통해 구현.
+     - initialize()
+       - ConstraintValidator 인터페이스에 정의된 메서드.
+       - isValid(Object, ConstraintValidatorContext) 호출을 준비하기 위해 검증기를 초기화.
+       - 검증 인스턴스가 사용되기 전에 반드시 우선호출됨.
+       - 주어진 제약 선언에 대한 제약 애너테이션이 전달
+       - default(인터페이스 메서드에 기본 구현을 제공하는 키워드)로 기본 구현은 아무 작업도 수행하지 않는(no-op) 구현 
+     - @SupportedValidationTarget 
+       - 제약 검증기가 교차 매개변수 제약을 지원하는지 표시하는 데 사용가능.
+     - 참고블로그 https://jsy1110.github.io/2022/enum-class-validation/
+   
    - 어노테이션 사용
    ~~~
     class InputWithCustomValidator {
@@ -374,6 +406,34 @@
 - 참고블로그 : https://sepiros.tistory.com/37
 
 ---
+### < git push 내역 되돌리기 >
+1. 로그내역 조회 명령어
+   - git log --oneline
+   
+2. 조회한 로그내역 빠져나가기
+   - Q키를 눌러 로그 화면을 빠져 나올수 있다
+
+3. push 내역 되돌리기
+   - Git reset을 사용하면 특정 커밋 지점으로 되돌아갈 수 있다.
+     ~~~
+     git reset --hard "해당commit의해시값"
+     ~~~
+   - reset hard
+     - 돌아갈 시점 이후의 모든 이력을 삭제하는 옵션. 이전에 커밋한 파일의 이력이 모두 사라진다. (commit내역유지)
+   - reset soft 
+     - 이력을 남겨두는 옵션. 즉 이전에 커밋했던 파일들은 스테이징 상태로 남겨진다. (commit내역 제거, 변경된 파일은 유지)
+
+4. 원격 저장소에 변경사항 반영
+   - 원격저장소를 내가 되돌린 상태(현재)와 같아지도록 반영.
+   - -f 옵션
+     - 해당 옵션 사용 시 강제로 푸시(push)하면 원격 저장소에 현재 로컬 저장소의 상태를 강제로 덮어씌울 수 있다. 
+       따라서 이 명령어를 사용할 때에는 주의 필요.
+   ~~~
+   git push -f origin 브랜치명
+   ~~~
+
+
+---
 ### < Mysql 데이터타입 결정 >
 - 참고블로그 https://dev-coco.tistory.com/54
 
@@ -383,6 +443,21 @@ https://010562.tistory.com/11
 https://velog.io/@chae_ag/Model-DTO-VO-DAO-%EA%B0%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80%EC%9A%94
 
 ---
+### < 유효성검사 정규식 >
+- ^[a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ0-9\s]+$
+  - ^ : 문자열의 시작을 의미합니다.
+  - [ ] : 대괄호 안의 모든 문자는 허용된 문자 범위입니다.
+  - a-zA-Z : 영어 대소문자 (a부터 z까지, A부터 Z까지).
+  - 가-힣 : 한글 완성형 글자 (한글 음절).
+  - ㄱ-ㅎ : 한글 자음 (초성).
+  - ㅏ-ㅣ : 한글 모음.
+  - 0-9 : 숫자 (0부터 9까지).
+  - \s : 공백 문자 (스페이스, 탭, 줄 바꿈 등).
+  - + : 앞의 패턴이 하나 이상 반복되는 것을 허용합니다.
+  - $ : 문자열의 끝을 의미합니다.
+  - * : 앞의 패턴이 0개 이상 반복되는 것을 허용합니다. 
+- 
+
 ### < 비밀번호 유효성검사 정규식 >
 - (?= ...)
     - 긍정형 전방 탐색(lookahead)를 의미하며 특정 패턴이 뒤따라야 한다는 조건을 확인하지만, 문자열에서 그 부분을 소비하지(매칭으로 소모하지) 않습니다.
@@ -401,7 +476,8 @@ https://velog.io/@chae_ag/Model-DTO-VO-DAO-%EA%B0%80-%EB%AC%B4%EC%97%87%EC%9D%B8
     }
     // 연속으로 동일문자 3번 반복 불가
     ~~~
-  
+
+
 ---
 ### < service, service impl 분리하지 않는 이유 >
 - 참고블로그 https://zhfvkq.tistory.com/76
@@ -613,6 +689,27 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
      }
      ~~~
    
+
+### < repository의 메서드를 stub하지 않아도 테스트코드 오류가 발생하지 않는 이유 >
+1. 궁금증 발생원인
+   - ProductionService.saveProduction() 메서드에서 productionRepository.findBySellerAndCode() 메서드를 서비스 로직에 추가했는데 
+     테스트코드에서 해당 메서드 호출 시 오류가 발생하지 않았다. (기존 다른 테스트코드 작성시에는 repository의 메서드 호출 시 stub 하지 않으면 오류가 발생했다.)
+
+2. 테스트코드 정상 수행된 이유
+   - productionRepository.findBySellerAndCode() 메서드가 실제로 호출되지 않아서입니다. 
+   - Mockito에서 @Mock 어노테이션을 사용해 ProductionRepository를 모킹했기 때문에, 해당 메서드는 실제로 실행되지 않고, 대신 빈 값을 반환하거나 아무 일도 일어나지 않게 됩니다.
+   - productionRepository.findBySellerAndCode() 메서드는 Optional<Production>을 반환하고, 해당 값이 존재할 경우 예외를 던지는 코드입니다.
+   - Mockito는 기본적으로 모킹된 객체가 호출되면 빈 값 (예: null 또는 Optional.empty())을 반환하기 때문에 ifPresent 블록이 실행되지 않습니다.
+   - 즉, productionRepository.findBySellerAndCode(sellerId, productionCode) 메서드를 모킹하지 않더라도, Mockito는 이 메서드가 호출되는 대신 아무 작업도 하지 않으므로, 예외가 발생하지 않는 것입니다.
+   > 결론     
+   > 모킹되지 않으면 기본값인 빈 값(null 또는 Optional.empty())이 반환됨.    
+   > 만약 메서드가 빈값을 반환해도 되는 경우, 테스트의 명확성과 일관성을 보장하기 위해 명시적으로 모킹해주는 것이 더 좋을 방법일 수 있음.    
+   > 테스트의 정확성을 위해서 Optional.empty()와 Optional.of(existingProduction) 두 가지 경우를 모두 테스트해 보는 것이 좋음.    
+
+3. 올바른 테스트코드 작성방법
+   - productionRepository.findBySellerAndCode() 메서드를 명시적으로 모킹해야 합니다.
+   - 예를 들어, 해당 메서드가 Optional.empty()를 반환하도록 설정하거나, 이미 존재하는 상품을 반환하도록 설정할 수 있습니다.
+
  
 ### < 테스트코드 검증 >
 1. Mockito의 verify()
@@ -1491,4 +1588,41 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
 
 - 참고블로그
   https://velog.io/@tjddus0302/Java-%EC%83%81%EC%88%98%EB%8A%94-%EC%99%9C-static-final%EB%A1%9C-%EC%84%A0%EC%96%B8%ED%95%A0%EA%B9%8C
+
+
+---
+### < Enum값 비교 연산자 >
+- Java에서 Enum 값을 비교할 때는 **== 연산자를 사용**하는 것이 더 안전하고 효율적.
+- 연산자 비교하기
+    1. == 연산자
+        - == 연산자는 참조 비교를 수행합니다.
+        - Enum은 싱글턴 패턴을 따르므로, 각 Enum 인스턴스는 고유하고 애플리케이션 내에서 유일합니다.
+        - 따라서 == 연산자는 Enum 값들이 동일한지 비교할 때 항상 참조가 동일한지 확인합니다.
+        - Enum 값들은 JVM 내에서 고정된 값으로 관리되기 때문에, 두 Enum 값이 동일한 값을 갖고 있다면 동일한 객체를 참조하게 됩니다.
+          이런 이유로 ==를 사용하면 성능과 안정성 면에서 최적화됩니다.
+
+    2. equals() 메서드
+        - equals() 메서드는 내용 비교를 수행합니다.
+        - Enum은 기본적으로 Object 클래스를 상속받고, Object 클래스의 equals() 메서드는 참조를 비교하는 방식으로 구현되어 있습니다.
+        - Enum 값에서 equals() 메서드를 호출하면, 사실상 == 연산자와 동일한 결과를 반환합니다.
+        - equals()를 사용하는 것은 불필요한 오버헤드를 발생시킬 수 있습니다.
+        - equals()는 일반적으로 객체의 상태를 비교하는 데 사용되므로, Enum과 같은 상수 객체에서는 == 연산자가 더 명확하고 효율적입니다.
+
+    3. instanceof 연산자
+        - 객체가 특정 클래스의 인스턴스인지를 확인하는 연산자.
+        - instanceof를 사용하여 특정 Enum 클래스의 값인지 확인하는 것은 불가능합니다.
+        - 이유는 Enum 값이 클래스 타입으로 존재하는 객체가 아니기 때문입니다.
+        - 대신, Enum의 값 자체가 Enum 클래스의 인스턴스가 아니라,
+          Enum 클래스에 정의된 고유한 상수 값으로 존재하기 때문에 instanceof를 사용하여 Enum 값을 직접 확인하는 방식은 적합하지 않습니다.
+        - Enum 값은 클래스의 인스턴스가 아니라, 해당 Enum 클래스의 고정된 상수입니다.
+          즉, Enum 값은 Enum 클래스의 정적 필드일 뿐, 클래스의 객체가 아닙니다.
+          그래서 instanceof를 사용하여 Enum 값이 특정 Enum 타입의 인스턴스인지 확인하는 것은 불가능.
+        - Enum 값이 특정 Enum 타입인지 확인하려면 Enum 클래스의 getClass() 메서드를 활용하는 방법을 사용가능.
+          ~~~
+          // status가 Status enum의 인스턴스인지 확인. 
+          // Enum 상수는 getClass()를 호출할 수 있으며, 해당 Enum의 타입을 반환.
+          if(status.getClass() == Status.class) { 
+              // ...
+          }
+          ~~~
 

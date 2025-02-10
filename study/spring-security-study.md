@@ -78,6 +78,10 @@
     스프링 시큐리티 구성 : 스프링 시큐리티 구성을 위한 WegbSecurityConfigurer 빈 생성 / 구성 클래스에서 configure() 메서드를 오버라이딩하여 웹 보안 설정 구성가능.   
     다양한 보안 기능 추가 ex) 폼 기반 인증, 로그인 페이지 구성, 권한 설정 등 가능.   
 
+- @EnableMethodSecurity
+  - 메소드레벨에서 인증권한 설정을 위해 추가.
+  - controller에서 @PreAuthorize("hasAuthority('SELLER')") 등의 어노테이션을 통해 해당 권한에 대해서만 API 접근을 허용하도록 설정가능.
+
 - permitAll()
     - 해당경로에 대해 인증없이 무조건적으로 권한허용.
     - 회원가입, 로그인의 경우는 토큰없이 접근가능해야함. (JWT 토큰은 로그인 후 생성되므로.)
@@ -501,4 +505,30 @@
   > custom exception 발생 로직을 제거하는 것으로 해결한다.     
   > 만약 custom exception을 발생시키고 싶으면 MemberException이 아니라 
   > AuthenticationException을 상속받는 새로운 custom exception을 생성하고 해당 예외를 던져 에외처리를 수행하도록 한다.     
+
+
+---
+### < DB 생성자, 수정자 ID 자동입력 > 
+- 생성자, 수정자 자동등록을 위해 추가
+  - @CreatedBy,  @LastModifiedBy 어노테이션 사용을 위해 추가.
+  - 해당 AuditorAware 인터페이스 구현하지 않으면 생성자, 수정자 자동입력불가.
+
+- 참고 블로그
+  : https://eoneunal.tistory.com/33
+
+
+---
+### < 스프링 시큐리티를 이용해 로그인 사용자정보 가져오기 >
+User Principal은 현재 접근하는 주체의 정보와 권한을 담는 인터페이스를 의미합니다.
+Spring Security에서 로그인한 사용자의 정보를 받아오기 위해서는 @AuthenticationPrincipal 어노테이션을 사용할 수 있습니다.
+@AuthenticationPrincipal은 다음과 같은 용도로 사용할 수 있습니다.
+- Account의 많은 정보를 얻고 싶을 때
+- Controller의 맵핑 메서드의 파라미터의 코드를 효율적으로 줄이고 싶을 때
+- 정보 객체로 사용되는 객체는 UserDetails를 구현하는 User를 상속받아야 하는 경우
+
+- User Principal 코드구현 참고 블로그   
+  https://januaryman.tistory.com/165
+
+- 참고 블로그   
+  https://charliezip.tistory.com/25
 

@@ -90,7 +90,7 @@ public class ProductionService {
         insertOptions(requestInsertOptionList, production);
 
         // 상품, 상품옵션목록 반환
-        return productionMapper.toDto(production);
+        return productionMapper.toDto(productionRepository.save(production));
     }
 
     // 상품 insert

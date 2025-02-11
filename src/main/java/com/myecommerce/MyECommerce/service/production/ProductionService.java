@@ -93,13 +93,6 @@ public class ProductionService {
             throw new ProductionException(NO_EDIT_DELETION_STATUS);
         }
 
-        // 상품 수정한 판매상태 체크 (상품 판매상태를 DELETION으로 변경할 때 수정불가)
-        if (requestProductionDto.getSaleStatus() == DELETION) {
-            // 상품 판매상태 수정해 반환
-            production.setSaleStatus(requestProductionDto.getSaleStatus());
-            return productionMapper.toDto(productionRepository.save(production));
-        }
-
         // 상품옵션목록 중복체크
         checkIfOptionCodeExists(requestInsertOptionList, production.getCode());
 

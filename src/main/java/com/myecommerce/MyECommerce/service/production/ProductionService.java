@@ -106,19 +106,14 @@ public class ProductionService {
         // 상품 설명, 판매상태 변경
         production.setDescription(requestProductionDto.getDescription());
         production.setSaleStatus(requestProductionDto.getSaleStatus());
-        Production updatedProduction = productionRepository.save(production);
-
-        // 옵션목록 조회
-        List<ProductionOption> optionList =
-                productionOptionRepository.findByProductionId(production.getId());
 
         // 상품옵션 수량 변경
         // 기존 데이터와 id가 일치하는 입력데이터 찾아 값 입력
         for (int i = 0; i < requestUpdateOptionList.size(); i++) {
-            for(int j = 0; j < optionList.size(); j++) {
+            for(int j = 0; j < production.getOptions().size(); j++) {
 
-                if(optionList.get(j).getId().equals(requestUpdateOptionList.get(i).getId())) {
-                    optionList.get(j).setQuantity(requestUpdateOptionList.get(i).getQuantity());
+                if(production.getOptions().get(j).getId().equals(requestUpdateOptionList.get(i).getId())) {
+                    production.getOptions().get(j).setQuantity(requestUpdateOptionList.get(i).getQuantity());
                     break;
                 }
             }
@@ -129,14 +124,11 @@ public class ProductionService {
             // 상품옵션목록의 JPA 연관관계를 위해 옵션에 상품객체 셋팅
             option.setProduction(production);
             // 조회한 상품옵션목록에 신규옵션 추가
-            optionList.add(option);
+            production.getOptions().add(option);
         });
 
-        // 상품옵션 변경, 저장
-        saveProductionOption(optionList, production);
-
         // 상품, 상품옵션목록 반환
-        return productionMapper.toDto(updatedProduction);
+        return productionMapper.toDto(production);
     }
 
 

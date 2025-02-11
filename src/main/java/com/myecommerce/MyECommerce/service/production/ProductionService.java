@@ -119,15 +119,21 @@ public class ProductionService {
 
                 if(optionList.get(j).getId().equals(requestUpdateOptionList.get(i).getId())) {
                     optionList.get(j).setQuantity(requestUpdateOptionList.get(i).getQuantity());
-                    // 상품옵션목록 등록(수정)
-                    productionOptionRepository.save(optionList.get(j));
                     break;
                 }
             }
         }
 
-        // 상품옵션 추가 등록
-        saveProductionOption(requestInsertOptionList, production);
+        // 신규 상품옵션 추가
+        requestInsertOptionList.forEach(option -> {
+            // 상품옵션목록의 JPA 연관관계를 위해 옵션에 상품객체 셋팅
+            option.setProduction(production);
+            // 조회한 상품옵션목록에 신규옵션 추가
+            optionList.add(option);
+        });
+
+        // 상품옵션 변경, 저장
+        saveProductionOption(optionList, production);
 
         // 상품, 상품옵션목록 반환
         return productionMapper.toDto(updatedProduction);
@@ -176,7 +182,7 @@ public class ProductionService {
 
         // 2. 입력받은 옵션코드목록과 등록된 옵션코드목록 중복 체크
         if (!productionOptionRepository.findByProductionCodeAndOptionCodeIn(
-                productionCode, optionCodeSet.stream().toList())
+                        productionCode, optionCodeSet.stream().toList())
                 .isEmpty()) {
             throw new ProductionException(ALREADY_REGISTERED_OPTION_CODE);
         }

@@ -37,7 +37,7 @@ public class ProductionService {
     /** 상품등록 **/
     @Transactional
     public ResponseProductionDto registerProduction(RequestProductionDto requestProductionDto,
-                                                Member member) {
+                                                    Member member) {
         // 상품 dto -> entity 변환
         Production production = productionMapper.toEntity(requestProductionDto);
 
@@ -67,63 +67,30 @@ public class ProductionService {
     @Transactional
     public ResponseProductionDto modifyProduction(RequestModifyProductionDto requestProductionDto,
                                                   Member member) {
-        // 기존 옵션목록 dto -> entity 변환
+        // validation check
+        updateProductionValidationCheck(requestProductionDto, member);
+
+        // 수정할 옵션목록 dto -> entity 변환
         List<ProductionOption> requestUpdateOptionList =
-                requestProductionDto.getOptions().stream()
-                        .filter(option ->
-                                option.getId() != null && option.getId() > 0)
-                        .map(modifyProductionOptionMapper::toEntity)
-                        .toList();
-
-        // 신규 옵션목록 dto -> entity 변환
+                convertToUpdateOptionEntities(requestProductionDto);
+        // 신규 저장 옵션목록 dto -> entity 변환
         List<ProductionOption> requestInsertOptionList =
-                requestProductionDto.getOptions().stream()
-                        .filter(option ->
-                                option.getId() == null || option.getId() <= 0)
-                        .map(modifyProductionOptionMapper::toEntity)
-                        .toList();
+                convertToInsertOptionEntities(requestProductionDto);
 
-        // 상품 판매자 체크
-        Production production = productionRepository.findByIdAndSeller(
-                        requestProductionDto.getId(), member.getId())
-                .orElseThrow(() -> new ProductionException(NO_EDIT_PERMISSION));
-
-        // 상품 기존 판매상태 체크
-        if (production.getSaleStatus() == DELETION) {
-            throw new ProductionException(NO_EDIT_DELETION_STATUS);
-        }
-
-        // 상품옵션목록 중복체크
-        checkIfOptionCodeExists(requestInsertOptionList, production.getCode());
+        // 상품 조회
+        Production production = getProductionEntityByIdAndSeller(
+                requestProductionDto.getId(), member.getId());
 
         // 상품 설명, 판매상태 변경
-        production.setDescription(requestProductionDto.getDescription());
-        production.setSaleStatus(requestProductionDto.getSaleStatus());
-
-        // 상품옵션 수량 변경
-        // 기존 데이터와 id가 일치하는 입력데이터 찾아 값 입력
-        for (int i = 0; i < requestUpdateOptionList.size(); i++) {
-            for(int j = 0; j < production.getOptions().size(); j++) {
-
-                if(production.getOptions().get(j).getId().equals(requestUpdateOptionList.get(i).getId())) {
-                    production.getOptions().get(j).setQuantity(requestUpdateOptionList.get(i).getQuantity());
-                    break;
-                }
-            }
-        }
-
+        updateProduction(production, requestProductionDto);
+        // 기존 상품옵션 수량 변경
+        updateOptions(requestUpdateOptionList, production);
         // 신규 상품옵션 추가
-        requestInsertOptionList.forEach(option -> {
-            // 상품옵션목록의 JPA 연관관계를 위해 옵션에 상품객체 셋팅
-            option.setProduction(production);
-            // 조회한 상품옵션목록에 신규옵션 추가
-            production.getOptions().add(option);
-        });
+        insertOptions(requestInsertOptionList, production);
 
         // 상품, 상품옵션목록 반환
         return productionMapper.toDto(production);
     }
-
 
     // 상품 insert
     private Production saveProduction(Production production, Member member) {
@@ -171,6 +138,83 @@ public class ProductionService {
                 .isEmpty()) {
             throw new ProductionException(ALREADY_REGISTERED_OPTION_CODE);
         }
+    }
+
+    // 수정할 옵션목록 필터링해 dto -> entity 변환
+    private List<ProductionOption> convertToUpdateOptionEntities(
+            RequestModifyProductionDto requestProductionDto) {
+        return requestProductionDto.getOptions().stream()
+                .filter(option ->
+                        option.getId() != null && option.getId() > 0)
+                .map(modifyProductionOptionMapper::toEntity)
+                .toList();
+    }
+
+    // 신규 저장할 옵션목록 필터링해 dto -> entity 변환
+    private List<ProductionOption> convertToInsertOptionEntities(
+            RequestModifyProductionDto requestProductionDto) {
+        return requestProductionDto.getOptions().stream()
+                .filter(option ->
+                        option.getId() == null || option.getId() <= 0)
+                .map(modifyProductionOptionMapper::toEntity)
+                .toList();
+    }
+
+    // 상품수정 validation check
+    private void updateProductionValidationCheck(RequestModifyProductionDto requestProductionDto,
+                                                 Member member) {
+        // 상품 판매자 체크
+        Production production = getProductionEntityByIdAndSeller(
+                requestProductionDto.getId(), member.getId());
+
+        // 상품 기존 판매상태 체크
+        if (production.getSaleStatus() == DELETION) {
+            throw new ProductionException(NO_EDIT_DELETION_STATUS);
+        }
+
+        // 상품옵션목록 중복체크
+        List<ProductionOption> requestInsertOptionList =
+                convertToInsertOptionEntities(requestProductionDto);
+        checkIfOptionCodeExists(requestInsertOptionList, production.getCode());
+    }
+
+    // 상품ID, 셀러ID와 일치하는 상품 단건 조회
+    private Production getProductionEntityByIdAndSeller(Long productionId, Long sellerId) {
+        return productionRepository.findByIdAndSeller(productionId, sellerId)
+                .orElseThrow(() -> new ProductionException(NO_EDIT_PERMISSION));
+    }
+
+    // 상품 Entity 데이터 변경
+    private void updateProduction(Production production,
+                                  RequestModifyProductionDto requestModifyProductionDto) {
+        production.setDescription(requestModifyProductionDto.getDescription());
+        production.setSaleStatus(requestModifyProductionDto.getSaleStatus());
+    }
+
+    // 상품 Entity의 필드인 상품옵션 Entity의 수량 변경
+    private void updateOptions(List<ProductionOption> requestUpdateOptionList, Production production) {
+        // 기존 데이터와 id가 일치하는 입력데이터 찾아 값 입력
+        // (업데이트 요청 옵션목록과 기존 옵션목록의 일치 옵션 찾을 때 N^2의 시간복잡도를 가짐.
+        //  빠르게 데이터를 찾는 방법 찾아야함.)
+        for (int i = 0; i < requestUpdateOptionList.size(); i++) {
+            for(int j = 0; j < production.getOptions().size(); j++) {
+
+                if(production.getOptions().get(j).getId().equals(requestUpdateOptionList.get(i).getId())) {
+                    production.getOptions().get(j).setQuantity(requestUpdateOptionList.get(i).getQuantity());
+                    break;
+                }
+            }
+        }
+    }
+
+    // 상품 Entity의 필드인 상품옵션 Entity에 신규옵션 추가
+    private void insertOptions(List<ProductionOption> requestInsertOptionList, Production production) {
+        requestInsertOptionList.forEach(option -> {
+            // 상품옵션목록의 JPA 연관관계를 위해 옵션에 상품객체 셋팅
+            option.setProduction(production);
+            // 조회한 상품옵션목록에 신규옵션 추가
+            production.getOptions().add(option);
+        });
     }
 
 }

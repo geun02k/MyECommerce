@@ -346,3 +346,111 @@ public class Order {
 }
 ~~~    
 
+
+---
+### < 상품수정 옵션 저장 시 발생한 에러 ObjectOptimisticLockingFailureException >
+1. 발생에러
+   - org.springframework.orm.ObjectOptimisticLockingFailureException: 
+     Row was updated or deleted by another transaction (or unsaved-value mapping was incorrect): 
+     [com.myecommerce.MyECommerce.entity.production.ProductionOption#5]
+
+2. 발생원인
+   - ObjectOptimisticLockingFailureException은 JPA에서의 낙관적 락(Optimistic Locking)을 사용하고 있을 때 발생할 수 있는 예외입니다.    
+     이 예외는 두 개 이상의 트랜잭션이 동시에 같은 데이터에 접근하려고 할 때 발생합니다.    
+     특히, 데이터가 동시에 변경될 가능성이 있을 때, 낙관적 락을 통해 이러한 충돌을 방지하는 방식입니다.    
+   
+   - updateOption과 insertOption에 반대의 데이터를 넣는 실수를 하면서 발생한 에러입니다. 
+     update해야하는 데이터에는 id가 null값이고, insert해야하는 데이터에는 id값이 존재해 데이터를 변경하는 과정에서 에러가 발생한 것 같습니다.  
+   > 트랜잭션 A가 Product 객체를 읽고 name을 변경합니다.
+   > 트랜잭션 B도 같은 Product 객체를 읽고 name을 변경합니다.
+   > 트랜잭션 B가 먼저 커밋됩니다.
+   > 트랜잭션 A가 커밋하려고 할 때, version 값이 달라져서 ObjectOptimisticLockingFailureException이 발생합니다.
+
+3. 해결방법
+   - updateOption과 insertOption에 올바른 정보를 넣으면서 해결했습니다.
+
+
+---
+### < update문을 명시적으로 우선 수행헀는데 실제로는 후에 호출한 insert문을 먼저 수행하는 이유 >
+> insert가 먼저 실행되는 이유는 영속성 컨텍스트가 수정된 엔티티를 처리하지 않고, 새로운 엔티티로 처리하고 있기 때문입니다.    
+  이를 해결하려면, 트랜잭션 내에서 엔티티 상태를 관리하고 flush()나 saveOrUpdate() 메서드를 적절히 사용하여 DB에 반영되는 시점을 제어해야 합니다.
+
+> 실제 문제 해결
+> 현재의 경우에는 딱히 쿼리 순서가 영향을 미치지 않으므로 수정하지 않는다. 그냥 이유가 궁금해서 알아본다.
+
+- 이 문제는 JPA의 **영속성 컨텍스트(Persistence Context)와 플러시(Flush) 동작과 관련**이 있습니다. 
+- Hibernate가 insert문을 먼저 실행한 이유는 JPA에서 엔티티 상태 변화와 DB에 반영되는 시점 간의 차이 때문일 수 있습니다.
+
+- JPA는 영속성 컨텍스트 내에서 엔티티의 상태를 추적합니다. 
+  즉, 엔티티가 수정되거나 새로 추가될 때 이를 영속성 컨텍스트에 반영하고, 
+  실제 DB에 변경 사항을 적용하는 시점은 플러시(flush) 동작을 통해 일어납니다.
+- JPA의 기본 동작은 flush가 실행될 때 변경된 엔티티가 DB에 반영됩니다. 
+  이 플러시가 트랜잭션 종료 시점에 일어날 수도 있고, 특정 시점에서 명시적으로 호출할 수도 있습니다.
+
+- Insert가 먼저 실행된 이유
+  - JPA에서 상태가 관리되지 않는 엔티티가 DB에 처음으로 추가되는 경우, 
+    JPA는 이 **엔티티를 영속성 컨텍스트에 저장한 후, flush를 통해 insert 쿼리를 실행**합니다.
+  - **insert가 발생한 엔티티는 새로 생성된 객체일 수 있으며, 
+    수정된 엔티티를 동일 트랜잭션 내에서 업데이트하기 전에 insert가 먼저 실행될 수 있습니다.**
+  - 문제상황
+      ~~~
+        @Transactional
+        public ResponseProductionDto modifyProduction(RequestModifyProductionDto requestProductionDto,
+                                                      Member member) {
+            // 상품 조회
+            Production production = productionRepository.findByIdAndSeller(
+                    requestProductionDto.getId(), member.getId())
+                    .orElseThrow(() -> new ProductionException(NO_EDIT_PERMISSION));
+      
+            // 상품옵션 수량 변경 (update)
+            // 기존 데이터와 id가 일치하는 입력데이터 찾아 값 입력
+            for (int i = 0; i < requestUpdateOptionList.size(); i++) {
+                for(int j = 0; j < production.getOptions().size(); j++) {
+                    if(production.getOptions().get(j).getId().equals(requestUpdateOptionList.get(i).getId())) {
+                        production.getOptions().get(j).setQuantity(requestUpdateOptionList.get(i).getQuantity());
+                        // 상품옵션목록 등록(수정) -> 명시적 저장
+                        productionOptionRepository.save(optionList.get(j));
+                        break;
+                    }
+                }
+            }
+    
+            // 상품옵션 추가 등록 (insert) -> 명시적 저장
+            saveProductionOption(requestInsertOptionList, production);
+        }
+      ~~~
+          
+- 엔티티 상태와 플러시 시점
+  - 만약 수정하려는 ProductionOption이 영속성 컨텍스트에서 새로 추가된 엔티티로 처리되었거나 연관된 엔티티가 먼저 플러시된 경우,  
+    Hibernate는 insert를 먼저 실행할 수 있습니다.
+  - 예를 들어, productionOption 객체가 영속성 상태에서 새로 생성된 객체로 간주되면, 
+    insert가 수정 이전에 먼저 실행될 수 있습니다.
+
+- 엔티티 상태 확인
+  - insert가 먼저 실행되는 이유가 엔티티의 상태가 새로 생성된 객체로 처리되었기 때문일 수 있습니다. 
+  - 이를 해결하려면 엔티티 상태를 명시적으로 관리하고, insert가 아니라 update로 처리하도록 해야 합니다.
+  - 예를 들어, JPA의 merge() 메서드를 사용할 때도 insert가 발생할 수 있기 때문에, 
+    엔티티가 영속 상태로 존재하는지 확인 후 적절히 save() 혹은 update()로 처리해야 합니다.
+
+- 쿼리 순서가 잘못된 경우
+  - 만약 update 쿼리가 먼저 실행되어야 한다면,  
+    flush()를 호출하거나 트랜잭션 범위 내에서 업데이트가 먼저 일어나도록 설정할 수 있습니다.
+
+- 해결 방법
+  - @Transactional을 사용한 트랜잭션 관리
+    - 트랜잭션 범위 내에서 insert나 update 작업이 정상적으로 이루어지는지 확인합니다.    
+      **JPA는 트랜잭션이 끝날 때까지 flush를 지연**시키므로, 명시적인 flush() 호출을 통해 해당 동작을 제어할 수 있습니다.
+  - @Modifying 어노테이션과 flush 사용
+    - 명시적으로 flush() 메서드를 호출하여 엔티티 상태를 DB에 반영할 시점을 제어할 수 있습니다.
+    - 예를 들어, 엔티티의 상태를 업데이트한 후 flush()를 호출하여 업데이트가 먼저 실행되도록 할 수 있습니다.
+  ~~~
+  @Transactional
+  public void modifyProductionOption(ProductionOption productionOption) {
+      // 먼저 수정 작업 수행
+      productionOptionRepository.save(productionOption);
+
+        // flush()를 호출하여 즉시 DB에 반영
+        entityManager.flush(); 
+  }
+  ~~~  
+

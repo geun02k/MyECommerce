@@ -17,4 +17,7 @@ public interface ProductionOptionRepository extends JpaRepository<ProductionOpti
             " WHERE PRD.code = ?1" +
             " AND OPTION.optionCode IN (?2)")
     List<Production> findByProductionCodeAndOptionCodeIn(String productionCode, List<String> optionCodes);
+
+    // 상품ID에 해당하는 상품옵션목록 조회
+    List<ProductionOption> findByProductionId(Long productionId);
 }

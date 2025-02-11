@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -176,6 +177,24 @@ public class ProductionService {
         List<ProductionOption> requestInsertOptionList =
                 convertToInsertOptionEntities(requestProductionDto);
         checkIfOptionCodeExists(requestInsertOptionList, production.getCode());
+
+        // 수정 요청 옵션 중 잘못된 옵션ID 체크
+        List<ProductionOption> requestUpdateOptionList =
+                convertToUpdateOptionEntities(requestProductionDto);
+
+        // 1. 기존옵션ID목록 Set으로 변환
+        Set<Long> productionOptionIds = production.getOptions().stream()
+                .map(ProductionOption::getId)
+                .collect(Collectors.toSet());
+
+        // 2. 요청옵션ID목록이 기존옵션ID목록에 모두 포함되는지 확인
+        boolean isExistAllOptionIds = requestUpdateOptionList.stream()
+                .allMatch(option -> productionOptionIds.contains(option.getId()));
+
+        // 3. 포함되지않는 경우에 대한 예외처리
+        if (!isExistAllOptionIds) {
+            throw new ProductionException(NO_EDIT_FOR_NOT_EXIST_OPTION);
+        }
     }
 
     // 상품ID, 셀러ID와 일치하는 상품 단건 조회
@@ -192,17 +211,21 @@ public class ProductionService {
     }
 
     // 상품 Entity의 필드인 상품옵션 Entity의 수량 변경
-    private void updateOptions(List<ProductionOption> requestUpdateOptionList, Production production) {
-        // 기존 데이터와 id가 일치하는 입력데이터 찾아 값 입력
-        // (업데이트 요청 옵션목록과 기존 옵션목록의 일치 옵션 찾을 때 N^2의 시간복잡도를 가짐.
-        //  빠르게 데이터를 찾는 방법 찾아야함.)
-        for (int i = 0; i < requestUpdateOptionList.size(); i++) {
-            for(int j = 0; j < production.getOptions().size(); j++) {
+    private void updateOptions(List<ProductionOption> requestUpdateOptionList,
+                               Production production) {
+        // 기존상품옵션 MAP으로 매핑
+        Map<Long, ProductionOption> originOptionMap = production.getOptions().stream()
+                .collect(Collectors.toMap(
+                        ProductionOption::getId, option -> option));
 
-                if(production.getOptions().get(j).getId().equals(requestUpdateOptionList.get(i).getId())) {
-                    production.getOptions().get(j).setQuantity(requestUpdateOptionList.get(i).getQuantity());
-                    break;
-                }
+        // 기존 데이터와 id가 일치하는 입력데이터 찾아 값 입력
+        for (ProductionOption requestOption : requestUpdateOptionList) {
+            ProductionOption foundOption = originOptionMap.get(requestOption.getId());
+
+            if (foundOption != null) {
+                foundOption.setQuantity(requestOption.getQuantity());
+            } else {
+                throw new ProductionException(NO_EDIT_FOR_NOT_EXIST_OPTION);
             }
         }
     }

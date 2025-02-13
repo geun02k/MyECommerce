@@ -308,7 +308,54 @@
     List<Production> findByProductionCodeWithOptions(String productionCode);
    ~~~
    
-  
+
+---
+## < 연관관계에 있는 Entity에서 부모만 조회하기 >
+- Production 엔티티가 productionOptions와 연관 관계가 있을 경우, 
+  prd만 선택해도 연관된 ProductionOption 정보가 함께 로드될 수 있습니다.
+
+- 부모 Entity 정보만 로드하는 방법
+  - 이를 방지하려면, **JPQL 쿼리에서 productionOptions를 제외하거나 fetch를 제한**하는 방법이 필요합니다.
+
+1. JPQL 쿼리에서 자식 Entity 제외
+   - JOIN을 단순히 사용하여 부모만 선택하고, 연관된 자식을 결과에 포함시키지 않도록 할 수 있습니다.
+   - 연관된 ProductionOption을 JOIN FETCH하지 않고
+     단순히 **JOIN만 사용**하면 ProductionOption(자식) **데이터는 데이터베이스에서 가져와 로드하지만 결과에는 포함되지 않습니다.**
+   ~~~
+    SELECT prd
+    FROM Production prd
+    JOIN prd.productionOptions option
+    WHERE prd.name LIKE CONCAT('%', ?1, '%')
+    AND prd.saleStatus = 'ON_SALE'
+    GROUP BY prd
+    ORDER BY MIN(option.price)
+   ~~~
+   > 이 쿼리에서 JOIN은 Production과 ProductionOption을 연관시킵니다.     
+   > 하지만 JOIN FETCH가 아니기 때문에, ProductionOption 데이터는 쿼리 결과에 포함되지 않으며
+     ProductionOption의 필드 값은 반환되지 않고 prd만 반환됩니다.
+   
+2. fetch 제한하기
+   - 자식이 @OneToMany와 같은 관계에서 FETCH 전략으로 로드되고 있을 때, 
+     fetch 전략을 LAZY로 설정하여 즉시 로드되지 않도록 할 수 있습니다.
+   - @OneToMany 관계에서 fetch = FetchType.LAZY로 설정
+   ~~~
+    @Entity
+    public class Production {
+        @OneToMany(mappedBy = "production", fetch = FetchType.LAZY)
+        private Set<ProductionOption> productionOptions;
+    }
+   ~~~
+   > FetchType.LAZY를 설정하면 ProductionOption은 지연 로딩되며, 쿼리 결과에 포함되지 않습니다.
+   > LAZY 로딩은 실제로 연관된 엔티티가 필요할 때 로드되므로, ProductionOption 필드는 결과에 포함되지 않으며 필요할 때만 쿼리가 실행됩니다. 
+
+3. Query에서 fetch 전략 제어
+   - @Query에서는 JOIN FETCH를 사용하지 않으면 자식이 자동으로 로드되지 않습니다. 
+
+LAZY 로딩을 설정하면 ProductionOption이 즉시 로드되지 않도록 할 수 있으며, 필요한 경우에만 로드되게 할 수 있습니다.
+FETCH 전략을 LAZY로 설정하고, 쿼리에서 JOIN만 사용하면 ProductionOption이 쿼리 결과에 포함되지 않습니다.
+따라서, @OneToMany나 @ManyToOne 관계에서 LAZY 로딩을 설정하는 것이 연관된 데이터를 지연 로딩하도록 하는 가장 좋은 방법입니다.
+
+
 ---
 ### < JPA 연관관계에서 지연로딩, 즉시로딩 >
 - 엔티티를 언제 로드할지를 정의하는 방식.
@@ -321,6 +368,7 @@
 1. 지연로딩
    - 지연 로딩은 **연관된 엔티티를 필요할 때 로딩**하는 방식.
    - 부모 엔티티를 조회할 때 연관된 자식 엔티티는 초기에는 로드되지 않으며, 실제로 자식 엔티티에 접근할 때 로드됨.
+   - 연관된 데이터를 실제로 필요할 때만 조회하므로 불필요한 데이터 조회를 피할 수 있음.
    - 성능
        - 지연 로딩은 필요할 때만 데이터를 로드하므로 성능에 유리하지만, 이를 잘못 사용하면 N+1 문제가 발생할 수 있습니다.
    - N+1 문제
@@ -331,12 +379,12 @@
 
 2. 즉시로딩
    - 즉시 로딩은 연관된 엔티티를 즉시 로딩하는 방식.
-   - 별도의 쿼리를 작성할 필요 없이 연관된 엔티티를 자동으로 로드 가능
+   - 별도의 쿼리를 작성할 필요 없이 연관된 엔티티를 자동으로 로드 가능.
    - **부모 엔티티를 조회 시 연관된 자식 엔티티도 함께 즉시 로드.**     
      ex) EAGER 로딩을 사용하면, Production을 조회할 때 **ProductionOption**이 자동으로 로드(조회).
    - 성능
      - 즉시 로딩은 연관된 데이터를 항상 함께 로드하기 때문에 N+1 문제를 방지할 수 있지만,
-       불필요하게 많은 데이터를 한 번에 조회하게 될 수 있어 성능에 부담을 줄 수 있습니다.
+       연관된 모든 불필요하게 많은 데이터를 한 번에 조회하게 될 수 있어 성능에 부담을 줄 수 있습니다.
 
 ~~~
 @Entity

@@ -346,3 +346,278 @@ public class Order {
 }
 ~~~    
 
+
+---
+### < 상품수정 옵션 저장 시 발생한 에러 ObjectOptimisticLockingFailureException >
+1. 발생에러
+   - org.springframework.orm.ObjectOptimisticLockingFailureException: 
+     Row was updated or deleted by another transaction (or unsaved-value mapping was incorrect): 
+     [com.myecommerce.MyECommerce.entity.production.ProductionOption#5]
+
+2. 발생원인
+   - ObjectOptimisticLockingFailureException은 JPA에서의 낙관적 락(Optimistic Locking)을 사용하고 있을 때 발생할 수 있는 예외입니다.    
+     이 예외는 두 개 이상의 트랜잭션이 동시에 같은 데이터에 접근하려고 할 때 발생합니다.    
+     특히, 데이터가 동시에 변경될 가능성이 있을 때, 낙관적 락을 통해 이러한 충돌을 방지하는 방식입니다.    
+   
+   - updateOption과 insertOption에 반대의 데이터를 넣는 실수를 하면서 발생한 에러입니다. 
+     update해야하는 데이터에는 id가 null값이고, insert해야하는 데이터에는 id값이 존재해 데이터를 변경하는 과정에서 에러가 발생한 것 같습니다.  
+   > 트랜잭션 A가 Product 객체를 읽고 name을 변경합니다.
+   > 트랜잭션 B도 같은 Product 객체를 읽고 name을 변경합니다.
+   > 트랜잭션 B가 먼저 커밋됩니다.
+   > 트랜잭션 A가 커밋하려고 할 때, version 값이 달라져서 ObjectOptimisticLockingFailureException이 발생합니다.
+
+3. 해결방법
+   - updateOption과 insertOption에 올바른 정보를 넣으면서 해결했습니다.
+
+
+---
+### < update문을 명시적으로 우선 수행헀는데 실제로는 후에 호출한 insert문을 먼저 수행하는 이유 >
+> insert가 먼저 실행되는 이유는 영속성 컨텍스트가 수정된 엔티티를 처리하지 않고, 새로운 엔티티로 처리하고 있기 때문입니다.    
+  이를 해결하려면, 트랜잭션 내에서 엔티티 상태를 관리하고 flush()나 saveOrUpdate() 메서드를 적절히 사용하여 DB에 반영되는 시점을 제어해야 합니다.
+
+> 실제 문제 해결
+> 현재의 경우에는 딱히 쿼리 순서가 영향을 미치지 않으므로 수정하지 않는다. 그냥 이유가 궁금해서 알아본다.
+
+- 이 문제는 JPA의 **영속성 컨텍스트(Persistence Context)와 플러시(Flush) 동작과 관련**이 있습니다. 
+- Hibernate가 insert문을 먼저 실행한 이유는 JPA에서 엔티티 상태 변화와 DB에 반영되는 시점 간의 차이 때문일 수 있습니다.
+
+- JPA는 영속성 컨텍스트 내에서 엔티티의 상태를 추적합니다. 
+  즉, 엔티티가 수정되거나 새로 추가될 때 이를 영속성 컨텍스트에 반영하고, 
+  실제 DB에 변경 사항을 적용하는 시점은 플러시(flush) 동작을 통해 일어납니다.
+- JPA의 기본 동작은 flush가 실행될 때 변경된 엔티티가 DB에 반영됩니다. 
+  이 플러시가 트랜잭션 종료 시점에 일어날 수도 있고, 특정 시점에서 명시적으로 호출할 수도 있습니다.
+
+- Insert가 먼저 실행된 이유
+  - JPA에서 상태가 관리되지 않는 엔티티가 DB에 처음으로 추가되는 경우, 
+    JPA는 이 **엔티티를 영속성 컨텍스트에 저장한 후, flush를 통해 insert 쿼리를 실행**합니다.
+  - **insert가 발생한 엔티티는 새로 생성된 객체일 수 있으며, 
+    수정된 엔티티를 동일 트랜잭션 내에서 업데이트하기 전에 insert가 먼저 실행될 수 있습니다.**
+  - 문제상황
+      ~~~
+        @Transactional
+        public ResponseProductionDto modifyProduction(RequestModifyProductionDto requestProductionDto,
+                                                      Member member) {
+            // 상품 조회
+            Production production = productionRepository.findByIdAndSeller(
+                    requestProductionDto.getId(), member.getId())
+                    .orElseThrow(() -> new ProductionException(NO_EDIT_PERMISSION));
+      
+            // 상품옵션 수량 변경 (update)
+            // 기존 데이터와 id가 일치하는 입력데이터 찾아 값 입력
+            for (int i = 0; i < requestUpdateOptionList.size(); i++) {
+                for(int j = 0; j < production.getOptions().size(); j++) {
+                    if(production.getOptions().get(j).getId().equals(requestUpdateOptionList.get(i).getId())) {
+                        production.getOptions().get(j).setQuantity(requestUpdateOptionList.get(i).getQuantity());
+                        // 상품옵션목록 등록(수정) -> 명시적 저장
+                        productionOptionRepository.save(optionList.get(j));
+                        break;
+                    }
+                }
+            }
+    
+            // 상품옵션 추가 등록 (insert) -> 명시적 저장
+            saveProductionOption(requestInsertOptionList, production);
+        }
+      ~~~
+          
+- 엔티티 상태와 플러시 시점
+  - 만약 수정하려는 ProductionOption이 영속성 컨텍스트에서 새로 추가된 엔티티로 처리되었거나 연관된 엔티티가 먼저 플러시된 경우,  
+    Hibernate는 insert를 먼저 실행할 수 있습니다.
+  - 예를 들어, productionOption 객체가 영속성 상태에서 새로 생성된 객체로 간주되면, 
+    insert가 수정 이전에 먼저 실행될 수 있습니다.
+
+- 엔티티 상태 확인
+  - insert가 먼저 실행되는 이유가 엔티티의 상태가 새로 생성된 객체로 처리되었기 때문일 수 있습니다. 
+  - 이를 해결하려면 엔티티 상태를 명시적으로 관리하고, insert가 아니라 update로 처리하도록 해야 합니다.
+  - 예를 들어, JPA의 merge() 메서드를 사용할 때도 insert가 발생할 수 있기 때문에, 
+    엔티티가 영속 상태로 존재하는지 확인 후 적절히 save() 혹은 update()로 처리해야 합니다.
+
+- 쿼리 순서가 잘못된 경우
+  - 만약 update 쿼리가 먼저 실행되어야 한다면,  
+    flush()를 호출하거나 트랜잭션 범위 내에서 업데이트가 먼저 일어나도록 설정할 수 있습니다.
+
+- 해결 방법
+  - @Transactional을 사용한 트랜잭션 관리
+    - 트랜잭션 범위 내에서 insert나 update 작업이 정상적으로 이루어지는지 확인합니다.    
+      **JPA는 트랜잭션이 끝날 때까지 flush를 지연**시키므로, 명시적인 flush() 호출을 통해 해당 동작을 제어할 수 있습니다.
+  - @Modifying 어노테이션과 flush 사용
+    - 명시적으로 flush() 메서드를 호출하여 엔티티 상태를 DB에 반영할 시점을 제어할 수 있습니다.
+    - 예를 들어, 엔티티의 상태를 업데이트한 후 flush()를 호출하여 업데이트가 먼저 실행되도록 할 수 있습니다.
+  ~~~
+  @Transactional
+  public void modifyProductionOption(ProductionOption productionOption) {
+      // 먼저 수정 작업 수행
+      productionOptionRepository.save(productionOption);
+
+        // flush()를 호출하여 즉시 DB에 반영
+        entityManager.flush(); 
+  }
+  ~~~  
+
+
+---
+### < dirty 체크 >
+- **Entity의 속성이 변경된 상태**
+  - Entity가 변경되었음을 JPA가 인식하고, DB에 반영될 준비가 된 상태.
+- ProductionOption 엔티티에서 quantity 값을 변경했다면, 해당 엔티티는 "dirty" 상태로 간주.
+- JPA는 해당 엔티티가 변경되었음을 추적합니다.
+
+1. JPA가 dirty check를 인식할 수 있는 이유
+   - JPA는 영속성 컨텍스트라는 메커니즘을 사용하여 엔티티의 상태를 추적. 
+   - 영속성 컨텍스트는 데이터베이스와의 연결을 관리하는 메모리상의 객체 상태를 의미. 
+   - 이 컨텍스트 내에서 엔티티의 상태가 변경되면, JPA는 이를 추적하고,  
+     flush() 또는 save()가 호출될 때 자동으로 DB에 반영합니다.
+
+2. Entity의 상태
+   - Entity가 처음 로드된 경우
+     - 데이터베이스에서 엔티티를 가져오면 영속성 컨텍스트에 보관되고, 
+       이 상태에서 **Entity는 변경되지 않은 상태**.
+     
+   - Entity가 수정된 경우
+     - Entity의 필드값을 변경하면, JPA는 이 Entity가 "dirty" 상태로 바뀌었다고 인식. 
+     - 필드값이 변경되었으므로 **수정된 상태는 flush()나 save()가 호출될 때 DB에 변경사항이 반영**됨.
+
+   - Entity에 저장되지 않은 변경사항이 있는 경우
+     - Entity가 "dirty" 상태로 **변경되었지만 save() 또는 flush()가 호출되지 않으면 
+       변경사항은 DB에 반영되지 않음.**
+
+3. dirty 상태 추적과 DB반영
+   - JPA는 자동으로 변경된 엔티티를 감지하고 
+     DB에 반영하기 위해 flush() 또는 save() 메서드를 호출할 때 이 변경사항 적용. 
+   - 이를 통해 코드에서 명시적으로 Entity save()를 호출하지 않더라도, 
+     영속성 컨텍스트 내에서 변경된 상태를 추적하고 반영 가능.
+
+
+---
+### < @Transaction 어노테이션을 이용한 flush() >
+- **@Transactional은 엔티티가 영속성 컨텍스트에 의해 관리되는 경우에만 자동으로 flush하고 저장** 처리를 수행.
+  - @Transactional 어노테이션을 사용 시 
+    **save()를 명시적으로 호출하지 않더라도 엔티티의 변경 사항이 자동으로 DB에 저장 가능.** 
+    하지만, 이 동작은 몇 가지 조건 하에서만 적용됩니다.
+
+1. @Transactional의 동작 원리
+   - @Transactional 어노테이션이 붙은 메서드는 트랜잭션을 관리하는 역할 수행. 
+   - **트랜잭션이 완료될 때, 영속성 컨텍스트에 있는 모든 변경사항을 자동으로 DB에 반영.** 
+   - 트랜잭션 범위 내에서 엔티티의 상태가 변경되면 **메서드가 끝날 때 자동으로 flush가 발생**하고 commit.
+
+2. 영속성 컨텍스트에서 관리되는 Entity
+   - @Transactional이 적용된 메서드 내에서 이미 영속성 컨텍스트에 관리되는 엔티티가 수정되면, 
+     트랜잭션이 종료될 때 JPA가 자동으로 변경 사항을 감지하고, flush()를 호출하여 DB에 반영합니다.
+   ~~~
+    @Transactional
+    public ResponseProductionDto modifyProduction(RequestModifyProductionDto requestProductionDto, Member member) {
+        // 기존 옵션 목록 dto -> entity 변환
+        List<ProductionOption> requestUpdateOptionList = requestProductionDto.getOptions().stream()
+            .filter(option -> option.getId() != null && option.getId() > 0)
+            .map(modifyProductionOptionMapper::toEntity)
+            .toList();
+    
+        // 상품 수정 (영속성 컨텍스트에 의해 관리되는 상태)
+        Production production = productionRepository.findByIdAndSeller(requestProductionDto.getId(), member.getId())
+                .orElseThrow(() -> new ProductionException(NO_EDIT_PERMISSION));
+    
+        // 수정된 옵션 목록에 대한 변경
+        for (ProductionOption option : requestUpdateOptionList) {
+            // 이때, option은 "dirty" 상태로 변경됨
+            option.setQuantity(newQuantity);  
+        }
+    
+        // 트랜잭션이 끝날 때 JPA가 자동으로 flush() 호출 -> 변경사항이 DB에 반영됨
+        return productionMapper.toDto(production);
+    }
+   ~~~
+   - @Transactional이 적용된 메서드 내에서 production과 그 관련 ProductionOption 객체들을 수정하는 경우, 
+     트랜잭션이 종료될 때 자동으로 변경사항이 DB에 반영됩니다. 
+     여기서 save() 메서드를 명시적으로 호출하지 않더라도,  
+     트랜잭션 범위 내에서 수정된 Entity들은 자동으로 DB에 저장됩니다.
+
+3. 영속성 컨텍스트 외의 객체
+   - 만약 Entity가 영속성 컨텍스트 외부에서 생성되었거나 별도로 관리되지 않는 Entity인 경우,  
+     @Transactional은 그 엔티티의 변경사항을 자동으로 DB에 반영하지 않습니다. 
+   - 이 경우, 명시적으로 save()를 호출해야 DB에 반영됩니다.
+
+
+---
+### < 연관관계에 있는 Entity의 저장방식 >
+- ProductionOption의 경우 Production Entity와 연관관계가 있기 때문에, 
+  JPA에서 관리하는 영속성 컨텍스트 내에서 Production Entity가 변경되면 
+  연관된 ProductionOption도 함께 변경되어야 할 것 같습니다. 
+
+- 하지만 연관관계에 있는 자식 Entity(ProductionOption)가 자동으로 저장되지 않도록 설정된 경우, 
+  직접적으로 save() 호출을 해줘야 합니다.
+
+1. 영속성 컨텍스트 내에서 자동 저장되는 경우
+   - JPA에서는 부모 Entity가 자식 Entity와 연관관계가 있을 때,  
+     cascade 속성이 설정된 경우 자식 Entity도 부모 Entity의 변경과 함께 자동으로 저장됩니다. 
+   - @OneToMany 관계에서 cascade = CascadeType.PERSIST나 cascade = CascadeType.ALL이 설정되어 있다면, 
+     부모 Entity가 저장될 때 자식 Entity도 자동으로 저장됩니다.
+   ~~~
+    public class Production extends BaseEntity {
+        // ...
+        
+        // 상품:옵션 (1:N)
+        // CascadeType.ALL로 설정 시, 부모 엔티티를 저장할 때 자식 엔티티도 자동 저장됨.
+        @OneToMany(cascade = CascadeType.ALL, mappedBy = "production")
+        private List<ProductionOption> options; // 한 상품이 여러 옵션을 가질 수 있음.
+    }
+   ~~~
+
+2. 수동으로 save()를 호출해야 하는 경우
+   - cascade 속성이 설정되지 않은 경우 Production 엔티티에 대한 변경만 이루어지고
+     연관된 ProductionOption Entity는 따로 명시적으로 저장해야 합니다. 
+   - ProductionOption의 변경 사항이 
+     영속성 컨텍스트에서 관리되지 않도록 설정되어 있거나, cascade가 설정되지 않았다면, 
+     productionOptionRepository.save(option)을 통해 수동으로 ProductionOption을 저장해야 합니다.
+
+
+---
+### < 부모-자식 관계의 기본적인 동작 >
+- 부모-자식 관계의 기본적인 동작은 상황에 따라 달라질 수 있습니다. 
+- 부모 엔티티를 수정한다고 해서 자식 엔티티(옵션 데이터)가 자동으로 저장되지 않으며, 
+  JPA에서 변경된 상태를 명시적으로 추적하지 않으면 자동으로 저장되지 않습니다.
+
+- 다만, 연관된 자식 엔티티가 영속성 컨텍스트에 의해 관리되고 있으면 트랜잭션 내에서 자식 엔티티도 자동으로 저장될 수 있습니다.
+
+1. 부모 엔티티와 자식 엔티티의 저장
+   - JPA에서 부모 엔티티가 수정되었다고 해서 자식 엔티티가 자동으로 저장되지 않습니다. 
+   - 부모 엔티티가 수정되어도 자식 엔티티가 수정되지 않거나 변경된 상태로 추적되지 않으면 
+     JPA는 자식 엔티티에 대한 save() 호출 없이 자동으로 DB에 반영하지 않습니다.
+
+2. 연관 관계에서 자식 엔티티 자동 저장
+   - 부모 엔티티와 자식 엔티티가 양방향 관계(예: @OneToMany와 @ManyToOne 등)일 때 
+     영속성 컨텍스트에서 자식 엔티티가 이미 관리되고 있으면, 
+     부모 엔티티의 상태가 변경되면서 자식 엔티티도 자동으로 저장될 수 있습니다. 
+   - 다만, 이때도 자식 엔티티가 명시적으로 수정되었는지 여부를 확인하는 과정이 필요합니다.
+
+3. @Transactional과 관련된 동작
+   - @Transactional을 사용하면 트랜잭션이 종료될 때 영속성 컨텍스트에 변경된 상태가 자동으로 DB에 반영됩니다. 
+   - 하지만 자식 엔티티의 변경 사항이 영속성 컨텍스트에 관리되지 않으면, 
+     부모 엔티티의 수정만 반영되고 자식 엔티티는 따로 save()를 호출해줘야 저장됩니다.
+
+4. 영속성 컨텍스트에 의해 관리되는 엔티티들
+   - 부모 엔티티와 자식 엔티티가 모두 영속성 컨텍스트에 의해 관리되면, 
+     트랜잭션이 끝날 때 JPA는 자동으로 부모와 자식 엔티티의 상태를 반영합니다. 
+   - 즉, 자식 엔티티가 save()를 명시적으로 호출하지 않아도 JPA가 자동으로 DB에 반영합니다.
+   
+5. CascadeType 설정
+   - 부모 엔티티에 @OneToMany, @ManyToMany 등 관계가 설정되어 있고 
+     cascade = CascadeType.ALL 또는 cascade = CascadeType.PERSIST와 같은 Cascade 옵션이 설정되어 있으면 
+     부모 엔티티를 저장할 때 자식 엔티티가 자동으로 저장됩니다.
+   ~~~
+   // 이 설정은 부모 엔티티인 Production이 저장될 때, 연관된 자식 엔티티인 options도 자동으로 저장되도록 합니다.
+   @OneToMany(mappedBy = "production", cascade = CascadeType.ALL)
+   private List<ProductionOption> options;
+   ~~~
+
+6. 부모 엔티티 수정만으로 자식 엔티티가 자동 저장을 위한 조건 
+   - 자식 엔티티가 영속성 컨텍스트에 의해 관리되고, CascadeType이 적절히 설정되어야 합니다. 
+     @Transactional이 적용된 메서드 내에서 영속성 컨텍스트가 관리하는 엔티티는 자동으로 저장됩니다.
+   - 그러나 @Transactional을 사용하여 트랜잭션 범위 내에서 부모 엔티티의 수정만 이루어진다고 하더라도, 
+     자식 엔티티가 영속성 컨텍스트에 의해 관리되고 Cascade 옵션이 활성화되었을 경우에만 자식 엔티티가 자동으로 DB에 반영됩니다.    
+     그렇지 않으면 명시적으로 save()를 호출해야 자식 엔티티도 DB에 저장됩니다.
+
+7. Production과 ProductionOption
+   - production의 options 필드는 @OneToMany 또는 @ManyToMany 등의 관계로 **자식 엔티티(옵션 데이터)**와 연결된 경우,
+     options 데이터는 연관된 자식 엔티티로 영속성 컨텍스트에 의해 관리되고 있기 때문에
+     부모 엔티티인 production이 트랜잭션 내에서 수정되면, 자식 엔티티인 options도 자동으로 저장될 수 있습니다.
+

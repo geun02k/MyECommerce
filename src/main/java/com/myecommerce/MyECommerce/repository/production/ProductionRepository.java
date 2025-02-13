@@ -10,4 +10,7 @@ import java.util.Optional;
 public interface ProductionRepository extends JpaRepository<Production, Long> {
     // 판매자의 동일 상품코드 조회
     Optional<Production> findBySellerAndCode(long id, String code);
+
+    // 판매자, 상품ID에 일치하는 상품 조회
+    Optional<Production> findByIdAndSeller(Long id, Long sellerId);
 }

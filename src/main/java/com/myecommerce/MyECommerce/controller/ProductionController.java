@@ -1,5 +1,6 @@
 package com.myecommerce.MyECommerce.controller;
 
+import com.myecommerce.MyECommerce.dto.production.RequestModifyProductionDto;
 import com.myecommerce.MyECommerce.dto.production.RequestProductionDto;
 import com.myecommerce.MyECommerce.dto.production.ResponseProductionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
@@ -34,6 +35,15 @@ public class ProductionController {
     /**
      * 상품, 상품옵션 수정 put /production/{id}
      **/
+    @PutMapping
+    @PreAuthorize("hasAuthority('SELLER')")
+    public ResponseEntity<ResponseProductionDto> modifyProduction(
+            @RequestBody @Valid RequestModifyProductionDto production,
+            @AuthenticationPrincipal Member member) {
+
+        return ResponseEntity.ok(
+                productionService.modifyProduction(production, member));
+    }
 
     /**
      * 상품, 상품옵션 삭제 delete /production/{id}

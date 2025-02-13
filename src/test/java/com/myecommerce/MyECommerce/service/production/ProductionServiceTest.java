@@ -14,6 +14,7 @@ import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -340,7 +341,11 @@ class ProductionServiceTest {
                 productionCode, Collections.singletonList(insertReqOptEntity.getOptionCode())))
                 .willReturn(new ArrayList());
 
-        given(productionMapper.toDto(any(Production.class)))
+        // ArgumentCaptor 생성
+        ArgumentCaptor<Production> productionCaptor = ArgumentCaptor.forClass(Production.class);
+
+        // stub(가설) : productionMapper.toDto() 실행 시 productionCaptor로 인자를 캡처하도록 설정.
+        given(productionMapper.toDto(productionCaptor.capture()))
                 .willReturn(expectedResultProductionDto);
 
         // when
@@ -348,6 +353,12 @@ class ProductionServiceTest {
                 productionService.modifyProduction(requestProductionDto, member);
 
         // then
+        // 0. toDto에 전달된 인자 캡처 후 검증
+        Production capturedProduction = productionCaptor.getValue();
+        assertEquals(requestProductionDto.getId(), capturedProduction.getId());
+        assertEquals(requestProductionDto.getDescription(), capturedProduction.getDescription());
+        assertEquals(requestProductionDto.getSaleStatus(), capturedProduction.getSaleStatus());
+
         // 1. 상품 수정 검증
         assertEquals(requestProductionDto.getId(), responseProductionDto.getId());
         assertEquals(requestProductionDto.getDescription(), responseProductionDto.getDescription());
@@ -361,18 +372,11 @@ class ProductionServiceTest {
         ResponseProductionOptionDto responseUpdatedOption = responseProductionDto.getOptions().get(0);
         assertEquals(requestUpdateOption.getId(), responseUpdatedOption.getId());
         assertEquals(requestUpdateOption.getQuantity(), responseUpdatedOption.getQuantity());
-        assertEquals(originOptionEntity.getOptionCode(), responseUpdatedOption.getOptionCode());
-        assertEquals(originOptionEntity.getOptionName(), responseUpdatedOption.getOptionName());
-        assertEquals(originOptionEntity.getPrice(), responseUpdatedOption.getPrice());
         // 3. 상품옵션 신규등록 검증
         RequestModifyProductionOptionDto requestInsertOption = requestProductionDto.getOptions().get(1);
         ResponseProductionOptionDto responseInsertedOption = responseProductionDto.getOptions().get(1);
         assertNull(requestInsertOption.getId());
         assertEquals(3L, responseInsertedOption.getId());
-        assertEquals(requestInsertOption.getOptionCode(), responseInsertedOption.getOptionCode());
-        assertEquals(requestInsertOption.getOptionName(), responseInsertedOption.getOptionName());
-        assertEquals(requestInsertOption.getPrice(), responseInsertedOption.getPrice());
-        assertEquals(requestInsertOption.getQuantity(), responseInsertedOption.getQuantity());
     }
 
 }

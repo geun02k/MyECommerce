@@ -285,6 +285,47 @@
    LEFT JOIN FETCH p.comments // Post.java Entity에서 comments로 선언한 필드 = List<Comments> comments;
    ~~~
 
+2. SQL JOIN과 JPA FETCH
+- JPQL은 서브쿼리 내에서 FETCH를 사용할 수 없으며,
+  GROUP BY나 집계 함수와 관련된 쿼리를 FETCH와 함께 사용할 때 문제가 발생할 수 있습니다.
+
+- INNER JOIN FETCH
+  - 연관된 엔티티를 가져오기 위해 사용됩니다.
+- FETCH
+  - 단일 엔티티를 연관된 엔티티와 함께 로드하는 데만 사용.
+- 서브쿼리와 JOIN FETCH
+  - 일반적으로 서브쿼리는 SELECT에서 바로 사용할 수는 있지만, FETCH 와 결합하는 것은 허용되지 않습니다.
+
+- GROUP BY와 집계 함수
+  - JPQL에서 서브쿼리 내에서 집계 함수를 사용할 수 있지만, FETCH와 결합하는 것은 불가능합니다.
+
+- 해결 방법    
+  - 서브쿼리에서 MIN(option.price) 값을 계산하고, 
+    이를 결과에 포함시키기 위해서는 서브쿼리를 JOIN으로 처리하는 방식으로 접근해야 합니다. 
+  - FETCH는 연관 관계를 가져오는 데 사용되므로, 서브쿼리와 함께 사용하지 않고, 
+    서브쿼리 결과를 JOIN한 후 ORDER BY를 적용하는 방법이 적합합니다. 
+  ~~~
+  SELECT prd
+  FROM Production prd
+  JOIN prd.productionOptions option
+  WHERE prd.name LIKE CONCAT('%', ?1, '%')
+  AND prd.saleStatus = 'ON_SALE'
+  GROUP BY prd
+  ORDER BY MIN(option.price)
+  ~~~
+  - JOIN prd.productionOptions option
+    - Production 엔티티와 연관된 ProductionOption 엔티티를 JOIN합니다. 
+    - 이때 INNER JOIN이 기본적으로 적용됩니다.
+  - 서브쿼리
+    - 서브쿼리를 사용하여 각 Production에 대해 **가장 낮은 가격을 가진 ProductionOption**을 찾습니다.
+
+
+FETCH는 연관된 엔티티를 함께 로드할 때 사용되며, 집계 함수나 서브쿼리와는 잘 결합되지 않습니다. 
+대신 JOIN을 사용하여 연관된 데이터를 가져오는 방식으로 처리합니다.
+서브쿼리에서 MIN() 함수와 GROUP BY를 사용할 때는 JOIN을 통해 결과를 비교하고 필터링하는 방식이 적합합니다.
+이렇게 수정된 쿼리는 각 Production에 대해 관련된 ProductionOption 중 가장 낮은 가격을 가진 옵션을 찾아 그 가격을 기준으로 정렬된 결과를 반환합니다.
+
+
 ---
 ### < 연관관계의 Entity 조회방식 >
 1. JPA 단순조회

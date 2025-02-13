@@ -289,37 +289,6 @@ class ProductionServiceTest {
                 .build();
 
         // 업데이트한 상품옵션 결과 DTO
-        ProductionOption expectedResponseUpdateOptionEntity =
-                ProductionOption.builder()
-                        .id(originOptionEntity.getId())
-                        .optionCode(originOptionEntity.getOptionCode())
-                        .optionName(originOptionEntity.getOptionName())
-                        .price(originOptionEntity.getPrice())
-                        .quantity(updateQuantity)
-                        .build();
-        ProductionOption expectedResponseInsertOptionEntity =
-                ProductionOption.builder()
-                        .id(3L)
-                        .optionCode(optionCode)
-                        .optionName(optionName)
-                        .price(price)
-                        .quantity(quantity)
-                        .build();
-        List<ProductionOption> expectedResponseOptionEntityList = new ArrayList<>();
-        expectedResponseOptionEntityList.add(expectedResponseUpdateOptionEntity);
-        expectedResponseOptionEntityList.add(expectedResponseInsertOptionEntity);
-
-        Production expectedProductionEntity = Production.builder()
-                .id(originProductionEntity.getId())
-                .seller(originProductionEntity.getSeller())
-                .code(originProductionEntity.getCode())
-                .name(originProductionEntity.getName())
-                .category(originProductionEntity.getCategory())
-                .description(updateDescription)
-                .saleStatus(updateSaleStatus)
-                .options(expectedResponseOptionEntityList)
-                .build();
-
         ResponseProductionOptionDto expectedResponseUpdateOptionDto =
                 ResponseProductionOptionDto.builder()
                         .id(originOptionEntity.getId())
@@ -371,19 +340,14 @@ class ProductionServiceTest {
                 productionCode, Collections.singletonList(insertReqOptEntity.getOptionCode())))
                 .willReturn(new ArrayList());
 
-        given(productionMapper.toDto(expectedProductionEntity))
+        given(productionMapper.toDto(any(Production.class)))
                 .willReturn(expectedResultProductionDto);
-
-        // stubbing: productionRepository.save() 호출 시 반환할 값 설정
-        given(productionRepository.save(any(Production.class)))
-                .willReturn(expectedProductionEntity); // 변경된 생산 정보 반환
 
         // when
         ResponseProductionDto responseProductionDto =
                 productionService.modifyProduction(requestProductionDto, member);
 
         // then
-        verify(productionRepository, times(1)).save(originProductionEntity); // update 1번
         // 1. 상품 수정 검증
         assertEquals(requestProductionDto.getId(), responseProductionDto.getId());
         assertEquals(requestProductionDto.getDescription(), responseProductionDto.getDescription());

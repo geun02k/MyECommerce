@@ -1732,3 +1732,19 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
     }
    ~~~
 
+
+---
+### < 쿼링 정확도순 정렬하기 >
+- like로 검색 후 유사한 결과 먼저 정렬하기
+  - 참고블로그   
+    https://blog.naver.com/rorean/221566107729
+  
+- like 검색의 단점과 FullTextSearch (10000건정도되면 like검색과 차이난다고 함.)
+  - 참고블로그
+    https://annajin.tistory.com/218
+
+---
+### < 쿼리 검색성능 개선하기 >
+- 추후 반영해서 구현해볼 것
+- 참고블로그   
+  https://velog.io/@juhyeon1114/MySQL-%EA%B2%80%EC%83%89-%EC%84%B1%EB%8A%A5-%EA%B0%9C%EC%84%A0%ED%95%98%EA%B8%B0-like%EC%99%80-full-text-search

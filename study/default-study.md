@@ -1626,3 +1626,109 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
           }
           ~~~
 
+
+---
+### < Pageable - 페이지 기능을 지원 >
+- 개발기간 단축
+  - 페이지 기능은 흔하지만 서비스의 핵심적인 기능은 아니다.
+    때문에 직접 구현하려면 많은 공수가 필요하지만 스프링부트에서 지원하는 Pageable을 사용해 구현하게 되면
+    단순한 기능보다 핵심적인 기능에 집중해 더 완성도있는 서비스를 제공할 수 있다.
+
+- 조회 데이터 제한    
+  - api 호출에 대한 응답 결과로 이 모든 정보를 조회하는 것은 옳지 않다.
+    요청을 주고 받는 데이터의 수가 클수록 당연히 네트워크의 대역폭도 더 많이 사용해야 하므로
+    서비스 전체에 악영향을 줄 가능성도 높아진다.
+  - 많은 회사 목록을 받는다 하더라도 어짜피 클라이언트에서 한번에 보여줄 수 있는 아이템의 개수는 한정되어있다.
+    따라서 적당한 수의 회사 정보만 조회하도록 한다.
+
+1. Pageable 
+   - 페이지 기능을 지원한다.
+   - import org.springframework.data.domain.Pageable;
+   - controller에서 파라미터로 Pageable을 받을 수 있도록 한다.
+   - 클라이언트에서 페이징 관련 옵션을 추가해 api를 호출할 수 있게 된다.
+   - Pageable이 임의로 변경되는 것을 막기위해 final로 선언한다.
+   - service에서 JPA repository의 findAll() 메서드 호출 시 인자로 Pageable 객체를 전달한다.
+     단, 반환값은 List<Entity> 타입이 아닌 Page<Entity>로 변경되어야 한다.
+   
+   - 페이지 관련 옵션   
+     - 응답시 회사목록에 추가로 하단에 페이지에 대한 정보도 함께 제공한다.
+     - 페이지의 사이즈(한 페이지에 출력할 데이터 수)는 default로 20.
+     - 따라서 사이즈 변수를 파라미터로 넘겨 사이즈 조절도 가능하다.
+     - query param으로 사이즈=3, 페이지는 0번째 페이지 출력하도록 전달 url
+     
+   - 참고블로그    
+     http://localhost:8080/company?size=3&page=0
+
+2. Page JSON 리턴값
+  {
+    "content": [
+      {
+        "id": 1,
+        "ticker": "MMM",
+        "name": "3M Company"
+      },
+      ...
+    ],
+    "pageable": {
+        "sort": {
+            "empty": true,
+            "sorted": false,
+            "unsorted": true
+        },
+        "offset": 0,
+        "pageNumber": 0,
+        "pageSize": 20,
+        "paged": true,
+        "unpaged": false
+    },
+    "last": true,
+    "totalElements": 4,
+    "totalPages": 1,
+    "size": 20,
+    "number": 0,
+    "sort": {
+        "empty": true,
+        "sorted": false,
+        "unsorted": true
+    },
+    "first": true,
+    "numberOfElements": 4,
+    "empty": false
+  }
+
+3. page 객체의 Entity -> Dto로 변환1
+   - Page.map() 메서드 사용. 
+     - map() 메서드는 Page 객체 내의 각 요소를 변환하는 데 사용됩니다.
+   ~~~ 
+   import org.springframework.data.domain.Page;
+   import org.springframework.data.domain.PageImpl;
+   import java.util.List;
+   import java.util.stream.Collectors;
+
+   public Page<ResponseProductionDto> convertToDto(Page<Entity> entityPage) {
+       List<ResponseProductionDto> dtoList = entityPage.getContent().stream()
+                   .map(entity -> new ResponseProductionDto(entity)) 
+                   .collect(Collectors.toList());
+
+       return new PageImpl<>(dtoList, entityPage.getPageable(), entityPage.getTotalElements());
+   }
+   ~~~ 
+   - entityPage.getContent()
+     - Page 객체의 실제 데이터를 가져옵니다.
+   - map()
+     - Page 객체의 각 Entity를 ResponseProductionDto로 변환합니다.
+   - new PageImpl<>(dtoList, entityPage.getPageable(), entityPage.getTotalElements())
+     - Page 객체는 PageImpl로 변환할 수 있습니다. 
+     - PageImpl은 DTO 리스트와 페이지 정보를 받아 새로운 Page 객체를 만듭니다.
+
+4. page 객체의 Entity -> Dto로 변환2
+   - Spring Data Page는 map() 메서드를 제공합니다. 
+   - Page의 각 항목을 변환한 후 새로운 Page를 반환할 수 있습니다.
+   ~~~
+    import org.springframework.data.domain.Page;
+    
+    public Page<ResponseProductionDto> convertToDto(Page<Entity> entityPage) {
+        return entityPage.map(entity -> new ResponseProductionDto(entity));
+    }
+   ~~~
+

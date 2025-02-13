@@ -31,7 +31,7 @@ import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 @RequiredArgsConstructor
 public class ProductionService {
 
-    private final static int PRODUCTION_LENGTH = 200;
+    private final static int PRODUCTION_NAME_LENGTH = 200;
 
     private final ProductionMapper productionMapper;
     private final ProductionOptionMapper productionOptionMapper;
@@ -103,29 +103,11 @@ public class ProductionService {
     public Page<ResponseProductionDto> searchProductionList(ProductionOrderByStdType orderByStd,
                                                             String keyword,
                                                             Pageable pageable) {
-        // 키워드 50자까지 잘라서 사용.
-        String limitedKeyword = keyword.length() > PRODUCTION_LENGTH ?
-                keyword.substring(0, PRODUCTION_LENGTH) : keyword;
+        // 키워드 200자로 제한
+        String limitedKeyword = getLimitedKeyword(keyword);
 
         // 정렬순서에 따른 상품목록조회
-        Page<Production> productionPage = null;
-        if (orderByStd == ORDER_BY_LOWEST_PRICE) {
-            productionPage = productionRepository
-                    .findByNameOrderByPrice(limitedKeyword, pageable);
-
-        } else if (orderByStd == ORDER_BY_HIGHEST_PRICE) {
-            productionPage = productionRepository
-                    .findByNameOrderByPriceDesc(limitedKeyword, pageable);
-
-        } else if (orderByStd == ORDER_BY_REGISTRATION) {
-            productionPage = productionRepository
-                    .findByNameLikeAndSaleStatusOrderByCreateDt(
-                            limitedKeyword, ON_SALE, pageable);
-
-        } else { // 기본 정확도순 정렬
-            productionPage = productionRepository
-                    .findByNameOrderByAccuracyDesc(limitedKeyword, pageable);
-        }
+        Page<Production> productionPage = getSortedProductions(orderByStd, limitedKeyword, pageable);
 
         // entity -> dto로 변환
         return  productionPage.map(productionMapper::toDto);
@@ -276,6 +258,39 @@ public class ProductionService {
             // 조회한 상품옵션목록에 신규옵션 추가
             production.getOptions().add(option);
         });
+    }
+
+    // 상품명 조회 키워드 자릿수 제한해 반환
+    private String getLimitedKeyword(String keyword) {
+        return keyword.length() > PRODUCTION_NAME_LENGTH ?
+                keyword.substring(0, PRODUCTION_NAME_LENGTH) : keyword;
+    }
+
+    // keyword를 포함하는 상품정보 페이지 조회
+    private Page<Production> getSortedProductions(ProductionOrderByStdType orderByStd,
+                                                  String keyword,
+                                                  Pageable pageable) {
+        Page<Production> productionPage;
+
+        if (orderByStd == ORDER_BY_LOWEST_PRICE) {
+            productionPage = productionRepository
+                    .findByNameOrderByPrice(keyword, pageable);
+
+        } else if (orderByStd == ORDER_BY_HIGHEST_PRICE) {
+            productionPage = productionRepository
+                    .findByNameOrderByPriceDesc(keyword, pageable);
+
+        } else if (orderByStd == ORDER_BY_REGISTRATION) {
+            productionPage = productionRepository
+                    .findByNameLikeAndSaleStatusOrderByCreateDt(
+                            keyword, ON_SALE, pageable);
+
+        } else { // 기본 정확도순 정렬
+            productionPage = productionRepository
+                    .findByNameOrderByAccuracyDesc(keyword, pageable);
+        }
+
+        return productionPage;
     }
 
 }

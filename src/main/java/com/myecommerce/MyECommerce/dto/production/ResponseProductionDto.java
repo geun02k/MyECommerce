@@ -36,6 +36,4 @@ public class ResponseProductionDto {
 
     private LocalDateTime updateDt;
 
-    private List<ResponseProductionOptionDto> options;
-
 }

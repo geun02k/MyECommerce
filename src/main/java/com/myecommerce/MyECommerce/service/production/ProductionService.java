@@ -74,8 +74,12 @@ public class ProductionService {
     @Transactional
     public ResponseProductionDto modifyProduction(RequestModifyProductionDto requestProductionDto,
                                                   Member member) {
+        // 상품 조회 및 상품 판매자 체크
+        Production production = getProductionEntityByIdAndSeller(
+                requestProductionDto.getId(), member.getId());
+
         // validation check
-        updateProductionValidationCheck(requestProductionDto, member);
+        updateProductionValidationCheck(production, requestProductionDto);
 
         // 수정할 옵션목록 dto -> entity 변환
         List<ProductionOption> requestUpdateOptionList =
@@ -83,10 +87,6 @@ public class ProductionService {
         // 신규 저장 옵션목록 dto -> entity 변환
         List<ProductionOption> requestInsertOptionList =
                 convertToInsertOptionEntities(requestProductionDto);
-
-        // 상품 조회
-        Production production = getProductionEntityByIdAndSeller(
-                requestProductionDto.getId(), member.getId());
 
         // 상품 설명, 판매상태 변경
         updateProduction(production, requestProductionDto);
@@ -96,7 +96,7 @@ public class ProductionService {
         insertOptions(requestInsertOptionList, production);
 
         // 상품, 상품옵션목록 반환
-        return productionMapper.toDto(productionRepository.save(production));
+        return productionMapper.toDto(production);
     }
 
     /** 상품목록조회 **/
@@ -182,12 +182,8 @@ public class ProductionService {
     }
 
     // 상품수정 validation check
-    private void updateProductionValidationCheck(RequestModifyProductionDto requestProductionDto,
-                                                 Member member) {
-        // 상품 판매자 체크
-        Production production = getProductionEntityByIdAndSeller(
-                requestProductionDto.getId(), member.getId());
-
+    private void updateProductionValidationCheck(Production production,
+                                                 RequestModifyProductionDto requestProductionDto) {
         // 상품 기존 판매상태 체크
         if (production.getSaleStatus() == DELETION) {
             throw new ProductionException(NO_EDIT_DELETION_STATUS);

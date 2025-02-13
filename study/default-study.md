@@ -712,6 +712,25 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
 
  
 ### < 테스트코드 검증 >
+- 전달인자, 반환값에 대한 검증
+  - 검증할 때 변경되지 않는 값들에 대해서는 반드시 검증할 필요없음.
+  - 특히, 테스트의 목표가 변경된 값들이 올바르게 처리되었는지를 확인하는 것이라면, 변경되지 않은 값들은 검증 대상에서 제외가능.
+
+- 변경된 값들 필수 검증
+  - 효율성
+    - 모든 값을 검증하면 너무 많은 검증이 이루어지게 되며, 테스트 코드가 불필요하게 복잡해짐. 
+    - 특히 변경되지 않은 값들은 이미 예상할 수 있기 때문에 검증을 생략해도 문제없음.
+  - 테스트 목적
+    - 테스트는 로직이 예상대로 작동하는지 확인해 수정된 값들이 제대로 처리되는지 것이므로 변경된 값에 대해서만 집중.
+
+- 변경되지 않은 값들에 대한 간접적 검증.
+  > 변경되지 않아야 할 부분도 간접적으로 검증하는 것이 중요.
+  > 만약 변경되지 않은 값이 의도치 않게 변경되면, 버그나 논리적 오류가 발생한 가능성 있음.
+  > 하지만 **모든 값을 검증하는 것은 비효율적**이므로,
+    **변경되지 않는 값 중 핵심적인 값들만 검증**하여 테스트의 효율성을 유지.
+  - 핵심 식별자(예: id, seller, code, name 등)가 의도치 않게 변경되지 않았는지 간단히 검증.
+  - 비즈니스 로직에 따라 중요한 값이 변경되지 않아야 하는 경우, 해당 값도 검증.
+
 1. Mockito의 verify()
    ~~~
     // then
@@ -761,6 +780,7 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
         assertTrue(capturedDuration.toMillis() <= validTime, "Duration should be less than or equal to validTime");
         ~~~
 
+
 ### < 테스트코드작성 ArgumentCaptor >
 - 참고블로그 https://hanrabong.com/entry/Test-ArgumentCaptor%EB%9E%80
 - capture()
@@ -775,6 +795,90 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
   - memberRepository.save() 실행 여부 체크
 
 
+### < 테스트코드 전달인자 검증 >
+- 참고 ProductionServiceTest.successModifyProduction()
+- 주로 toDto **메소드에 전달된 값들이 의도한 대로 정확히 전달되었는지를 확인**.
+
+- 전달인자 검증방법
+  - ArgumentCaptor를 사용하여 전달인자를 캡처한 뒤 이를 검증하면 해당 객체가 수정된 값들을 정확하게 포함하고 있는지 확인가능.
+  - 이 테스트 코드에서는 전달인자 검증이 중요한 부분이므로
+    ArgumentCaptor를 사용해 toDto 메소드로 전달된 Production 객체의 속성값들이 예상대로 처리되었는지 검증하는 핖요.
+
+- ArgumentCaptor 사용해 전달인자 검증 예시
+  ~~~
+    // ArgumentCaptor 생성
+    ArgumentCaptor<Production> productionCaptor = ArgumentCaptor.forClass(Production.class);
+    
+    // stub(가설) : productionMapper.toDto() 실행 시 productionCaptor로 인자를 캡처하도록 설정.
+    given(productionMapper.toDto(productionCaptor.capture()))
+        .willReturn(expectedResultProductionDto);
+    
+    // when
+    ResponseProductionDto responseProductionDto =
+        productionService.modifyProduction(requestProductionDto, member);
+    
+    // then
+    // 1. 상품 수정 검증
+    assertEquals(requestProductionDto.getId(), responseProductionDto.getId());
+    assertEquals(requestProductionDto.getDescription(), responseProductionDto.getDescription());
+    assertEquals(requestProductionDto.getSaleStatus(), responseProductionDto.getSaleStatus());
+    assertEquals(originProductionEntity.getSeller(), responseProductionDto.getSeller());
+    assertEquals(originProductionEntity.getCode(), responseProductionDto.getCode());
+    assertEquals(originProductionEntity.getName(), responseProductionDto.getName());
+    assertEquals(originProductionEntity.getCategory(), responseProductionDto.getCategory());
+    
+    // 2. 상품옵션 수정 검증
+    RequestModifyProductionOptionDto requestUpdateOption = requestProductionDto.getOptions().get(0);
+    ResponseProductionOptionDto responseUpdatedOption = responseProductionDto.getOptions().get(0);
+    assertEquals(requestUpdateOption.getId(), responseUpdatedOption.getId());
+    assertEquals(requestUpdateOption.getQuantity(), responseUpdatedOption.getQuantity());
+    
+    // 3. 상품옵션 신규등록 검증
+    RequestModifyProductionOptionDto requestInsertOption = requestProductionDto.getOptions().get(1);
+    ResponseProductionOptionDto responseInsertedOption = responseProductionDto.getOptions().get(1);
+    assertNull(requestInsertOption.getId());
+    assertEquals(3L, responseInsertedOption.getId());
+    
+    // 4. toDto에 전달된 인자 캡처 후 검증
+    Production capturedProduction = productionCaptor.getValue();
+    assertEquals(updateDescription, capturedProduction.getDescription());
+    assertEquals(updateSaleStatus, capturedProduction.getSaleStatus());
+    assertEquals(productionId, capturedProduction.getId());
+  ~~~
+    1. Production 객체에 대한 검증
+       - toDto 메소드로 전달된 Production 객체가 수정된 설명(updateDescription)과 판매 상태(updateSaleStatus)를 정확히 포함하는지 검증.
+    
+    2. ProductionOption 객체에 대한 검증
+       - ResponseProductionOptionDto가 수정된 quantity와 일치하는지, 그리고 신규 추가된 옵션에 대해서도 id 값이나 quantity 값이 예상대로 처리되는지 검증.
+    
+    3. toDto에 전달된 Production 객체 검증
+       - ArgumentCaptor를 사용하여 productionMapper.toDto()로 전달된 Production 객체를 캡처하고, 그 값들을 검증합니다.
+    
+    4. 옵션 quantity 및 price 값이 올바르게 전달되는지 확인
+       - ProductionOption에 대해 업데이트와 삽입된 옵션이 quantity와 price를 올바르게 갖고 있는지 검증합니다.
+
+1. productionMapper.toDto() 메소드의 전달인자 검증
+    - 메소드가 호출되었을 때, 실제로 Production 객체가 올바르게 전달되었는지 확인가능.
+    - expectedProductionEntity가 productionMapper.toDto()에 전달된 객체일 때,
+      그 객체가 올바르게 수정된 값들을 포함하고 있는지 확인하는 것입니다.
+
+2. modifyProductionOptionMapper.toEntity() 메소드의 전달인자 검증
+    - RequestModifyProductionOptionDto 객체를 ProductionOption으로 변환하는 로직.
+    - 이 과정에서 전달되는 DTO 값들이 실제로 Entity로 올바르게 변환되는지 검증.
+    - quantity나 price 값이 제대로 전달되는지 검증가능.
+
+3. ProductionOption 관련 인자들 검증
+    - 수정된 옵션(RequestModifyProductionOptionDto)들이
+      실제로 서비스 로직에 전달될 때 값들이 올바르게 전달되었는지 확인 필요.
+    - RequestModifyProductionOptionDto에서 quantity, price, optionCode 등이 올바르게 설정되었는지 확인가능.
+    - expectedResponseOptionDtoList에 있는 값들이 요청 DTO에서 예상한 값과 일치하는지 검증가능.
+
+4. 서비스 내에서 인자 검증
+    - productionService.modifyProduction()에서 인자들이 올바르게 처리되는지도 중요한 검증 대상.
+    - requestProductionDto의 값들이 제대로 전달되었는지.
+    - productionService.modifyProduction() 내부에서 originProductionEntity에 대한 수정이 예상대로 이루어졌는지.
+
+      
 ### < Reflection - private 메서드 테스트코드 작성 >
 - 리플렉션을 사용 시 클래스의 메서드나 필드에 직접 접근할 수 없더라도 접근 제어자에 관계없이 해당 클래스의 메서드나 필드를 검사하거나 수정가능.
 - 자바의 java.lang.reflect 패키지에서 제공되는 클래스를 사용.

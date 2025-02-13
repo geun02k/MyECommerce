@@ -14,6 +14,7 @@ import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -285,39 +286,7 @@ class ProductionServiceTest {
                 .saleStatus(saleStatus)
                 .options(Stream.of(originOptionEntity).collect(Collectors.toList()))
                 .build();
-
-        // 업데이트한 상품옵션 결과 DTO
-        ProductionOption expectedResponseUpdateOptionEntity =
-                ProductionOption.builder()
-                        .id(originOptionEntity.getId())
-                        .optionCode(originOptionEntity.getOptionCode())
-                        .optionName(originOptionEntity.getOptionName())
-                        .price(originOptionEntity.getPrice())
-                        .quantity(updateQuantity)
-                        .build();
-        ProductionOption expectedResponseInsertOptionEntity =
-                ProductionOption.builder()
-                        .id(3L)
-                        .optionCode(optionCode)
-                        .optionName(optionName)
-                        .price(price)
-                        .quantity(quantity)
-                        .build();
-        List<ProductionOption> expectedResponseOptionEntityList = new ArrayList<>();
-        expectedResponseOptionEntityList.add(expectedResponseUpdateOptionEntity);
-        expectedResponseOptionEntityList.add(expectedResponseInsertOptionEntity);
-
-        Production expectedProductionEntity = Production.builder()
-                .id(originProductionEntity.getId())
-                .seller(originProductionEntity.getSeller())
-                .code(originProductionEntity.getCode())
-                .name(originProductionEntity.getName())
-                .category(originProductionEntity.getCategory())
-                .description(updateDescription)
-                .saleStatus(updateSaleStatus)
-                .options(expectedResponseOptionEntityList)
-                .build();
-
+        
         // 업데이트한 상품 결과 DTO
         ResponseProductionDto expectedResultProductionDto = ResponseProductionDto.builder()
                 .id(originProductionEntity.getId())
@@ -348,19 +317,24 @@ class ProductionServiceTest {
                 productionCode, Collections.singletonList(insertReqOptEntity.getOptionCode())))
                 .willReturn(new ArrayList());
 
-        given(productionMapper.toDto(expectedProductionEntity))
-                .willReturn(expectedResultProductionDto);
+        // ArgumentCaptor 생성
+        ArgumentCaptor<Production> productionCaptor = ArgumentCaptor.forClass(Production.class);
 
-        // stubbing: productionRepository.save() 호출 시 반환할 값 설정
-        given(productionRepository.save(any(Production.class)))
-                .willReturn(expectedProductionEntity); // 변경된 생산 정보 반환
+        // stub(가설) : productionMapper.toDto() 실행 시 productionCaptor로 인자를 캡처하도록 설정.
+        given(productionMapper.toDto(productionCaptor.capture()))
+                .willReturn(expectedResultProductionDto);
 
         // when
         ResponseProductionDto responseProductionDto =
                 productionService.modifyProduction(requestProductionDto, member);
 
         // then
-        verify(productionRepository, times(1)).save(originProductionEntity); // update 1번
+        // 0. toDto에 전달된 인자 캡처 후 검증
+        Production capturedProduction = productionCaptor.getValue();
+        assertEquals(requestProductionDto.getId(), capturedProduction.getId());
+        assertEquals(requestProductionDto.getDescription(), capturedProduction.getDescription());
+        assertEquals(requestProductionDto.getSaleStatus(), capturedProduction.getSaleStatus());
+
         // 1. 상품 수정 검증
         assertEquals(requestProductionDto.getId(), responseProductionDto.getId());
         assertEquals(requestProductionDto.getDescription(), responseProductionDto.getDescription());
@@ -371,19 +345,14 @@ class ProductionServiceTest {
         assertEquals(originProductionEntity.getCategory(), responseProductionDto.getCategory());
         // 2. 상품옵션 수정 검증
         RequestModifyProductionOptionDto requestUpdateOption = requestProductionDto.getOptions().get(0);
-        assertEquals(requestUpdateOption.getId(), expectedResponseUpdateOptionEntity.getId());
-        assertEquals(requestUpdateOption.getQuantity(), expectedResponseUpdateOptionEntity.getQuantity());
-        assertEquals(originOptionEntity.getOptionCode(), expectedResponseUpdateOptionEntity.getOptionCode());
-        assertEquals(originOptionEntity.getOptionName(), expectedResponseUpdateOptionEntity.getOptionName());
-        assertEquals(originOptionEntity.getPrice(), expectedResponseUpdateOptionEntity.getPrice());
+        ProductionOption responseUpdatedOption = capturedProduction.getOptions().get(0);
+        assertEquals(requestUpdateOption.getId(), responseUpdatedOption.getId());
+        assertEquals(requestUpdateOption.getQuantity(), responseUpdatedOption.getQuantity());
         // 3. 상품옵션 신규등록 검증
         RequestModifyProductionOptionDto requestInsertOption = requestProductionDto.getOptions().get(1);
+        ProductionOption responseInsertedOption = capturedProduction.getOptions().get(1);
         assertNull(requestInsertOption.getId());
-        assertEquals(3L, expectedResponseInsertOptionEntity.getId());
-        assertEquals(requestInsertOption.getOptionCode(), expectedResponseInsertOptionEntity.getOptionCode());
-        assertEquals(requestInsertOption.getOptionName(), expectedResponseInsertOptionEntity.getOptionName());
-        assertEquals(requestInsertOption.getPrice(), expectedResponseInsertOptionEntity.getPrice());
-        assertEquals(requestInsertOption.getQuantity(), expectedResponseInsertOptionEntity.getQuantity());
+        assertNotNull(responseInsertedOption);
     }
 
 }

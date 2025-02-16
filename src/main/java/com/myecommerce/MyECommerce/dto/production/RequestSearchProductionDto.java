@@ -18,7 +18,7 @@ public class RequestSearchProductionDto {
     @EnumValid(enumClass = ProductionOrderByStdType.class)
     private ProductionOrderByStdType orderByStd;
 
-    @EnumValid(enumClass = ProductionOrderByStdType.class)
+    @EnumValid(enumClass = ProductionCategoryType.class)
     private ProductionCategoryType category;
 
     @Pattern(regexp = "^[^\\s]+$", message = "검색어를 입력하세요.") // 공백 이외 최소 한글자이상 입력

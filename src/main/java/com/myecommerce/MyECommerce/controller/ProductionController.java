@@ -60,7 +60,7 @@ public class ProductionController {
      **/
     @GetMapping
     public ResponseEntity<Page<ResponseProductionDto>> searchProductionList(
-            RequestSearchProductionDto requestSearchProductionDto) {
+            @Valid RequestSearchProductionDto requestSearchProductionDto) {
         return ResponseEntity.ok(
                 productionService.searchProductionList(requestSearchProductionDto));
     }

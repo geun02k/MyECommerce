@@ -50,6 +50,6 @@ public interface ProductionRepository extends JpaRepository<Production, Long> {
             " FROM Production prd " +
             " WHERE prd.name LIKE CONCAT('%', ?1, '%') " +
             " AND prd.saleStatus = 'ON_SALE' " +
-            " ORDER BY CHAR_LENGTH(prd.name) - CHAR_LENGTH(?1) ")
-    Page<Production> findByNameOrderByAccuracyDesc(String name, Pageable pageable);
+            " ORDER BY (LENGTH(prd.name) - LENGTH(?1)) ")
+    Page<Production> findByNameOrderByCalculatedAccuracyDesc(String name, Pageable pageable);
 }

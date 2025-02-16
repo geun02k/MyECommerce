@@ -283,7 +283,7 @@ public class ProductionService {
 
         } else { // 기본 정확도순 정렬
             productionPage = productionRepository
-                    .findByNameOrderByAccuracyDesc(keyword, pageable);
+                    .findByNameOrderByCalculatedAccuracyDesc(keyword, pageable);
         }
 
         return productionPage;

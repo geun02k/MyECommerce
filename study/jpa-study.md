@@ -712,6 +712,101 @@ public class Order {
 
 
 ---
+### < @Query에서 파라미터 바인딩 방법 >
+1. ?1 (위치 기반 바인딩)
+    - 순서대로 파라미터를 바인딩가능. (?1 -> 첫 번째 파라미터 참조)
+    - 순서를 명확히 알 수 있다면 짧고 직관적.
+    - 파라미터 순서가 바뀌면 오류 발생가능.
+    - 쿼리에서 직접 파라미터를 사용할 때 순서를 정확히 맞춰야 하기 때문에 가독성이 떨어질 수 있음.
+   ~~~
+   @Query("SELECT p FROM Product p WHERE p.name = ?1")
+   List<Product> findByName(String name);
+   ~~~
+
+2. :name (명명된 파라미터)
+    - 쿼리 내에서 파라미터의 이름을 명시적으로 지정하고, 이를 메서드 파라미터와 연결.
+    - 파라미터 순서에 구애받지 않으며, 쿼리의 가독성이 높음.
+    - 파라미터 이름이 명확하게 나타나므로 쿼리 수정 시 안전.
+    - 파라미터 이름을 지정해주어야 하므로, @Param 어노테이션을 사용해야 할 경우가 많음.
+   ~~~
+   @Query("SELECT p FROM Product p WHERE p.name = :name")
+   List<Product> findByName(@Param("name") String name);
+   ~~~
+
+
+---
+### < JPA에서 Entity에 없는 필드인 계산된 값을 사용하기 >
+> 쿼리에서 사용되는 값이 실제로 엔티티에 존재하지 않으면 해당 값을 **계산된 값으로 처리**해야함.
+> @Query에서 직접 계산할 수 있거나, 애플리케이션에서 후처리하여 정렬가능.
+> 동적 쿼리나 Criteria API, Querydsl을 사용하여 계산된 값을 정렬 기준으로 활용가능.
+
+- accuracy는 실제로 Production 엔티티의 필드가 아니고, 단지 쿼리 정렬을 위한 임시 값으로 사용.
+- 정렬 기준으로 사용되는 accuracy가 실제 필드가 아닌 계산된 값이기 때문에, 이를 쿼리에서 직접 사용은 뷸가능.
+
+- accuracy는 실제 엔티티의 필드가 아니므로, 이를 기준으로 정렬을 하려고 하면 @Query에서 사용불가.
+- 정렬 기준으로 사용될 값을 계산하거나 다른 방식으로 해당 값을 처리는 가능.
+
+1. 쿼리에서 accuracy를 계산된 값으로 사용하기 (내가 사용한 방법)
+    - 만약 accuracy가 계산된 값이라면, @Query에서 그 값을 직접 계산하거나 별도로 처리할 수 있도록 쿼리를 작성하는 방법.
+    - accuracy가 어떤 계산식에 의해 정해진다면, 그 계산식을 쿼리에서 직접 구현가능.
+    - 실제 accuracy처럼 **계산된 값을 @Query 내에서 사용하려면, 계산 수식을 ( )에 포함해 직접 쿼리 안에서 정의**필요.
+    - accuracy가 실제로 **계산식에 의존하는 값**이라면, 그 계산식을 쿼리 내에서 직접 계산하여 정렬 기준으로 사용가능.
+   ~~~
+    // someField1과 someField2를 더한 값을 정렬 기준으로 사용.
+    @Query("SELECT p FROM Production p WHERE p.name = :name ORDER BY (p.someField1 + p.someField2) DESC")
+    Page<Production> findByNameOrderByCalculatedAccuracyDesc(@Param("name") String name, Pageable pageable);
+   ~~~
+
+2. 애플리케이션에서 accuracy를 계산하여 전달하기
+    - accuracy가 엔티티 내에 존재하지 않는 값이지만 애플리케이션 내에서 계산할 수 있는 값이라면,
+      애플리케이션 코드에서 먼저 해당 값을 계산하고 정렬을 위해 별도로 처리한 뒤 페이징된 결과를 반환가능.
+    - accuracy 값이 복잡한 계산이나 외부 데이터를 참조하는 경우
+      쿼리에서는 계산된 값을 사용하지 않고 결과를 애플리케이션에서 후처리하여 정렬을 구현가능.
+   ~~~
+    // accuracy 값을 애플리케이션에서 계산하여 정렬한 후, PageImpl을 사용하여 페이징 처리된 결과를 반환.
+    public Page<Production> findByNameOrderByAccuracyDesc(String name, Pageable pageable) {
+        Page<Production> productions = productionRepository.findByName(name, pageable); 
+
+        // accuracy 값을 계산하고 정렬
+        List<Production> sortedProductions = productions.stream()
+                .sorted((p1, p2) -> Double.compare(calculateAccuracy(p2), calculateAccuracy(p1)))
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(sortedProductions, pageable, productions.getTotalElements());
+    }
+   
+    private double calculateAccuracy(Production production) {
+        // accuracy를 계산하는 로직
+        return production.getSomeField1() * production.getSomeField2() / production.getSomeField3();
+    }
+   ~~~ 
+
+3. Criteria API 또는 Querydsl을 사용한 동적 쿼리 처리
+    - Criteria API나 Querydsl을 사용하면, 동적으로 복잡한 계산을 기반으로 정렬가능.
+   ~~~
+    // Criteria API를 사용하여 동적으로 계산된 값(someField1 * someField2)을 기준으로 정렬 수행
+    public Page<Production> findByNameWithCalculatedAccuracy(String name, Pageable pageable) {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Production> cq = cb.createQuery(Production.class);
+        Root<Production> root = cq.from(Production.class);
+   
+        // 조건 설정
+        Predicate namePredicate = cb.equal(root.get("name"), name);
+        cq.where(namePredicate);
+    
+        // 계산된 값으로 정렬 (예: someField1 * someField2 )
+        cq.orderBy(cb.desc(cb.prod(root.get("someField1"), root.get("someField2"))));
+    
+        TypedQuery<Production> query = em.createQuery(cq);
+        query.setFirstResult((int) pageable.getOffset());
+        query.setMaxResults(pageable.getPageSize());
+     
+        return new PageImpl<>(query.getResultList(), pageable, countTotalResults());
+    }
+   ~~~
+
+
+---
 ### < 쿼리 검색성능 개선하기 >
 - 추후 반영해서 구현해볼 것
 - 참고블로그   

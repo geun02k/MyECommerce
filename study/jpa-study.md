@@ -710,3 +710,20 @@ public class Order {
      options 데이터는 연관된 자식 엔티티로 영속성 컨텍스트에 의해 관리되고 있기 때문에
      부모 엔티티인 production이 트랜잭션 내에서 수정되면, 자식 엔티티인 options도 자동으로 저장될 수 있습니다.
 
+
+---
+### < 쿼리 검색성능 개선하기 >
+- 추후 반영해서 구현해볼 것
+- 참고블로그   
+  https://velog.io/@juhyeon1114/MySQL-%EA%B2%80%EC%83%89-%EC%84%B1%EB%8A%A5-%EA%B0%9C%EC%84%A0%ED%95%98%EA%B8%B0-like%EC%99%80-full-text-search
+
+
+### < 쿼리 정확도순 정렬하기 >
+- like로 검색 후 유사한 결과 먼저 정렬하기
+    - 참고블로그   
+      https://blog.naver.com/rorean/221566107729
+
+- like 검색의 단점과 FullTextSearch (10000건 정도되면 like검색과 차이난다고 함.)
+    - 참고블로그
+      https://annajin.tistory.com/218
+

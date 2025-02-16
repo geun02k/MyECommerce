@@ -2,17 +2,13 @@ package com.myecommerce.MyECommerce.controller;
 
 import com.myecommerce.MyECommerce.dto.production.RequestModifyProductionDto;
 import com.myecommerce.MyECommerce.dto.production.RequestProductionDto;
+import com.myecommerce.MyECommerce.dto.production.RequestSearchProductionDto;
 import com.myecommerce.MyECommerce.dto.production.ResponseProductionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.service.production.ProductionService;
-import com.myecommerce.MyECommerce.type.ProductionOrderByStdType;
-import com.myecommerce.MyECommerce.validation.EnumValid;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -64,14 +60,9 @@ public class ProductionController {
      **/
     @GetMapping
     public ResponseEntity<Page<ResponseProductionDto>> searchProductionList(
-            @RequestParam @EnumValid(enumClass = ProductionOrderByStdType.class)
-            ProductionOrderByStdType orderByStd,
-            @RequestParam @Pattern(regexp = "^[^\\s]+$", message = "검색어를 입력하세요.") // 최소 한글자이상 입력
-            String keyword,
-            @PageableDefault(size = 5, page = 0)
-            Pageable pageable) {
+            RequestSearchProductionDto requestSearchProductionDto) {
         return ResponseEntity.ok(
-                productionService.searchProductionList(orderByStd, keyword, pageable));
+                productionService.searchProductionList(requestSearchProductionDto));
     }
 
 }

@@ -100,14 +100,13 @@ public class ProductionService {
     }
 
     /** 상품목록조회 **/
-    public Page<ResponseProductionDto> searchProductionList(ProductionOrderByStdType orderByStd,
-                                                            String keyword,
-                                                            Pageable pageable) {
+    public Page<ResponseProductionDto> searchProductionList(
+            RequestSearchProductionDto requestDto) {
         // 키워드 200자로 제한
-        String limitedKeyword = getLimitedKeyword(keyword);
+        String limitedKeyword = getLimitedKeyword(requestDto.getKeyword());
 
         // 정렬순서에 따른 상품목록조회
-        Page<Production> productionPage = getSortedProductions(orderByStd, limitedKeyword, pageable);
+        Page<Production> productionPage = getSortedProductions(requestDto, limitedKeyword);
 
         // entity -> dto로 변환
         return  productionPage.map(productionMapper::toDto);
@@ -263,10 +262,11 @@ public class ProductionService {
     }
 
     // keyword를 포함하는 상품정보 페이지 조회
-    private Page<Production> getSortedProductions(ProductionOrderByStdType orderByStd,
-                                                  String keyword,
-                                                  Pageable pageable) {
+    private Page<Production> getSortedProductions(RequestSearchProductionDto requestDto,
+                                                  String keyword) {
         Page<Production> productionPage;
+        ProductionOrderByStdType orderByStd = requestDto.getOrderByStd();
+        Pageable pageable = requestDto.getPageable();
 
         if (orderByStd == ORDER_BY_LOWEST_PRICE) {
             productionPage = productionRepository

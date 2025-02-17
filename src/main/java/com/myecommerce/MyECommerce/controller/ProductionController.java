@@ -2,11 +2,13 @@ package com.myecommerce.MyECommerce.controller;
 
 import com.myecommerce.MyECommerce.dto.production.RequestModifyProductionDto;
 import com.myecommerce.MyECommerce.dto.production.RequestProductionDto;
+import com.myecommerce.MyECommerce.dto.production.RequestSearchProductionDto;
 import com.myecommerce.MyECommerce.dto.production.ResponseProductionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.service.production.ProductionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -56,4 +58,11 @@ public class ProductionController {
     /**
      * 상품목록 조회 get /production
      **/
+    @GetMapping
+    public ResponseEntity<Page<ResponseProductionDto>> searchProductionList(
+            @Valid RequestSearchProductionDto requestSearchProductionDto) {
+        return ResponseEntity.ok(
+                productionService.searchProductionList(requestSearchProductionDto));
+    }
+
 }

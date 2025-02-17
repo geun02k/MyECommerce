@@ -10,7 +10,10 @@ import com.myecommerce.MyECommerce.mapper.ProductionMapper;
 import com.myecommerce.MyECommerce.mapper.ProductionOptionMapper;
 import com.myecommerce.MyECommerce.repository.production.ProductionOptionRepository;
 import com.myecommerce.MyECommerce.repository.production.ProductionRepository;
+import com.myecommerce.MyECommerce.type.ProductionCategoryType;
+import com.myecommerce.MyECommerce.type.ProductionCategoryType;
 import com.myecommerce.MyECommerce.type.ProductionOrderByStdType;
+import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -266,24 +269,25 @@ public class ProductionService {
                                                   String keyword) {
         Page<Production> productionPage;
         ProductionOrderByStdType orderByStd = requestDto.getOrderByStd();
+        ProductionCategoryType category = requestDto.getCategory();
         Pageable pageable = requestDto.getPageable();
 
         if (orderByStd == ORDER_BY_LOWEST_PRICE) {
             productionPage = productionRepository
-                    .findByNameOrderByPrice(keyword, pageable);
+                    .findByNameOrderByPrice(keyword, category, pageable);
 
         } else if (orderByStd == ORDER_BY_HIGHEST_PRICE) {
             productionPage = productionRepository
-                    .findByNameOrderByPriceDesc(keyword, pageable);
+                    .findByNameOrderByPriceDesc(keyword, category, pageable);
 
         } else if (orderByStd == ORDER_BY_REGISTRATION) {
             productionPage = productionRepository
-                    .findByNameLikeAndSaleStatusOrderByCreateDt(
-                            keyword, ON_SALE, pageable);
+                    .findByNameLikeAndSaleStatusAndCategoryOrderByCreateDt(
+                            keyword, ON_SALE, category, pageable);
 
         } else { // 기본 정확도순 정렬
             productionPage = productionRepository
-                    .findByNameOrderByCalculatedAccuracyDesc(keyword, pageable);
+                    .findByNameOrderByCalculatedAccuracyDesc(keyword, category, pageable);
         }
 
         return productionPage;

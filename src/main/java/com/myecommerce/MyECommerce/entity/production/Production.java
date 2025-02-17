@@ -9,6 +9,7 @@ import lombok.*;
 import java.util.List;
 
 @Entity
+@Table(indexes = {@Index(name = "idx_production_search", columnList = "saleStatus,category")}) // 복합인덱스 생성
 @Getter
 @Setter
 @Builder

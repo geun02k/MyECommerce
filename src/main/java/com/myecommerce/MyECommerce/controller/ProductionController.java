@@ -4,9 +4,11 @@ import com.myecommerce.MyECommerce.dto.production.RequestModifyProductionDto;
 import com.myecommerce.MyECommerce.dto.production.RequestProductionDto;
 import com.myecommerce.MyECommerce.dto.production.RequestSearchProductionDto;
 import com.myecommerce.MyECommerce.dto.production.ResponseProductionDto;
+import com.myecommerce.MyECommerce.dto.production.ResponseSearchDetailProductionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.service.production.ProductionService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -54,6 +56,12 @@ public class ProductionController {
     /**
      * 상품상세 조회 get /production/{id}
      **/
+    @GetMapping("/{id}")
+    public ResponseEntity<ResponseSearchDetailProductionDto> searchDetailProduction(
+            @PathVariable @NotNull Long id) {
+        return ResponseEntity.ok(
+                productionService.searchDetailProduction(id));
+    }
 
     /**
      * 상품목록 조회 get /production

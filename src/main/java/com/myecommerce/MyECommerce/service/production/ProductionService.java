@@ -8,6 +8,7 @@ import com.myecommerce.MyECommerce.exception.ProductionException;
 import com.myecommerce.MyECommerce.mapper.ModifyProductionOptionMapper;
 import com.myecommerce.MyECommerce.mapper.ProductionMapper;
 import com.myecommerce.MyECommerce.mapper.ProductionOptionMapper;
+import com.myecommerce.MyECommerce.mapper.SearchDetailProductionMapper;
 import com.myecommerce.MyECommerce.repository.production.ProductionOptionRepository;
 import com.myecommerce.MyECommerce.repository.production.ProductionRepository;
 import com.myecommerce.MyECommerce.type.ProductionCategoryType;
@@ -40,6 +41,7 @@ public class ProductionService {
     private final ProductionOptionMapper productionOptionMapper;
 
     private final ModifyProductionOptionMapper modifyProductionOptionMapper;
+    private final SearchDetailProductionMapper searchDetailProductionMapper;
 
     private final ProductionRepository productionRepository;
     private final ProductionOptionRepository productionOptionRepository;
@@ -102,6 +104,13 @@ public class ProductionService {
         return productionMapper.toDto(production);
     }
 
+    /** 상품상세조회 **/
+    public ResponseSearchDetailProductionDto searchDetailProduction(Long id) {
+        return searchDetailProductionMapper.toDto(
+                productionRepository.findById(id)
+                        .orElseThrow(() -> new ProductionException(NOT_EXIST_PRODUCT)));
+    }
+  
     /** 상품목록조회 **/
     public Page<ResponseProductionDto> searchProductionList(
             RequestSearchProductionDto requestDto) {
@@ -113,7 +122,7 @@ public class ProductionService {
 
         // entity -> dto로 변환
         return  productionPage.map(productionMapper::toDto);
-    }
+    }  
 
     // 상품 insert
     private Production saveProduction(Production production, Member member) {

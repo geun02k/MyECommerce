@@ -20,8 +20,10 @@ public enum ProductionErrorCode implements CommonErrorCode {
     NO_EDIT_PERMISSION(HttpStatus.BAD_REQUEST.value(), "본인이 등록한 상품만 수정 가능합니다."),
     NO_EDIT_DELETION_STATUS(HttpStatus.BAD_REQUEST.value(), "판매종료된 상품에 대해 수정 불가합니다."),
     NO_EDIT_FOR_NOT_EXIST_OPTION(HttpStatus.BAD_REQUEST.value(), "존재하지 않는 상품옵션에 대한 수정은 불가합니다."),
-    ;
 
+    // 상품상세조회
+    NOT_EXIST_PRODUCT(HttpStatus.BAD_REQUEST.value(), "존재하지 않는 상품입니다.")
+    ;
 
     private final int statusCode;
     private final String errorMessage;

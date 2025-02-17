@@ -1730,3 +1730,272 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
           }
           ~~~
 
+
+---
+### < Pageable - 페이지 기능을 지원 >
+- 개발기간 단축
+  - 페이지 기능은 흔하지만 서비스의 핵심적인 기능은 아니다.
+    때문에 직접 구현하려면 많은 공수가 필요하지만 스프링부트에서 지원하는 Pageable을 사용해 구현하게 되면
+    단순한 기능보다 핵심적인 기능에 집중해 더 완성도있는 서비스를 제공할 수 있다.
+
+- 조회 데이터 제한    
+  - api 호출에 대한 응답 결과로 이 모든 정보를 조회하는 것은 옳지 않다.
+    요청을 주고 받는 데이터의 수가 클수록 당연히 네트워크의 대역폭도 더 많이 사용해야 하므로
+    서비스 전체에 악영향을 줄 가능성도 높아진다.
+  - 많은 회사 목록을 받는다 하더라도 어짜피 클라이언트에서 한번에 보여줄 수 있는 아이템의 개수는 한정되어있다.
+    따라서 적당한 수의 회사 정보만 조회하도록 한다.
+
+1. Pageable 
+   - 페이지 기능을 지원한다.
+   - import org.springframework.data.domain.Pageable;
+   - controller에서 파라미터로 Pageable을 받을 수 있도록 한다.
+   - 클라이언트에서 페이징 관련 옵션을 추가해 api를 호출할 수 있게 된다.
+   - Pageable이 임의로 변경되는 것을 막기위해 final로 선언한다.
+   - service에서 JPA repository의 findAll() 메서드 호출 시 인자로 Pageable 객체를 전달한다.
+     단, 반환값은 List<Entity> 타입이 아닌 Page<Entity>로 변경되어야 한다.
+   
+   - 페이지 관련 옵션   
+     - 응답시 회사목록에 추가로 하단에 페이지에 대한 정보도 함께 제공한다.
+     - 페이지의 사이즈(한 페이지에 출력할 데이터 수)는 default로 20.
+     - 따라서 사이즈 변수를 파라미터로 넘겨 사이즈 조절도 가능하다.
+     - query param으로 사이즈=3, 페이지는 0번째 페이지 출력하도록 전달 url
+     
+   - 참고블로그    
+     http://localhost:8080/company?size=3&page=0
+
+2. Page JSON 리턴값
+  {
+    "content": [
+      {
+        "id": 1,
+        "ticker": "MMM",
+        "name": "3M Company"
+      },
+      ...
+    ],
+    "pageable": {
+        "sort": {
+            "empty": true,
+            "sorted": false,
+            "unsorted": true
+        },
+        "offset": 0,
+        "pageNumber": 0,
+        "pageSize": 20,
+        "paged": true,
+        "unpaged": false
+    },
+    "last": true,
+    "totalElements": 4,
+    "totalPages": 1,
+    "size": 20,
+    "number": 0,
+    "sort": {
+        "empty": true,
+        "sorted": false,
+        "unsorted": true
+    },
+    "first": true,
+    "numberOfElements": 4,
+    "empty": false
+  }
+
+3. page 객체의 Entity -> Dto로 변환1
+   - Page.map() 메서드 사용. 
+     - map() 메서드는 Page 객체 내의 각 요소를 변환하는 데 사용됩니다.
+   ~~~ 
+   import org.springframework.data.domain.Page;
+   import org.springframework.data.domain.PageImpl;
+   import java.util.List;
+   import java.util.stream.Collectors;
+
+   public Page<ResponseProductionDto> convertToDto(Page<Entity> entityPage) {
+       List<ResponseProductionDto> dtoList = entityPage.getContent().stream()
+                   .map(entity -> new ResponseProductionDto(entity)) 
+                   .collect(Collectors.toList());
+
+       return new PageImpl<>(dtoList, entityPage.getPageable(), entityPage.getTotalElements());
+   }
+   ~~~ 
+   - entityPage.getContent()
+     - Page 객체의 실제 데이터를 가져옵니다.
+   - map()
+     - Page 객체의 각 Entity를 ResponseProductionDto로 변환합니다.
+   - new PageImpl<>(dtoList, entityPage.getPageable(), entityPage.getTotalElements())
+     - Page 객체는 PageImpl로 변환할 수 있습니다. 
+     - PageImpl은 DTO 리스트와 페이지 정보를 받아 새로운 Page 객체를 만듭니다.
+
+4. page 객체의 Entity -> Dto로 변환2
+   - Spring Data Page는 map() 메서드를 제공합니다. 
+   - Page의 각 항목을 변환한 후 새로운 Page를 반환할 수 있습니다.
+   ~~~
+    import org.springframework.data.domain.Page;
+    
+    public Page<ResponseProductionDto> convertToDto(Page<Entity> entityPage) {
+        return entityPage.map(entity -> new ResponseProductionDto(entity));
+    }
+   ~~~
+
+
+---
+### < Pageable 페이지, 사이즈 디폴트값 지정 >
+1. @PageableDefault 어노테이션
+   - Pageable 객체의 기본 설정을 Controller 메서드에서 직접 지정할 때 사용.
+   - PageRequest를 Controller에서 동적으로 생성.
+   - @PageableDefault 어노테이션은 기본적으로 페이지 크기(size)와 페이지 번호(page)를 설정하는 데 사용.
+   - Pageable 객체가 HTTP 요청의 쿼리 파라미터를 기반으로 자동으로 매핑.
+     - GET /products?page=1&size=10
+   - Pageable의 주요 파라미터:
+     - page: 요청한 페이지 번호. (기본값 0)
+     - size: 한 페이지당 데이터 수. (기본값 20)
+     - sort: 정렬 기준. 예를 들어, sort=name,asc는 이름을 기준으로 오름차순 정렬
+
+   ~~~
+    import org.springframework.data.domain.PageRequest;
+    import org.springframework.data.domain.Pageable;
+    import org.springframework.web.bind.annotation.GetMapping;
+    import org.springframework.web.bind.annotation.RequestParam;
+    import org.springframework.web.bind.annotation.RestController;
+    
+    @RestController
+    public class ProductController {
+    
+        // ...
+       
+        @GetMapping("/products")
+        public Page<Product> getProducts(@PageableDefault(size = 5, page = 0)
+                                         Pageable pageable) {
+            return productService.getProducts(pageable);
+        }
+    } 
+   ~~~
+
+2. PageRequest 생성 
+   - Pageable을 DTO에서 페이지와 페이지 크기의 기본 사이즈를 설정하려면 PageRequest를 사용해 Pageable을 집접 수동으로 생성해 처리가능.
+   
+    1. PageRequest 직접 생성
+      - PageRequest는 페이지 번호와 페이지 크기를 지정할 수 있는 방법을 제공. 
+      - 컨트롤러에서 DTO를 받아서 Pageable을 생성하고, 서비스에 전달.
+      - 유연성
+        - Pageable 객체를 DTO에서 직접 생성함으로써 페이지와 크기 설정을 한 곳에서 관리가능.
+      - 재사용성
+        - 페이지네이션 설정을 여러 곳에서 재사용 가능. (여러 엔티티에서 동일한 방식으로 페이지와 크기 처리가능)
+      ~~~
+      import org.springframework.data.domain.PageRequest;
+      import org.springframework.data.domain.Pageable;
+    
+      public class ProductSearchDto {
+      
+          private int page = 0;  // 기본값은 0으로 설정
+          private int size = 5; // 기본값은 5으로 설정
+    
+          // Getters and Setters
+    
+          public Pageable toPageable() {
+              return PageRequest.of(this.page, this.size); // PageRequest 생성
+          } 
+      }
+      ~~~ 
+      - DTO에서 page와 size를 필드로 가지고 PageRequest.of(page, size)로 변환하는 toPageable() 메서드 생성. 
+      ~~~
+      @RestController
+      public class ProductController {
+    
+          // ...
+    
+          @GetMapping("/products")
+          public Page<Product> getProducts(ProductSearchDto searchDto) {
+              Pageable pageable = searchDto.toPageable(); // requestDto에서 Pageable 생성
+              return productService.getProducts(pageable);
+          }
+      }
+      ~~~
+      - DTO는 Pageable을 변환하여 Controller로 전달하고, 컨트롤러는 이 값을 사용하여 서비스에서 데이터를 조회.
+
+
+---
+### < 컨트롤러에서 @RequestParam을 DTO(Data Transfer Object)로 받는 이유 >
+> 컨트롤러에서 @RequestParam을 DTO로 받는 것은 코드의 가독성, 유지보수성, 확장성을 높이는 좋은 설계 방식.
+> 파라미터를 하나의 객체로 묶어 관리하고, 유효성 검사를 적용하며, 비즈니스 로직을 더욱 명확하고 일관되게 처리가능.
+
+1. 데이터 캡슐화 및 관리 용이.
+  - DTO를 사용하면 파라미터들을 하나의 객체로 묶어 관리 가능.   
+  - 파라미터가 많거나 복잡할 때 유용.    
+  - URL 쿼리 파라미터가 많다면, 각 파라미터를 DTO로 묶어 하나의 객체로 전달하면 코드가 더 깔끔하고 읽기 쉬워짐.
+
+2. 유효성 검사 (Validation)
+   - DTO 객체에 @Valid 또는 @Validated 어노테이션을 사용하여 유효성 검사를 간편하게 적용가능. 
+   - 각 필드에 @NotNull, @Size, @Pattern 등의 제약 조건을 추가하여 서버 측에서 파라미터 검증을 처리가능.
+   ~~~
+    public class SearchCriteria {
+    @NotNull
+    private String name;
+        @Min(18)
+        private int age;
+    }
+   ~~~
+   ~~~
+    @GetMapping("/search")
+    public ResponseEntity<List<User>> searchUsers(@Valid SearchCriteria criteria) {
+        // 유효성 검증 후 비즈니스 로직 수행
+    }
+   ~~~
+
+3. 파라미터 처리의 일관성
+   - @RequestParam을 DTO로 받으면, 컨트롤러 메소드의 파라미터를 일관되게 처리가능. 
+   - 여러 개의 파라미터를 개별적으로 처리하는 것보다 DTO로 묶으면 코드의 가독성과 유지보수성이 높아짐.
+
+4. 확장성 (Scalability)
+   - 비즈니스 로직이 커지거나, 파라미터가 추가되는 경우 DTO를 수정하는 것만으로도 손쉽게 확장가능. 
+   - 새로운 파라미터가 추가되면 DTO 클래스에 새로운 필드만 추가하고, 컨트롤러는 동일한 형태로 처리가능.
+
+5. 객체 지향적인 설계
+   - 파라미터를 DTO 객체로 묶으면 객체 지향적인 설계를 구현가능.
+   - 각 파라미터가 가진 의미를 명확히 하고, 코드에서 해당 객체를 통해 데이터를 전달함으로써 객체 지향의 이점을 살릴 수 있음.
+
+6. 장점
+   - 객체 매핑 (Binding)
+     - Spring은 @RequestParam과 DTO 객체 간의 자동 매핑을 처리.
+     - 복잡한 변환 로직을 따로 작성할 필요없음.
+   - 재사용성
+     - DTO는 다른 컨트롤러나 서비스에서 재사용할 수 있어 중복 코드 줄어듦.
+
+
+---
+### < 컨트롤러에서 파라미터값 받는 방법 >
+- DTO (Data Transfer Object)를 사용할 때 @RequestParam을 사용하지 않는 이유는
+  DTO 객체를 자동으로 매핑하기 위해 Spring이 사용하는 방식 때문입니다.
+
+1. GET 쿼리파라미터
+    - @RequestParam은 개별 쿼리 파라미터를 메서드 파라미터로 매핑할 때 사용.
+    - 쿼리 파라미터가 하나하나 대응되어야 하는데, DTO 객체처럼 여러 필드를 묶어서 전달하는 경우에는
+      @RequestParam으로 직접 받는 것이 번거롭고 불편할 수 있습니다.
+   ~~~
+    // 각 파라미터마다 @RequestParam을 명시해주어야 하기 때문에 필드가 많을 경우 코드가 길어지고 불편.
+   
+    @RequestMapping("/search")
+    public String search(@RequestParam("name") String name, @RequestParam("status") String status) {
+        // name과 status를 각각 받아서 처리
+    }
+   ~~~
+
+2. GET 쿼리파라미터와 DTO
+    - Spring MVC에서는 DTO 객체를 쿼리 파라미터와 자동으로 매핑가능.
+    - @RequestParam 없이 DTO의 필드 이름과 동일한 쿼리 파라미터가 있을 경우
+      자동으로 해당 값을 DTO에 주입해주기 때문에, 하나의 객체로 여러 파라미터를 묶어 처리가능.
+   ~~~
+    // 이 방식에서는 name, status 같은 쿼리 파라미터가 있으면, 
+    //  Spring이 자동으로 RequestSearchProductionDto 객체의 필드에 매핑. 
+    // 이 방식은 쿼리 파라미터가 많을 때 유용하고, 코드를 간결하게 유지가능.
+    
+    @RequestMapping("/search")
+    public String search(RequestSearchProductionDto requestSearchProductionDto) {
+        // method logic
+    }
+   ~~~
+
+3. GET,POST requestBody
+    - @RequestBody는 HTTP 요청의 본문에 포함된 데이터를 객체로 변환해서 받는 방식.
+    - 보통 POST 요청에서 JSON 데이터를 받을 때 사용.
+    - 쿼리파라미터와 달리 DTO로 데이터를 받을 때 @requestBody 어노테이션을 사용해야함.
+

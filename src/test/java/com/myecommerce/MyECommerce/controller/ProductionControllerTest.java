@@ -95,7 +95,6 @@ class ProductionControllerTest {
                 .category(category)
                 .description(description)
                 .saleStatus(ON_SALE)
-                .options(null)
                 .build();
 
         given(productionService.registerProduction(

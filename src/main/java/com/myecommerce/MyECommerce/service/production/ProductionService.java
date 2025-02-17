@@ -11,7 +11,13 @@ import com.myecommerce.MyECommerce.mapper.ProductionOptionMapper;
 import com.myecommerce.MyECommerce.mapper.SearchDetailProductionMapper;
 import com.myecommerce.MyECommerce.repository.production.ProductionOptionRepository;
 import com.myecommerce.MyECommerce.repository.production.ProductionRepository;
+import com.myecommerce.MyECommerce.type.ProductionCategoryType;
+import com.myecommerce.MyECommerce.type.ProductionCategoryType;
+import com.myecommerce.MyECommerce.type.ProductionOrderByStdType;
+import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,12 +27,15 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.*;
+import static com.myecommerce.MyECommerce.type.ProductionOrderByStdType.*;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.DELETION;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 
 @Service
 @RequiredArgsConstructor
 public class ProductionService {
+
+    private final static int PRODUCTION_NAME_LENGTH = 200;
 
     private final ProductionMapper productionMapper;
     private final ProductionOptionMapper productionOptionMapper;
@@ -101,6 +110,19 @@ public class ProductionService {
                 productionRepository.findById(id)
                         .orElseThrow(() -> new ProductionException(NOT_EXIST_PRODUCT)));
     }
+  
+    /** 상품목록조회 **/
+    public Page<ResponseProductionDto> searchProductionList(
+            RequestSearchProductionDto requestDto) {
+        // 키워드 200자로 제한
+        String limitedKeyword = getLimitedKeyword(requestDto.getKeyword());
+
+        // 정렬순서에 따른 상품목록조회
+        Page<Production> productionPage = getSortedProductions(requestDto, limitedKeyword);
+
+        // entity -> dto로 변환
+        return  productionPage.map(productionMapper::toDto);
+    }  
 
     // 상품 insert
     private Production saveProduction(Production production, Member member) {
@@ -243,6 +265,41 @@ public class ProductionService {
             // 조회한 상품옵션목록에 신규옵션 추가
             production.getOptions().add(option);
         });
+    }
+
+    // 상품명 조회 키워드 자릿수 제한해 반환
+    private String getLimitedKeyword(String keyword) {
+        return keyword.length() > PRODUCTION_NAME_LENGTH ?
+                keyword.substring(0, PRODUCTION_NAME_LENGTH) : keyword;
+    }
+
+    // keyword를 포함하는 상품정보 페이지 조회
+    private Page<Production> getSortedProductions(RequestSearchProductionDto requestDto,
+                                                  String keyword) {
+        Page<Production> productionPage;
+        ProductionOrderByStdType orderByStd = requestDto.getOrderByStd();
+        ProductionCategoryType category = requestDto.getCategory();
+        Pageable pageable = requestDto.getPageable();
+
+        if (orderByStd == ORDER_BY_LOWEST_PRICE) {
+            productionPage = productionRepository
+                    .findByNameOrderByPrice(keyword, category, pageable);
+
+        } else if (orderByStd == ORDER_BY_HIGHEST_PRICE) {
+            productionPage = productionRepository
+                    .findByNameOrderByPriceDesc(keyword, category, pageable);
+
+        } else if (orderByStd == ORDER_BY_REGISTRATION) {
+            productionPage = productionRepository
+                    .findByNameLikeAndSaleStatusAndCategoryOrderByCreateDt(
+                            keyword, ON_SALE, category, pageable);
+
+        } else { // 기본 정확도순 정렬
+            productionPage = productionRepository
+                    .findByNameOrderByCalculatedAccuracyDesc(keyword, category, pageable);
+        }
+
+        return productionPage;
     }
 
 }

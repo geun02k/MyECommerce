@@ -6,6 +6,7 @@ import com.myecommerce.MyECommerce.security.filter.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -50,6 +51,7 @@ public class SecurityConfig {
                         authorizeRequests
                             // 회원가입, 로그인 경로에 대해 모든인원 접근허용
                             .requestMatchers("/member/signup/**", "/member/signin/**").permitAll()
+                            .requestMatchers(HttpMethod.GET,  "/production/*").permitAll()
                             // 그 외 경로에 대해 인증필요
                             .anyRequest().authenticated())
 

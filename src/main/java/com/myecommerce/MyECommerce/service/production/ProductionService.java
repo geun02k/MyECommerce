@@ -8,6 +8,7 @@ import com.myecommerce.MyECommerce.exception.ProductionException;
 import com.myecommerce.MyECommerce.mapper.ModifyProductionOptionMapper;
 import com.myecommerce.MyECommerce.mapper.ProductionMapper;
 import com.myecommerce.MyECommerce.mapper.ProductionOptionMapper;
+import com.myecommerce.MyECommerce.mapper.SearchDetailProductionMapper;
 import com.myecommerce.MyECommerce.repository.production.ProductionOptionRepository;
 import com.myecommerce.MyECommerce.repository.production.ProductionRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class ProductionService {
     private final ProductionOptionMapper productionOptionMapper;
 
     private final ModifyProductionOptionMapper modifyProductionOptionMapper;
+    private final SearchDetailProductionMapper searchDetailProductionMapper;
 
     private final ProductionRepository productionRepository;
     private final ProductionOptionRepository productionOptionRepository;
@@ -91,6 +93,13 @@ public class ProductionService {
 
         // 상품, 상품옵션목록 반환
         return productionMapper.toDto(production);
+    }
+
+    /** 상품상세조회 **/
+    public ResponseSearchDetailProductionDto searchDetailProduction(Long id) {
+        return searchDetailProductionMapper.toDto(
+                productionRepository.findById(id)
+                        .orElseThrow(() -> new ProductionException(NOT_EXIST_PRODUCT)));
     }
 
     // 상품 insert

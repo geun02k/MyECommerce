@@ -23,8 +23,6 @@ public class ResponseProductionOptionDto {
 
     private int quantity;
 
-    private Member member;
-
     private Long createId;
 
     private LocalDateTime createDt;

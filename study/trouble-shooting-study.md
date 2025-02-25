@@ -688,3 +688,94 @@ Redis에서 네임스페이스를 분리하여 데이터를 저장하려면, Red
      - 이렇게 하면 Redis 인스턴스 내에서 데이터들이 논리적으로 분리되어 관리되므로
        로그인 토큰, 장바구니 등 각각의 데이터를 독립적으로 저장하고 관리가능.
 
+
+---
+### < Redis 역직렬화 오류해결 >
+1. 발생오류
+   - java.lang.RuntimeException: com.fasterxml.jackson.databind.exc.MismatchedInputException: Cannot construct instance of `com.myecommerce.MyECommerce.dto.cart.ResponseCartDto` (although at least one Creator exists): no String-argument constructor/factory method to deserialize from String value ('{"productId":1,"productName":"제품1","optionId":1,"optionName":"스몰사이즈 화이트컬러","price":76000.00,"quantity":30}')
+     at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 1]
+   
+2. 발생원인
+   - Redis에 Json으로 직렬화해 저장한 후 조회해 데이터를 역직렬화 해 DTO로 변경 시 역직렬화 오류발생.
+   - Redis에 Object로 저장해도 오류가 발생했다.
+   - 기존 RedisTemplate의 설정에서 key와 value 모두 StringRedisSerializer로 설정.      
+     이 경우 key와 value 모두 문자열로 직렬화되기 때문에 객체를 문자열로 변환하여 Redis에 저장하고, 문자열로 가져오는 방식으로 처리됨.     
+     이 방식은 객체를 JSON으로 직렬화하고 역직렬화하는 방식이 아니기 때문에 객체의 복잡한 구조를 제대로 다루지 못하고,
+     단순한 문자열로 저장되어 오류가 발생.
+     StringRedisSerializer는 문자열(String)만 처리.
+     즉, 객체를 문자열로 직렬화하면 객체의 필드나 구조 정보가 손실되고, 그대로 문자열로 저장됨.
+     객체를 JSON 형태로 저장하려면 StringRedisSerializer 대신 Jackson2JsonRedisSerializer와 같은 JSON 직렬화 방식을 사용해야함.
+     StringRedisSerializer는 객체를 JSON 형식이 아닌 문자열로 저장하고 역직렬화할 때 형식 불일치가 발생가능.
+     이로 인해 ResponseCartDto와 같은 객체로 변환 시 오류 발생.
+   ~~~
+    @Configuration
+    public class RedisConfig {
+        // ...
+     
+        /** RedisTemplate 설정
+         *  : Redis에 저장할 데이터형식 제공 **/
+        @Bean
+        public RedisTemplate<String, Object> redisTemplate() {
+            RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
+    
+            // 사용할 Connection 설정
+            redisTemplate.setConnectionFactory(redisConnectionFactory());
+            // key에 사용할 직렬화 명시
+            redisTemplate.setKeySerializer(new StringRedisSerializer());
+            // value에 사용할 직렬화 명시 (오류발생원인)
+            redisTemplate.setValueSerializer(new StringRedisSerializer());
+            // 그 외 사용할 직렬화 명시
+            redisTemplate.setDefaultSerializer(new StringRedisSerializer());
+    
+            return redisTemplate;
+        }
+    }   
+   ~~~
+
+3. 해결방법
+   - Redis에서 객체를 JSON 형식으로 직렬화하고 역직렬화하려면 Jackson2JsonRedisSerializer를 사용해야함.
+   ~~~
+    package com.myecommerce.MyECommerce.config;
+    
+    import org.springframework.beans.factory.annotation.Value;
+    import org.springframework.context.annotation.Bean;
+    import org.springframework.context.annotation.Configuration;
+    import org.springframework.data.redis.connection.RedisConnectionFactory;
+    import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+    import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+    import org.springframework.data.redis.core.RedisTemplate;
+    import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
+    import org.springframework.data.redis.serializer.StringRedisSerializer;
+    
+    @Configuration
+    public class RedisConfig {
+        // ...
+    
+        /** RedisTemplate 설정
+         *  : Redis에 저장할 데이터형식 제공 **/
+        @Bean
+        public RedisTemplate<String, Object> redisTemplate() {
+            RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
+    
+            // 사용할 Connection 설정
+            redisTemplate.setConnectionFactory(redisConnectionFactory());
+            
+            // key에 사용할 직렬화 명시 (Key는 String으로 직렬화)
+            redisTemplate.setKeySerializer(new StringRedisSerializer());
+            
+            // value에 사용할 직렬화 명시 (Value는 Jackson2Json으로 직렬화)
+            Jackson2JsonRedisSerializer<Object> jsonSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
+            redisTemplate.setValueSerializer(jsonSerializer);
+    
+            // 그 외 사용할 직렬화 명시 (디폴트 직렬화 방법 설정)
+            redisTemplate.setDefaultSerializer(jsonSerializer);
+    
+            return redisTemplate;
+        }
+    }
+   ~~~
+   - Key 직렬화
+     - key는 여전히 문자열로 저장할 수 있으므로 StringRedisSerializer를 사용합니다.
+   - Value 직렬화
+     - value는 객체이므로, Jackson2JsonRedisSerializer를 사용하여 객체를 JSON 형태로 직렬화합니다. 이 설정은 객체를 JSON으로 변환하여 Redis에 저장하고, 다시 Redis에서 가져올 때 JSON을 객체로 역직렬화합니다.
+

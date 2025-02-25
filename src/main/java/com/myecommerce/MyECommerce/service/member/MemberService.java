@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.MemberErrorCode.*;
-import static com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.REDIS_NAMESPACE_FOR_LOGIN;
+import static com.myecommerce.MyECommerce.type.RedisNamespaceType.LOGIN;
 
 @Service
 @RequiredArgsConstructor
@@ -94,7 +94,7 @@ public class MemberService {
         String token = jwtAuthenticationProvider.parseToken(authorization);
 
         // 2. Redis에서 유효한 토큰 삭제
-        if (ObjectUtils.isEmpty(redisSingleDataService.getAndDeleteSingleData(REDIS_NAMESPACE_FOR_LOGIN, token))) {
+        if (ObjectUtils.isEmpty(redisSingleDataService.getAndDeleteSingleData(LOGIN, token))) {
             throw new MemberException(ALREADY_SIGN_OUT_USER);
         }
     }
@@ -137,6 +137,6 @@ public class MemberService {
 
         // Token을 LOGIN value를 가지도록 저장
         redisSingleDataService.saveSingleData(
-                REDIS_NAMESPACE_FOR_LOGIN, token, null, Duration.ofMillis(validTime));
+                LOGIN, token, null, Duration.ofMillis(validTime));
     }
 }

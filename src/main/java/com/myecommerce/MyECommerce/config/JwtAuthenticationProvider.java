@@ -23,7 +23,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 
-import static com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.REDIS_NAMESPACE_FOR_LOGIN;
+import static com.myecommerce.MyECommerce.type.RedisNamespaceType.LOGIN;
 
 @Component
 @RequiredArgsConstructor
@@ -144,6 +144,6 @@ public class JwtAuthenticationProvider {
 
     // redis에 토큰 등록여부 반환
     public boolean isValidLoginTokenInRedis(String token) {
-        return redisSingleDataService.getSingleData(REDIS_NAMESPACE_FOR_LOGIN, token) != null;
+        return redisSingleDataService.getSingleData(LOGIN, token) != null;
     }
 }

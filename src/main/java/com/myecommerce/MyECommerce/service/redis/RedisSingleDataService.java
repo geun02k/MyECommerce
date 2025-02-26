@@ -34,13 +34,30 @@ public class RedisSingleDataService {
         return redisTemplate.opsForValue().get(setKey(nameSpace, key));
     }
 
+    /** Redis 단일 해시 테이터 등록 **/
+    public void saveSingleHashValueData(RedisNamespaceType nameSpace,
+                                        String key,
+                                        String hashKey,
+                                        Object hashValue) {
+        redisTemplate.opsForHash()
+                .put(setKey(nameSpace, key), hashKey, setObjectValue(hashValue));
+    }
+
+    /** Redis 단일 해시 테이터 조회 **/
+    public Object getSingleHashValueData(RedisNamespaceType nameSpace,
+                                         String key,
+                                         String hashKey) {
+        return (Object) redisTemplate.opsForHash()
+                .get(setKey(nameSpace, key), hashKey);
+    }
+
     // key값 셋팅 (네임스페이스를 포함한 키 생성)
-    private String setKey(RedisNamespaceType namespace, String key) {
+    String setKey(RedisNamespaceType namespace, String key) {
         return namespace + ":" + key;
     }
 
     // value값 셋팅
-    private Object setObjectValue(Object value) {
+    Object setObjectValue(Object value) {
         return (value == null) ? ""  : value;
     }
 }

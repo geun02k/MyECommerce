@@ -14,5 +14,6 @@ public interface ServiceCartMapper {
     @Mapping(source="production.id", target="productId")
     @Mapping(source="production.name", target="productName")
     @Mapping(source="id", target="optionId")
+    @Mapping(target ="expiryDate", ignore = true)
     ServiceCartDto toDto(ProductionOption productionOption);
 }

@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.LIMIT_CART_MAX_SIZE;
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.NOT_EXIST_PRODUCT;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
@@ -25,6 +27,7 @@ import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 public class CartService {
     // 장바구니 최대 데이터 수
     public static final int CART_MAX_SIZE = 100;
+    public static final Long EXPIRATION_PERIOD = 30L;
 
     private final ObjectMapper objectMapper;
     private final ServiceCartMapper serviceCartMapper;
@@ -75,6 +78,9 @@ public class CartService {
             // 상품수량 (신규수량으로 초기화)
             foundOptionDto.setQuantity(requestCartDto.getQuantity());
         }
+
+        // 3-1. 만료일자 셋팅
+        foundOptionDto.setExpiryDate(LocalDate.now().plusDays(EXPIRATION_PERIOD));
 
         // 4. Redis에 상품 등록
         redisSingleDataService.saveSingleHashValueData(

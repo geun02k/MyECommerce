@@ -43,6 +43,13 @@ public class RedisSingleDataService {
                 .put(setKey(nameSpace, key), hashKey, setObjectValue(hashValue));
     }
 
+    /** Redis 단일 해시 테이터 삭제 **/
+    public void deleteSingleHashValueData(RedisNamespaceType nameSpace,
+                                          String key,
+                                          String hashKey) {
+        redisTemplate.opsForHash().delete(setKey(nameSpace, key), hashKey);
+    }
+
     /** Redis 단일 해시 테이터 조회 **/
     public Object getSingleHashValueData(RedisNamespaceType nameSpace,
                                          String key,

@@ -3,6 +3,7 @@ package com.myecommerce.MyECommerce.dto.cart;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -23,4 +24,5 @@ public class ServiceCartDto {
 
     private int quantity;
 
+    private LocalDate expiryDate;
 }

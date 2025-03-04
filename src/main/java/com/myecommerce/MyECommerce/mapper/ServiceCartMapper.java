@@ -1,5 +1,6 @@
 package com.myecommerce.MyECommerce.mapper;
 
+import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ServiceCartDto;
 import com.myecommerce.MyECommerce.entity.production.ProductionOption;
 import org.mapstruct.Mapper;
@@ -16,4 +17,6 @@ public interface ServiceCartMapper {
     @Mapping(source="id", target="optionId")
     @Mapping(target ="expiryDate", ignore = true)
     ServiceCartDto toDto(ProductionOption productionOption);
+
+    ResponseCartDto toResponseDto(ServiceCartDto serviceCartDto);
 }

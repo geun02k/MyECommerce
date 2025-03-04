@@ -33,23 +33,29 @@ public class CartScheduler {
         LocalDate expireDate = LocalDate.now();
 
         Cursor<byte[]> cursor = null;
-        do {
-            // redis 장바구니 Scan
-            cursor = redisMultiDataService.getNameSpaceScan(CART);
+        try{
+            do {
+                // redis 장바구니 Scan
+                cursor = redisMultiDataService.getNameSpaceScan(CART);
 
-            // scan한 key 데이터 byte -> String 변환
-            Set<String> keys = getKeysToString(cursor);
+                // scan한 key 데이터 byte -> String 변환
+                Set<String> keys = getKeysToString(cursor);
 
-            keys.forEach(key -> {
-                // userId 파싱
-                String userId = getUserIdFromKey(key, CART);
-                // 유저의 상품목록 조회
-                Map<Object, Object> hashEntries =
-                        redisMultiDataService.getHashEntries(CART, userId);
-                // 만료상품삭제
-                deleteExpiredProductsInRedis(userId, expireDate, hashEntries);
-            });
-        } while (cursor != null && cursor.hasNext());
+                keys.forEach(key -> {
+                    // userId 파싱
+                    String userId = getUserIdFromKey(key, CART);
+                    // 유저의 상품목록 조회
+                    Map<Object, Object> hashEntries =
+                            redisMultiDataService.getHashEntries(CART, userId);
+                    // 만료상품삭제
+                    deleteExpiredProductsInRedis(userId, expireDate, hashEntries);
+                });
+            } while (cursor != null && cursor.hasNext());
+
+        } finally {
+            // 커서닫기
+            closeCursor(cursor);
+        }
     }
 
     // scan 데이터 byte -> String 변환
@@ -81,5 +87,13 @@ public class CartScheduler {
                         CART, userId, productId.toString());
             }
         });
+    }
+
+    // 커서 멍시적 닫기
+    private void closeCursor(Cursor<byte[]> cursor) {
+        // 커서닫기
+        if(cursor != null && !cursor.isClosed()) {
+            cursor.close();
+        }
     }
 }

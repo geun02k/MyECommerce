@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
@@ -83,14 +84,18 @@ class CartServiceTest {
                 .productId(foundOption.getProduction().getId())
                 .productName(foundOption.getProduction().getName())
                 .build();
-        // Redis 장바구니 상품정보
-        HashMap<String, Object> orgOption = new HashMap<>();
+        // Redis 장바구니 상품정보 단건
+        Map<Object, Object> orgOption = new HashMap<>();
         orgOption.put("optionId", foundOptionDto.getOptionId());
         orgOption.put("optionName", foundOptionDto.getOptionName());
         orgOption.put("price", foundOptionDto.getPrice());
         orgOption.put("quantity", 1);
         orgOption.put("productId", foundOptionDto.getProductId());
         orgOption.put("productName", foundOptionDto.getProductName());
+        // Redis 장바구니 상품목록
+        Map<Object, Object> userCart = new HashMap<>();
+        userCart.put(orgOption.get("optionId"), orgOption);
+
         // 반환 상품정보
         ResponseCartDto expectedResponseCartDto = ResponseCartDto.builder()
                 .optionId(foundOptionDto.getOptionId())
@@ -102,9 +107,21 @@ class CartServiceTest {
                 .productName(foundOptionDto.getProductName())
                 .build();
 
-        // stub(가설) : redisMultiDataService.getSizeOfHashData() 실행 시 key에 해당하는 hash 데이터 수 2 반환 예상.
-        given(redisMultiDataService.getSizeOfHashData(eq(CART), eq(member.getUserId())))
-                .willReturn(2L);
+        // stub(가설) : redisMultiDataService.getHashEntries() 실행 시
+        //             Redis에서 기존 유저 장바구니의 상품옵션목록 Map<Object, Object> 반환 예상.
+        given(redisMultiDataService.getHashEntries(eq(CART), eq(member.getUserId())))
+                .willReturn(userCart);
+
+        // stub(가설) : objectMapper.convertValue() 실행 시 object를 dto로 반환 예상.
+        given(objectMapper.convertValue(eq(userCart.get(orgOption.get("optionId"))), eq(ServiceCartDto.class)))
+                .willReturn(ServiceCartDto.builder()
+                        .optionId((Long) orgOption.get("optionId"))
+                        .optionName((String) orgOption.get("optionName"))
+                        .price((BigDecimal) orgOption.get("price"))
+                        .quantity((Integer) orgOption.get("quantity"))
+                        .productId((Long) orgOption.get("productId"))
+                        .optionName((String) orgOption.get("productName"))
+                        .build());
 
         // stub(가설) : productionOptionRepository.findById() 실행 시 DB에서 상품옵션ID에 해당하는 상품옵션 반환 예상.
         given(productionOptionRepository.findById(eq(requestCartDto.getOptionId())))

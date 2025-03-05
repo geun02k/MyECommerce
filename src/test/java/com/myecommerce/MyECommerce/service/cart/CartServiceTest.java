@@ -11,18 +11,16 @@ import com.myecommerce.MyECommerce.mapper.ServiceCartMapper;
 import com.myecommerce.MyECommerce.repository.production.ProductionOptionRepository;
 import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
-import com.myecommerce.MyECommerce.type.RedisNamespaceType;
-import org.assertj.core.util.Maps;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
@@ -93,6 +91,16 @@ class CartServiceTest {
         orgOption.put("quantity", 1);
         orgOption.put("productId", foundOptionDto.getProductId());
         orgOption.put("productName", foundOptionDto.getProductName());
+        // 반환 상품정보
+        ResponseCartDto expectedResponseCartDto = ResponseCartDto.builder()
+                .optionId(foundOptionDto.getOptionId())
+                .optionName(foundOptionDto.getOptionName())
+                .price(foundOptionDto.getPrice())
+                .quantity(requestCartDto.getQuantity() +
+                          (Integer) orgOption.get("quantity"))
+                .productId(foundOptionDto.getProductId())
+                .productName(foundOptionDto.getProductName())
+                .build();
 
         // stub(가설) : redisMultiDataService.getSizeOfHashData() 실행 시 key에 해당하는 hash 데이터 수 2 반환 예상.
         given(redisMultiDataService.getSizeOfHashData(eq(CART), eq(member.getUserId())))
@@ -123,13 +131,27 @@ class CartServiceTest {
                         .optionName((String) orgOption.get("productName"))
                         .build());
 
+        // ArgumentCaptor 생성
+        ArgumentCaptor<ServiceCartDto> foundOptionDtoCaptor =
+                ArgumentCaptor.forClass(ServiceCartDto.class);
+
+        // stub(가설) : serviceCartMapper.toDto() 실행 시 entity에 해당하는 dto 반환 예상.
+        given(serviceCartMapper.toResponseDto(foundOptionDtoCaptor.capture()))
+                .willReturn(expectedResponseCartDto);
+
         // when
         ResponseCartDto responseCartDto = cartService.addCart(requestCartDto, member);
 
         // then
+        // toResponseDto에 전달된 인자 캡처 후 검증
+        ServiceCartDto capturedFoundOptionDto = foundOptionDtoCaptor.getValue();
+        assertEquals(requestCartDto.getOptionId(), capturedFoundOptionDto.getOptionId());
+        assertEquals(2, capturedFoundOptionDto.getQuantity());
+        // redis 저장 실행여부 검증
         verify(redisSingleDataService, times(1))
                 .saveSingleHashValueData(
                         CART, member.getUserId(), requestCartDto.getOptionId().toString(), foundOptionDto);
+        // 반환 결과 검증
         assertEquals(requestCartDto.getOptionId(), responseCartDto.getOptionId());
         assertEquals(foundOption.getOptionName(), responseCartDto.getOptionName());
         assertEquals(foundOption.getPrice(), responseCartDto.getPrice());

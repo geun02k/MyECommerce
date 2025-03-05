@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.LIMIT_CART_MAX_SIZE;
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.NOT_EXIST_PRODUCT;
@@ -63,8 +64,16 @@ public class CartService {
 
     // 장바구니 제품 수량 체크
     private void checkUserCartSize(String userId) {
-        Long userCartSize = redisMultiDataService.getSizeOfHashData(CART, userId);
-        if (userCartSize > CART_MAX_SIZE) {
+        Map<Object, Object> optionsInCart =
+                redisMultiDataService.getHashEntries(CART, userId);
+
+        Integer cartItemCount = optionsInCart.values().stream()
+                .map(object ->
+                        objectMapper.convertValue(object, ServiceCartDto.class)
+                                    .getQuantity())
+                .reduce(0, Integer::sum);
+
+        if (cartItemCount >= CART_MAX_SIZE) {
             throw new CartException(LIMIT_CART_MAX_SIZE);
         }
     }

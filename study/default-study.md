@@ -3,6 +3,50 @@
 
 
 ---
+## <목차>
+1. Spring
+   - Spring core
+   - 스프링부트 의존성추가 키워드
+   - Spring 어노테이션
+2. 라이브러리
+   - 매핑 라이브러리 MapStruct
+   - 유효성 검사 라이브러리 validation
+3. 유효성 검증
+   - 검증관련처리
+   - 유효성검사 정규식
+   - 비밀번호 유효성검사 정규식
+4. git 사용하기
+   - slack과 github 연동
+   - git push 내역 되돌리기
+5. 데이터베이스
+   - Mysql 데이터타입 결정 
+   - 데이터베이스의 커서(Cursor)
+   - 커서의 hasNext(), isClosed()
+   - 커서가 닫힌 것과 읽을 데이터가 없는 것
+6. DTO
+   - DTO, VO, MODEL 차이
+   - 도메인과 DTO
+   - 요청과 응답으로 DTO 사용해야하는 이유
+   - request, response DTO 분리
+7. 인터페이스
+   - 인터페이스 사용 이유
+   - 인터페이스와 추상화 클래스의 차이
+   - service, service impl 분리하지 않는 이유
+8. 예외처리
+9. JWT 이용한 로그아웃
+10. 로그 레벨 결정
+11. 상수 선언
+12. Enum값 비교 연산자
+13. Pageable
+    - Pageable - 페이지 기능을 지원 
+    - Pageable 페이지, 사이즈 디폴트값 지정
+14. Controller 메서드 파라미터
+    - Controller에서 @RequestParam을 DTO로 받는 이유 
+    - 스프링 MVC 파라미터 바인딩 (컨트롤러에서 파라미터값 받는 방법) 
+
+
+---
+## 1. Spring
 ### < Spring core >
 1. Spring Core
     - Spring Framework의 핵심 모듈로, 애플리케이션 개발에 필요한 기본적인 기능들을 제공.
@@ -30,8 +74,7 @@
         - Spring Core는 객체의 생성, 초기화, 소멸 등의 생명 주기를 관리하며, 객체가 필요한 자원을 효율적으로 관리할 수 있도록 도와줍니다.
 
 
----
-### < 스프링부트 의존성추가 >
+### < 스프링부트 의존성추가 키워드 >
 1. Gradle에서 종속성 추가 시 사용가능한 키워드
    - dependencies 
      - Gradle에서 종속 항목을 추가할 때 사용하는 키워드.
@@ -54,19 +97,50 @@
        ex) Lombok 같은 라이브러리들이 컴파일 시 애너테이션을 처리하는 데 사용됨.
      - 런타임 시에는 필요하지 않으며, 컴파일 타임에만 필요한 의존성을 지정할 때 사용됨.
      - 코드 생성이나 바이트코드 수정을 담당하는 툴들에 필요.
-
-   - Lombok         
-        
-         // Lombok 애너테이션을 처리하기 위해 컴파일 시 애너테이션 프로세서를 추가   
-         compileOnly 'org.projectlombok:lombok'   
-         annotationProcessor 'org.projectlombok:lombok'   
-     - Lombok은 @Getter, @Setter 등의 어노테이션에 대해 **컴파일 시에 자동으로 메서드 생성.**
+   - 사용 예시   
+     Lombok   
+     Lombok은 @Getter, @Setter 등의 어노테이션에 대해 **컴파일 시에 자동으로 메서드 생성.**
+     ~~~
+     // Lombok 애너테이션을 처리하기 위해 컴파일 시 애너테이션 프로세서를 추가   
+     compileOnly 'org.projectlombok:lombok'   
+     annotationProcessor 'org.projectlombok:lombok'   
+     ~~~
 
 3. org.springframework.boot:spring-boot-starter-web 의존성추가
    - 참고블로그 https://priming.tistory.com/144
 
 
+### < Spring 어노테이션 >
+1. @RequestHeader
+    - public @interface RequestHeader.java 파일 오픈해서 확인.
+    - 메서드 매개변수가 웹 요청 헤더에 바인딩되어야 함을 나타내는 애너테이션.
+    - 매서드 매개변수가 Map<String, String>, MultiValueMap<String, Strng>, HttpHeaders 이면 Map은 모든 헤더 이름과 값으로 채워짐.
+   ~~~
+    @PostMapping("/signout")
+    public ResponseEntity<String> signOut(@RequestHeader Map<String, String> headers) {
+        String authority = headers.get("authorization");
+        // ...
+    }
+   ~~~
+    1. @Name
+        - The name of the request header to bind to.   
+          요청 헤더에 바인딩할 이름 선택가능.
+       ~~~
+         @PostMapping("/signout")
+         public ResponseEntity<String> signOut(@RequestHeader @Name("Authorization") String authorization) {
+             // ...
+         }
+       ~~~
+    2. Spring core에 있는 상수를 사용
+     ~~~
+       public ResponseEntity<String> signOut(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+           // ...
+       } 
+     ~~~
+
+
 ---
+## 2. 라이브러리
 ### < 매핑 라이브러리 MapStruct >
 - MapStruct
     - 자바 Bean 매핑 라이브러리로, 컴파일 타임에 매핑 코드를 자동으로 생성.    
@@ -93,7 +167,6 @@
    ~~~
   
 
----
 ### < 유효성 검사 라이브러리 validation >
 1. 작동방식
    - 지원하는 어노테이션으로 클래스의 필드에 대한 제약조건을 정의.
@@ -321,12 +394,13 @@
    ~~~
 
 7. 프로그래밍 방식으로 검증   
-   - 하단의 링크 참조      
-     - https://reflectoring.io/bean-validation-with-spring-boot/
+   - 하단의 링크 참조         
+     https://reflectoring.io/bean-validation-with-spring-boot/
 
 
 ---
-### < 검증관련처리 >
+## 3. 유효성 검증
+### < 검증관련처리 > 
 1. DTO에서 처리
    > 단순한 검증 로직은 DTO에서 @Valid 어노테이션을 사용.   
      기본적인 @NotNull, @Size, @Pattern 등의 검증 어노테이션으로 처리하는 것이 더 효율적.
@@ -401,11 +475,45 @@
      - DTO의 필드에 대해 간단한 유효성 검증은 @NotBlank, @Size 등의 내장 어노테이션을 사용하면 되지만, 비즈니스 로직에서 필요로 하는 복잡한 검증은 사용자 정의 어노테이션으로 처리하기 어려운 경우가 있을 수 있습니다.
 
 
+### < 유효성검사 정규식 >
+- ^[a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ0-9\s]+$
+    - ^ : 문자열의 시작을 의미합니다.
+    - [ ] : 대괄호 안의 모든 문자는 허용된 문자 범위입니다.
+    - a-zA-Z : 영어 대소문자 (a부터 z까지, A부터 Z까지).
+    - 가-힣 : 한글 완성형 글자 (한글 음절).
+    - ㄱ-ㅎ : 한글 자음 (초성).
+    - ㅏ-ㅣ : 한글 모음.
+    - 0-9 : 숫자 (0부터 9까지).
+    - \s : 공백 문자 (스페이스, 탭, 줄 바꿈 등).
+    - + : 앞의 패턴이 하나 이상 반복되는 것을 허용합니다.
+    - $ : 문자열의 끝을 의미합니다.
+    - * : 앞의 패턴이 0개 이상 반복되는 것을 허용합니다.
+
+### < 비밀번호 유효성검사 정규식 >
+- (?= ...)
+    - 긍정형 전방 탐색(lookahead)를 의미하며 특정 패턴이 뒤따라야 한다는 조건을 확인하지만, 문자열에서 그 부분을 소비하지(매칭으로 소모하지) 않습니다.
+- (?=.[!@#$%^+=-])
+    - 문자열에 하나 이상의 지정된 특수 문자가 포함되어 있는지 확인합니다.
+- 정규식 참고블로그 https://gocoding.tistory.com/93
+- 참고블로그 https://ddyes.tistory.com/6
+- 참고블로그 https://kin.naver.com/qna/detail.naver?d1id=1&dirId=1040202&docId=468186271&enc=utf8&kinsrch_src=pc_nx_kin&qb=7KCV6rec7ZGc7ZiE7Iud&rank=1&search_sort=0&section=kin.qna_ency_cafe&spq=0
+- 비밀번호 추가 유효성검사
+    ~~~
+    // ~!@#$%^&*-=_+ 특수문자 중 1개 필수포함
+    String pwPattern = "(?=.[~!@#$%^&*-=_+])";
+    if(!(Pattern.matches(pwPattern, member.getPassword()))) {
+        System.out.println("비밀번호에 특수문자 ~ ! @ # $ % ^ & * - = _ + 중 하나를 필수 포함해야합니다.");
+        return false;
+    }
+    // 연속으로 동일문자 3번 반복 불가
+    ~~~
+
+
 ---
+## 4. git 사용하기
 ### < slack과 github 연동 >
 - 참고블로그 : https://sepiros.tistory.com/37
 
----
 ### < git push 내역 되돌리기 >
 1. 로그내역 조회 명령어
    - git log --oneline
@@ -434,129 +542,11 @@
 
 
 ---
+## 5. 데이터베이스
 ### < Mysql 데이터타입 결정 >
 - 참고블로그 https://dev-coco.tistory.com/54
 
----
-### < DTO, VO, MODEL 차이 >
-https://010562.tistory.com/11
-https://velog.io/@chae_ag/Model-DTO-VO-DAO-%EA%B0%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80%EC%9A%94
 
----
-### < 유효성검사 정규식 >
-- ^[a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ0-9\s]+$
-  - ^ : 문자열의 시작을 의미합니다.
-  - [ ] : 대괄호 안의 모든 문자는 허용된 문자 범위입니다.
-  - a-zA-Z : 영어 대소문자 (a부터 z까지, A부터 Z까지).
-  - 가-힣 : 한글 완성형 글자 (한글 음절).
-  - ㄱ-ㅎ : 한글 자음 (초성).
-  - ㅏ-ㅣ : 한글 모음.
-  - 0-9 : 숫자 (0부터 9까지).
-  - \s : 공백 문자 (스페이스, 탭, 줄 바꿈 등).
-  - + : 앞의 패턴이 하나 이상 반복되는 것을 허용합니다.
-  - $ : 문자열의 끝을 의미합니다.
-  - * : 앞의 패턴이 0개 이상 반복되는 것을 허용합니다. 
-- 
-
-### < 비밀번호 유효성검사 정규식 >
-- (?= ...)
-    - 긍정형 전방 탐색(lookahead)를 의미하며 특정 패턴이 뒤따라야 한다는 조건을 확인하지만, 문자열에서 그 부분을 소비하지(매칭으로 소모하지) 않습니다.
-- (?=.[!@#$%^+=-])
-    - 문자열에 하나 이상의 지정된 특수 문자가 포함되어 있는지 확인합니다.
-- 정규식 참고블로그 https://gocoding.tistory.com/93
-- 참고블로그 https://ddyes.tistory.com/6
-- 참고블로그 https://kin.naver.com/qna/detail.naver?d1id=1&dirId=1040202&docId=468186271&enc=utf8&kinsrch_src=pc_nx_kin&qb=7KCV6rec7ZGc7ZiE7Iud&rank=1&search_sort=0&section=kin.qna_ency_cafe&spq=0
-- 비밀번호 추가 유효성검사
-    ~~~
-    // ~!@#$%^&*-=_+ 특수문자 중 1개 필수포함
-    String pwPattern = "(?=.[~!@#$%^&*-=_+])";
-    if(!(Pattern.matches(pwPattern, member.getPassword()))) {
-        System.out.println("비밀번호에 특수문자 ~ ! @ # $ % ^ & * - = _ + 중 하나를 필수 포함해야합니다.");
-        return false;
-    }
-    // 연속으로 동일문자 3번 반복 불가
-    ~~~
-
-
----
-### < service, service impl 분리하지 않는 이유 >
-- 참고블로그 https://zhfvkq.tistory.com/76
-
-spring은 객체간의 의존성을 관리해주는데 이 의존성은 테스트 코드 단위테스트를 작성할때 문제가 생긴다.    
-의존성을 가지는 다른 객체에 의해 테스트 결과가 영향을 받는다.    
-그래서 내가 원하는 동작만 하도록 하는것이 Mock 객체다.    
-이를 편하게 사용하도록 지원하는것이 Mockito 이다.    
-
-Service와 ServiceImpl 구조를 사용하면 단위 테스트가 어려울 수 있다.    
-이 구조를 사용하면 Service 인터페이스와 ServiceImpl 구현체를 모두 생성해야 하므로 테스트 코드를 작성하기 어렵다.    
-또한, 구현체와 인터페이스 간의 의존성이 높아져 테스트 케이스 작성이 복잡해질 수 있다.     
-결론적으로 Service ServiceImpl 구조를 사용해야 할까?    
-OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 원칙 때문에 사용한다. 보통 흔히 얘기하는 느슨한 결합 혹은 유연해지도록 설계하기 위해 사용된다.    
-그렇다면 Spring에서 Service는 다형성이 필요한가?    
-우리가 사용하는 대부분의 Service는 하나의 Service가 여러 개의 SerivceImpl을 가지고 있는 경우가 아닌 1:1 구조를 띄고 있다.    
-그러므로 Service를 사용하고, 추후 다형성이 필요해지면 그때 해당 Service에 대해서 인터페이스를 적용해도 늦지 않는 것 같다.    
-
-    
----
-### < 인터페이스 사용 이유 >
-- 기능(메소드)의 구현을 강제함으로써, 클래스의 설계 또는 표준화를 유도하기위해 사용함.
-- 참고블로그 https://0soo.tistory.com/62
-
-### < 인터페이스와 추상화 클래스의 차이 >
-    기능(메소드)의 구현을 강제함으로써, 클래스의 설계 또는 표준화를 유도를 위해 
-    인터페이스와 추상화 클래스로 Error Code와 Custom Exception을 생성했다.      
-    RuntimeException을 확장해 Custom Exception을 생성한다는 의미로 추상클래스로 구현했고
-    Error Code 생성 시 필수 선언해야하는 필드들의 getter()를 추상메서드로 선언해 필수 구현하도록 했다.
-
-- 인터페이스
-    - 인터페이스에 정의된 메서드를 각 클래스의 목적에 맞게 기능을 구현하는 느낌.
-    - 클래스와 별도로 구현 객체가 같은 동작을 한다는 것을 보장하기 위해 사용하는 것에 초점을 맞춘다.
-- 추상클래스
-    - 자신의 기능들을 하위 클래스로 확장 시키는 느낌.
-    - 추상화(추상 메서드)를 하면서 중복되는 클래스 멤버들을 통합 및 확장을 할 수 있다.   
-    - 같은 추상화인 인터페이스와 다른점은, 추상클래스는 클래스간의 연관 관계를 구축하는 것에 초점을 맞춘다는 것에 있다.
-- 참고블로그 https://inpa.tistory.com/entry/JAVA-%E2%98%95-%EC%9D%B8%ED%84%B0%ED%8E%98%EC%9D%B4%EC%8A%A4-vs-%EC%B6%94%EC%83%81%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%B0%A8%EC%9D%B4%EC%A0%90-%EC%99%84%EB%B2%BD-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0
-
-
----
-### < 예외처리 >
-- Custom Exception을 생성해 예외처리하는 이유
-  - throw new NullPointerException("error message") 와 같이 에러를 처리하면   
-    통일성이 전혀 없고 또 정확한 에러 원인과 이유도 알 수 없다.
-  - 참고블로그 https://velog.io/@mindfulness_22/%EC%98%88%EC%99%B8%EC%B2%98%EB%A6%AC%EB%8A%94-%EC%99%9C-Custom%ED%95%B4%EC%84%9C-%EC%8D%A8%EC%95%BC%ED%95%A0%EA%B9%8C   
-
-- Custom Exception 생성 시 RuntimeException 상속받는 이유
-  - 호출자가 예외를 처리하도록 강제받지 않기위해 Exception이 아닌 RuntimeException 상속받음.
-  1. Checked Exception을 피할 수 있음
-     커스텀 예외를 정의할 때 RuntimeException을 상속받으면 언체크 예외가 됩니다. 이는 호출자가 예외를 처리하도록 강제받지 않기 때문에 코드가 더 간결해질 수 있습니다.
-  2. 사용자 편의성
-     개발자가 특정한 상황에서 발생하는 예외를 명확하게 정의할 수 있어, 코드의 가독성을 높이고 예외 처리 로직을 간단하게 유지할 수 있습니다. 불필요한 예외 처리를 피할 수 있는 장점이 있습니다.
-  3. 비즈니스 로직과의 일관성
-     대부분의 비즈니스 로직에서 발생하는 예외는 런타임 예외로 간주되므로, 커스텀 예외도 이를 따르는 것이 자연스럽습니다.   
-  - 참고블로그 https://pixx.tistory.com/409
-  
-- CommonErrorResponse.java
-  - 에러 발생 시 응답을 위한 모델.
-  - 모든 에러에 대해 일괄적인 응답을 위해 사용.
-
-- CommonExceptionHandler.java
-  - 발생한 예외처리를 수행.
-    ~~~
-    // 모든 BaseAbstractException을 상속하는 에외객체에 대한 예외처리 수행.
-    @ExceptionHandler
-    protected ResponseEntity<CommonErrorResponse> commonHandler(BaseAbstractException e) {
-        // 응답 객체 생성
-        // 응답 객체 반환
-      }
-    ~~~
-  - HttpStatus.resolve(e.getStatusCode())  : HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
-    ~~~ 
-      return new ResponseEntity<>(errorResponse,
-                Objects.requireNonNull(HttpStatus.resolve(e.getStatusCode())));
-    ~~~
-
-
----
 ### < 데이터베이스의 커서(Cursor) >
 - 데이터베이스에서 데이터를 읽거나 쿼리 결과를 순차적으로 한 번에 하나씩 처리하기 위한 객체로 포인터 역할을 수행.
 - 커서는 결과셋을 탐색하고 각 항목에 접근하는 방법을 제공.
@@ -656,6 +646,152 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
 
 
 ---
+## 6. DTO
+### < DTO, VO, MODEL 차이 >
+https://010562.tistory.com/11
+https://velog.io/@chae_ag/Model-DTO-VO-DAO-%EA%B0%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80%EC%9A%94
+
+### < 도메인과 DTO >
+1. 도메인
+    - 하나의 비즈니스 업무 영역과 관련된 개념.
+    - 실제 비즈니스 로직이나 규칙, 도메인 정보 등을 포함.
+2. DTO
+    - 계층간의 데이터 전달을 위해 사용하는 객체.
+- 참고블로그
+  https://shyun00.tistory.com/214
+
+
+### < 요청과 응답으로 DTO 사용해야하는 이유 >
+1. Entity 내부 구현 캡슐화해 은닉
+    - Entity
+        - 도메인의 핵심 로직, 속성을 가짐.
+        - 실제 DB 테이블과 매칭되는 클래스.
+    - Entity가 getter, setter를 갖게 되면 controller 같은 비즈니스 로직과 관계없는 곳에서 자원의 속성이 실수로라도 변경될 수 있음.
+    - Entity UI 계층을 노출하는 것은 테이블 설계 화면을 공개하는 것과 같으므로 보안상 바람직하지 않음.
+
+2. 화면에 필요한 데이터 선별
+    - 요청과 응답으로 Entity 사용 시, 요청하는 화면에서 불필요한 속성까지 전달됨. -> 속도 느려짐.
+    - 요청과 응답으로 Entity 사용 시 다양한 요청과 응답에 따른 속성들을 동적 선택 불가.
+    - 특정 api에 필요한 데이터를 포함한 DTO 별도 생성 시 화면이 요구하는 필요 데이터들만 선별해 용청과 응답가능.
+
+3. 순환참조 예방
+    - JPA로 개발 시 양방향 참조인 경우 순환참조를 조심해야함.
+    - 양방향 참조된 Entity를 응답으로 return 하게되면  
+      entity가 참조하고 있는 객체 지연로딩 -> 로딩된 객체는 또 다시 본인이 참조하고 있는 객체를 호출
+      을 반복하면 무한루프에 빠진다.
+    - 순환참조가 일어나지 않도록 응답의 return으로 DTO를 사용하는 것이 순환참조에서 안전.
+
+4. validation코드와 모델링코드 분리가능.
+    - Entity 클래스는 DB의 테이블과 매칭되는 필드가 속성으로 선언되어 있고, 복잡한 비즈니스 로직이 작성되어있음.
+      띠리서 속성에 @Column, @JoinColumn , @ManyToOne, @OneToOne 등의 모델링을 위한 코드가 추가됨.
+      여기에 추가로 @NotNull, @NotEmpty @NotBlank 같은 요청에 대한 값에 대한 validation 코드가 들어가면 Entity 클래스는 더 복잡해지고 가독성이 저하됨.
+    - DTO에는 요청에 필요한 validation 정의.
+    - Entity 클래스는 모델링과 비즈니스 로직에만 집중가능.
+
+- DTO를 모든 API마다 구별해서 만들다보면 너무 많은 DTO가 생겨서 관리하기 어렵다고 하기도 한다.
+  그럼에도 불구하고 요청과 응답으로 엔티티를 사용하면, 개발의 편리함을 얻는 대신 애플리케이션의 결함을 얻게 될 수 있다.
+  API 스펙과 엔티티 사이에 의존성이 생기는 문제도 간과할 수 없다
+  UI와 도메인이 서로 의존성을 갖zx지 않고 독립적으로 개발하는 것을 지향하기 때문에 이를 중간에서 연결시켜주는 DTO의 역할은 꽤나 중요
+  요청과 응답으로 DTO를 사용하면 각각의 DTO 클래스가 데이터를 전송하는 클래스로서의 역할을 명확히 가질 수 있게 되고, 이는 하나의 클래스가 하나의 역할을 해야 한다는 객체지향의 정신과도 부합
+
+- 참고블로그   
+  https://shyun00.tistory.com/214
+
+  
+### < request, response DTO 분리 >
+- client->controller에 들어오는 request 정보와 controller->client로 내보내는 response는
+  사용하는 목적이 다르고 전달하는 데이터도 다르기에 분리하는 것이 좋다.
+- DTO는 주고받는 데이터를 정의한 api 명세서와 다름없다.
+- 단건, 복수 건 조회 정도만 동일 DTO 사용으로 운명을 함께할 수 있다.
+
+1. request DTO   
+   validation check 어노테이션을 사용 -> 데이터의 유효성 검사.
+2. response DTO   
+   단순히 데이터를 반환.
+
+
+---
+## 7. 인터페이스
+### < 인터페이스 사용 이유 >
+- 기능(메소드)의 구현을 강제함으로써, 클래스의 설계 또는 표준화를 유도하기위해 사용함.
+- 참고블로그 https://0soo.tistory.com/62
+
+### < 인터페이스와 추상화 클래스의 차이 >
+    기능(메소드)의 구현을 강제함으로써, 클래스의 설계 또는 표준화를 유도를 위해 
+    인터페이스와 추상화 클래스로 Error Code와 Custom Exception을 생성했다.      
+    RuntimeException을 확장해 Custom Exception을 생성한다는 의미로 추상클래스로 구현했고
+    Error Code 생성 시 필수 선언해야하는 필드들의 getter()를 추상메서드로 선언해 필수 구현하도록 했다.
+
+1. 인터페이스
+    - 인터페이스에 정의된 메서드를 각 클래스의 목적에 맞게 기능을 구현하는 느낌.
+    - 클래스와 별도로 구현 객체가 같은 동작을 한다는 것을 보장하기 위해 사용하는 것에 초점을 맞춘다.
+2. 추상클래스
+    - 자신의 기능들을 하위 클래스로 확장 시키는 느낌.
+    - 추상화(추상 메서드)를 하면서 중복되는 클래스 멤버들을 통합 및 확장을 할 수 있다.
+    - 같은 추상화인 인터페이스와 다른점은, 추상클래스는 클래스간의 연관 관계를 구축하는 것에 초점을 맞춘다는 것에 있다.
+- 참고블로그 https://inpa.tistory.com/entry/JAVA-%E2%98%95-%EC%9D%B8%ED%84%B0%ED%8E%98%EC%9D%B4%EC%8A%A4-vs-%EC%B6%94%EC%83%81%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%B0%A8%EC%9D%B4%EC%A0%90-%EC%99%84%EB%B2%BD-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0
+
+
+### < service, service impl 분리하지 않는 이유 >
+- 참고블로그 https://zhfvkq.tistory.com/76
+
+spring은 객체간의 의존성을 관리해주는데 이 의존성은 테스트 코드 단위테스트를 작성할때 문제가 생긴다.    
+의존성을 가지는 다른 객체에 의해 테스트 결과가 영향을 받는다.    
+그래서 내가 원하는 동작만 하도록 하는것이 Mock 객체다.    
+이를 편하게 사용하도록 지원하는것이 Mockito 이다.
+
+Service와 ServiceImpl 구조를 사용하면 단위 테스트가 어려울 수 있다.    
+이 구조를 사용하면 Service 인터페이스와 ServiceImpl 구현체를 모두 생성해야 하므로 테스트 코드를 작성하기 어렵다.    
+또한, 구현체와 인터페이스 간의 의존성이 높아져 테스트 케이스 작성이 복잡해질 수 있다.     
+결론적으로 Service ServiceImpl 구조를 사용해야 할까?    
+OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 원칙 때문에 사용한다. 보통 흔히 얘기하는 느슨한 결합 혹은 유연해지도록 설계하기 위해 사용된다.    
+그렇다면 Spring에서 Service는 다형성이 필요한가?    
+우리가 사용하는 대부분의 Service는 하나의 Service가 여러 개의 SerivceImpl을 가지고 있는 경우가 아닌 1:1 구조를 띄고 있다.    
+그러므로 Service를 사용하고, 추후 다형성이 필요해지면 그때 해당 Service에 대해서 인터페이스를 적용해도 늦지 않는 것 같다.
+
+
+---
+## 8. 예외처리
+### < 예외처리 >
+1. Custom Exception을 생성해 예외처리하는 이유
+   - throw new NullPointerException("error message") 와 같이 에러를 처리하면   
+     통일성이 전혀 없고 또 정확한 에러 원인과 이유도 알 수 없다.
+   - 참고블로그 https://velog.io/@mindfulness_22/%EC%98%88%EC%99%B8%EC%B2%98%EB%A6%AC%EB%8A%94-%EC%99%9C-Custom%ED%95%B4%EC%84%9C-%EC%8D%A8%EC%95%BC%ED%95%A0%EA%B9%8C   
+
+2. Custom Exception 생성 시 RuntimeException 상속받는 이유
+   - 호출자가 예외를 처리하도록 강제받지 않기위해 Exception이 아닌 RuntimeException 상속받음.
+   1) Checked Exception을 피할 수 있음   
+      커스텀 예외를 정의할 때 RuntimeException을 상속받으면 언체크 예외가 됩니다. 이는 호출자가 예외를 처리하도록 강제받지 않기 때문에 코드가 더 간결해질 수 있습니다.
+   2) 사용자 편의성   
+      개발자가 특정한 상황에서 발생하는 예외를 명확하게 정의할 수 있어, 코드의 가독성을 높이고 예외 처리 로직을 간단하게 유지할 수 있습니다. 불필요한 예외 처리를 피할 수 있는 장점이 있습니다.
+   3) 비즈니스 로직과의 일관성   
+      대부분의 비즈니스 로직에서 발생하는 예외는 런타임 예외로 간주되므로, 커스텀 예외도 이를 따르는 것이 자연스럽습니다.   
+   - 참고블로그 https://pixx.tistory.com/409
+  
+3. CommonErrorResponse.java
+   - 에러 발생 시 응답을 위한 모델.
+   - 모든 에러에 대해 일괄적인 응답을 위해 사용.
+
+4. CommonExceptionHandler.java
+   - 발생한 예외처리를 수행.
+     ~~~
+     // 모든 BaseAbstractException을 상속하는 에외객체에 대한 예외처리 수행.
+     @ExceptionHandler
+     protected ResponseEntity<CommonErrorResponse> commonHandler(BaseAbstractException e) {
+        // 응답 객체 생성
+        // 응답 객체 반환
+     }
+     ~~~
+  - HttpStatus.resolve(e.getStatusCode())     
+    HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
+    ~~~ 
+      return new ResponseEntity<>(errorResponse,
+                Objects.requireNonNull(HttpStatus.resolve(e.getStatusCode())));
+    ~~~
+
+
+---
+## 9. JWT 이용한 로그아웃
 ### < JWT 이용한 로그아웃 >
 1. 로그인, 로그아웃 구현방식
     - 세션 방식
@@ -764,67 +900,7 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
 
 
 ---
-### < DTO >
-1. 도메인
-   - 하나의 비즈니스 업무 영역과 관련된 개념.
-   - 실제 비즈니스 로직이나 규칙, 도메인 정보 등을 포함.
-2. DTO
-   - 계층간의 데이터 전달을 위해 사용하는 객체.
-- 참고블로그
-  https://shyun00.tistory.com/214
-
-
-### < 요청과 응답으로 DTO 사용해야하는 이유 >
-1. Entity 내부 구현 캡슐화해 은닉
-   - Entity
-     - 도메인의 핵심 로직, 속성을 가짐.
-     - 실제 DB 테이블과 매칭되는 클래스.
-   - Entity가 getter, setter를 갖게 되면 controller 같은 비즈니스 로직과 관계없는 곳에서 자원의 속성이 실수로라도 변경될 수 있음.
-   - Entity UI 계층을 노출하는 것은 테이블 설계 화면을 공개하는 것과 같으므로 보안상 바람직하지 않음.
-    
-2. 화면에 필요한 데이터 선별
-   - 요청과 응답으로 Entity 사용 시, 요청하는 화면에서 불필요한 속성까지 전달됨. -> 속도 느려짐.
-   - 요청과 응답으로 Entity 사용 시 다양한 요청과 응답에 따른 속성들을 동적 선택 불가.
-   - 특정 api에 필요한 데이터를 포함한 DTO 별도 생성 시 화면이 요구하는 필요 데이터들만 선별해 용청과 응답가능.
-
-3. 순환참조 예방
-   - JPA로 개발 시 양방향 참조인 경우 순환참조를 조심해야함.
-   - 양방향 참조된 Entity를 응답으로 return 하게되면  
-     entity가 참조하고 있는 객체 지연로딩 -> 로딩된 객체는 또 다시 본인이 참조하고 있는 객체를 호출
-     을 반복하면 무한루프에 빠진다.
-   - 순환참조가 일어나지 않도록 응답의 return으로 DTO를 사용하는 것이 순환참조에서 안전.
-
-4. validation코드와 모델링코드 분리가능.
-   - Entity 클래스는 DB의 테이블과 매칭되는 필드가 속성으로 선언되어 있고, 복잡한 비즈니스 로직이 작성되어있음. 
-     띠리서 속성에 @Column, @JoinColumn , @ManyToOne, @OneToOne 등의 모델링을 위한 코드가 추가됨.
-     여기에 추가로 @NotNull, @NotEmpty @NotBlank 같은 요청에 대한 값에 대한 validation 코드가 들어가면 Entity 클래스는 더 복잡해지고 가독성이 저하됨.
-   - DTO에는 요청에 필요한 validation 정의.
-   - Entity 클래스는 모델링과 비즈니스 로직에만 집중가능.
-
-- DTO를 모든 API마다 구별해서 만들다보면 너무 많은 DTO가 생겨서 관리하기 어렵다고 하기도 한다.
-  그럼에도 불구하고 요청과 응답으로 엔티티를 사용하면, 개발의 편리함을 얻는 대신 애플리케이션의 결함을 얻게 될 수 있다.
-  API 스펙과 엔티티 사이에 의존성이 생기는 문제도 간과할 수 없다
-  UI와 도메인이 서로 의존성을 갖zx지 않고 독립적으로 개발하는 것을 지향하기 때문에 이를 중간에서 연결시켜주는 DTO의 역할은 꽤나 중요
-  요청과 응답으로 DTO를 사용하면 각각의 DTO 클래스가 데이터를 전송하는 클래스로서의 역할을 명확히 가질 수 있게 되고, 이는 하나의 클래스가 하나의 역할을 해야 한다는 객체지향의 정신과도 부합
-
-- 참고블로그   
-  https://shyun00.tistory.com/214
-
-  
----
-### < request, response DTO 분리 >
-- client->controller에 들어오는 request 정보와 controller->client로 내보내는 response는
-  사용하는 목적이 다르고 전달하는 데이터도 다르기에 분리하는 것이 좋다.
-- DTO는 주고받는 데이터를 정의한 api 명세서와 다름없다.
-- 단건, 복수 건 조회 정도만 동일 DTO 사용으로 운명을 함께할 수 있다.
-
-1. request DTO
-    - validation check 어노테이션을 사용 -> 데이터의 유효성 검사.
-2. response DTO
-    - 단순히 데이터를 반환.
-
-
----
+## 10. 로그 레벨 결정
 ### < 로그 레벨 결정 >
 - 로그 레벨
   - 해당 로그 메시지가 얼마나 중요한지 알려주는 정보.
@@ -901,36 +977,7 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
 
 
 ---
-### < Spring 어노테이션 >
-1. @RequestHeader
-   - public @interface RequestHeader.java 파일 오픈해서 확인.
-   - 메서드 매개변수가 웹 요청 헤더에 바인딩되어야 함을 나타내는 애너테이션.
-   - 매서드 매개변수가 Map<String, String>, MultiValueMap<String, Strng>, HttpHeaders 이면 Map은 모든 헤더 이름과 값으로 채워짐.
-   ~~~
-    @PostMapping("/signout")
-    public ResponseEntity<String> signOut(@RequestHeader Map<String, String> headers) {
-        String authority = headers.get("authorization");
-        // ...
-    }
-   ~~~
-   1. @Name
-      - The name of the request header to bind to.   
-        요청 헤더에 바인딩할 이름 선택가능.
-      ~~~
-        @PostMapping("/signout")
-        public ResponseEntity<String> signOut(@RequestHeader @Name("Authorization") String authorization) {
-            // ...
-        }
-      ~~~
-   2. Spring core에 있는 상수를 사용
-     ~~~
-       public ResponseEntity<String> signOut(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
-           // ...
-       } 
-     ~~~
-
-
----
+## 11. 상수 선언
 ### < 상수 선언 >
 1. final
    - 변수에 final 선언 시 해당 변수는 한 번만 초기화 가능.
@@ -948,43 +995,44 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
 
 
 ---
+## 12. Enum값 비교 연산자
 ### < Enum값 비교 연산자 >
 - Java에서 Enum 값을 비교할 때는 **== 연산자를 사용**하는 것이 더 안전하고 효율적.
-- 연산자 비교하기
-    1. == 연산자
-        - == 연산자는 참조 비교를 수행합니다.
-        - Enum은 싱글턴 패턴을 따르므로, 각 Enum 인스턴스는 고유하고 애플리케이션 내에서 유일합니다.
-        - 따라서 == 연산자는 Enum 값들이 동일한지 비교할 때 항상 참조가 동일한지 확인합니다.
-        - Enum 값들은 JVM 내에서 고정된 값으로 관리되기 때문에, 두 Enum 값이 동일한 값을 갖고 있다면 동일한 객체를 참조하게 됩니다.
-          이런 이유로 ==를 사용하면 성능과 안정성 면에서 최적화됩니다.
+1. == 연산자
+    - == 연산자는 참조 비교를 수행합니다.
+    - Enum은 싱글턴 패턴을 따르므로, 각 Enum 인스턴스는 고유하고 애플리케이션 내에서 유일합니다.
+    - 따라서 == 연산자는 Enum 값들이 동일한지 비교할 때 항상 참조가 동일한지 확인합니다.
+    - Enum 값들은 JVM 내에서 고정된 값으로 관리되기 때문에, 두 Enum 값이 동일한 값을 갖고 있다면 동일한 객체를 참조하게 됩니다.
+      이런 이유로 ==를 사용하면 성능과 안정성 면에서 최적화됩니다.
 
-    2. equals() 메서드
-        - equals() 메서드는 내용 비교를 수행합니다.
-        - Enum은 기본적으로 Object 클래스를 상속받고, Object 클래스의 equals() 메서드는 참조를 비교하는 방식으로 구현되어 있습니다.
-        - Enum 값에서 equals() 메서드를 호출하면, 사실상 == 연산자와 동일한 결과를 반환합니다.
-        - equals()를 사용하는 것은 불필요한 오버헤드를 발생시킬 수 있습니다.
-        - equals()는 일반적으로 객체의 상태를 비교하는 데 사용되므로, Enum과 같은 상수 객체에서는 == 연산자가 더 명확하고 효율적입니다.
+2. equals() 메서드
+    - equals() 메서드는 내용 비교를 수행합니다.
+    - Enum은 기본적으로 Object 클래스를 상속받고, Object 클래스의 equals() 메서드는 참조를 비교하는 방식으로 구현되어 있습니다.
+    - Enum 값에서 equals() 메서드를 호출하면, 사실상 == 연산자와 동일한 결과를 반환합니다.
+    - equals()를 사용하는 것은 불필요한 오버헤드를 발생시킬 수 있습니다.
+    - equals()는 일반적으로 객체의 상태를 비교하는 데 사용되므로, Enum과 같은 상수 객체에서는 == 연산자가 더 명확하고 효율적입니다.
 
-    3. instanceof 연산자
-        - 객체가 특정 클래스의 인스턴스인지를 확인하는 연산자.
-        - instanceof를 사용하여 특정 Enum 클래스의 값인지 확인하는 것은 불가능합니다.
-        - 이유는 Enum 값이 클래스 타입으로 존재하는 객체가 아니기 때문입니다.
-        - 대신, Enum의 값 자체가 Enum 클래스의 인스턴스가 아니라,
-          Enum 클래스에 정의된 고유한 상수 값으로 존재하기 때문에 instanceof를 사용하여 Enum 값을 직접 확인하는 방식은 적합하지 않습니다.
-        - Enum 값은 클래스의 인스턴스가 아니라, 해당 Enum 클래스의 고정된 상수입니다.
-          즉, Enum 값은 Enum 클래스의 정적 필드일 뿐, 클래스의 객체가 아닙니다.
-          그래서 instanceof를 사용하여 Enum 값이 특정 Enum 타입의 인스턴스인지 확인하는 것은 불가능.
-        - Enum 값이 특정 Enum 타입인지 확인하려면 Enum 클래스의 getClass() 메서드를 활용하는 방법을 사용가능.
-          ~~~
-          // status가 Status enum의 인스턴스인지 확인. 
-          // Enum 상수는 getClass()를 호출할 수 있으며, 해당 Enum의 타입을 반환.
-          if(status.getClass() == Status.class) { 
-              // ...
-          }
-          ~~~
+3. instanceof 연산자
+    - 객체가 특정 클래스의 인스턴스인지를 확인하는 연산자.
+    - instanceof를 사용하여 특정 Enum 클래스의 값인지 확인하는 것은 불가능합니다.
+    - 이유는 Enum 값이 클래스 타입으로 존재하는 객체가 아니기 때문입니다.
+    - 대신, Enum의 값 자체가 Enum 클래스의 인스턴스가 아니라,
+      Enum 클래스에 정의된 고유한 상수 값으로 존재하기 때문에 instanceof를 사용하여 Enum 값을 직접 확인하는 방식은 적합하지 않습니다.
+    - Enum 값은 클래스의 인스턴스가 아니라, 해당 Enum 클래스의 고정된 상수입니다.
+      즉, Enum 값은 Enum 클래스의 정적 필드일 뿐, 클래스의 객체가 아닙니다.
+      그래서 instanceof를 사용하여 Enum 값이 특정 Enum 타입의 인스턴스인지 확인하는 것은 불가능.
+    - Enum 값이 특정 Enum 타입인지 확인하려면 Enum 클래스의 getClass() 메서드를 활용하는 방법을 사용가능.
+      ~~~
+      // status가 Status enum의 인스턴스인지 확인. 
+      // Enum 상수는 getClass()를 호출할 수 있으며, 해당 Enum의 타입을 반환.
+      if(status.getClass() == Status.class) { 
+          // ...
+      }
+      ~~~
 
 
 ---
+## 13. Pageable
 ### < Pageable - 페이지 기능을 지원 >
 - 개발기간 단축
   - 페이지 기능은 흔하지만 서비스의 핵심적인 기능은 아니다.
@@ -1090,7 +1138,6 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
    ~~~
 
 
----
 ### < Pageable 페이지, 사이즈 디폴트값 지정 >
 1. @PageableDefault 어노테이션
    - Pageable 객체의 기본 설정을 Controller 메서드에서 직접 지정할 때 사용.
@@ -1167,7 +1214,8 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
 
 
 ---
-### < 컨트롤러에서 @RequestParam을 DTO(Data Transfer Object)로 받는 이유 >
+14. Controller 메서드 파라미터
+### < Controller에서 @RequestParam을 DTO로 받는 이유 >
 > 컨트롤러에서 @RequestParam을 DTO로 받는 것은 코드의 가독성, 유지보수성, 확장성을 높이는 좋은 설계 방식.
 > 파라미터를 하나의 객체로 묶어 관리하고, 유효성 검사를 적용하며, 비즈니스 로직을 더욱 명확하고 일관되게 처리가능.
 
@@ -1214,28 +1262,34 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
      - DTO는 다른 컨트롤러나 서비스에서 재사용할 수 있어 중복 코드 줄어듦.
 
 
----
-### < 컨트롤러에서 파라미터값 받는 방법 >
-- DTO (Data Transfer Object)를 사용할 때 @RequestParam을 사용하지 않는 이유는
-  DTO 객체를 자동으로 매핑하기 위해 Spring이 사용하는 방식 때문입니다.
+### < 스프링 MVC 파라미터 바인딩 (컨트롤러에서 파라미터값 받는 방법) >
+- @RequestParam을 DTO(Data Transfer Object)에서 생략 가능한 이유
+  DTO를 파라미터로 받을 경우,
+  Spring MVC의 데이터 바인딩(Data Binding) 기능(@ModelAttribute)에 의해
+  쿼리 파라미터가 DTO 필드에 자동 매핑되므로
+  개별 필드마다 @RequestParam을 사용할 필요 없음.
 
-1. GET 쿼리파라미터
-    - @RequestParam은 개별 쿼리 파라미터를 메서드 파라미터로 매핑할 때 사용.
-    - 쿼리 파라미터가 하나하나 대응되어야 하는데, DTO 객체처럼 여러 필드를 묶어서 전달하는 경우에는
-      @RequestParam으로 직접 받는 것이 번거롭고 불편할 수 있습니다.
+1. GET 쿼리파라미터 - @RequestParam 사용
+    - @RequestParam은 ***개별 쿼리 파라미터를 개별 메서드 파라미터로 매핑*** 시 사용.
+    - 각 파라미터마다 @RequestParam을 명시해주어야 하기 때문에 필드가 많을 경우 코드가 길어지고 불편.
+    - 쿼리 파라미터가 하나하나 대응되어야 하므로 DTO 객체처럼 여러 필드를 묶어서 전달하는 경우에는
+      @RequestParam으로 직접 받는 것이 번거롭고 불편할 수 있음.
    ~~~
-    // 각 파라미터마다 @RequestParam을 명시해주어야 하기 때문에 필드가 많을 경우 코드가 길어지고 불편.
-   
     @RequestMapping("/search")
-    public String search(@RequestParam("name") String name, @RequestParam("status") String status) {
+    public String search(@RequestParam("name") String name, 
+                         @RequestParam("status") String status) {
         // name과 status를 각각 받아서 처리
     }
    ~~~
 
-2. GET 쿼리파라미터와 DTO
+2. GET 쿼리파라미터 - DTO 사용
     - Spring MVC에서는 DTO 객체를 쿼리 파라미터와 자동으로 매핑가능.
     - @RequestParam 없이 DTO의 필드 이름과 동일한 쿼리 파라미터가 있을 경우
-      자동으로 해당 값을 DTO에 주입해주기 때문에, 하나의 객체로 여러 파라미터를 묶어 처리가능.
+      자동으로 해당 값을 DTO 필드에 바인딩하기 때문에, 하나의 객체로 여러 파라미터를 묶어 처리가능.
+    - Spring MVC에서는
+      @RequestBody가 없고, 단순 객체 타입 파라미터인 경우
+      기본적으로 @ModelAttribute 방식으로 처리되며,
+      이때 쿼리 파라미터를 DTO의 필드 이름 기준으로 자동 바인딩한다.
    ~~~
     // 이 방식에서는 name, status 같은 쿼리 파라미터가 있으면, 
     //  Spring이 자동으로 RequestSearchProductionDto 객체의 필드에 매핑. 
@@ -1247,8 +1301,17 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
     }
    ~~~
 
-3. GET,POST requestBody
-    - @RequestBody는 HTTP 요청의 본문에 포함된 데이터를 객체로 변환해서 받는 방식.
-    - 보통 POST 요청에서 JSON 데이터를 받을 때 사용.
-    - 쿼리파라미터와 달리 DTO로 데이터를 받을 때 @requestBody 어노테이션을 사용해야함.
+3. POST JSON requestBody - @RequestBody 사용 / POST Form 데이터 - @ModelAttribute  
+   HTTP 요청의 본문에 포함된 데이터를 객체로 변환해서 받는 방식.
+   1) POST 요청에서 JSON 데이터   
+      ***POST 요청에서 JSON 데이터***를 Body로 받을 경우 ***@RequestBody***를 사용.   
+      Jackson(ObjectMapper)가 HTTP Body의 JSON 데이터를 지정한 DTO 객체로 변환.   
+      requestBody가 JSON인데 @RequestBody가 없는 경우,
+      Spring은 Body를 파싱하지 않으므로 DTO 필드가 null이 되거나 바인딩에 실패.
+   2) POST 요청에서 form 데이터
+      POST 요청이라도 form 데이터의 경우는 ***@ModelAttribute*** 방식으로 바인딩됨.
+      ex) content type이 application/x-www-form-urlencoded, multipart/form-data
+   3) GET은 Body 사용 비권장
+      HTTP 스펙 상 GET은 Body 사용을 권장하지 않기 때문에 
+      일부 서버, 프록시, 캐시가 Body를 무시하므로 GET에 @RequestBody를 쓰지 않음.
 

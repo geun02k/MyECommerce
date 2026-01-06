@@ -3,9 +3,43 @@
 
 
 ---
-### < JPA >
-- Java Persistence API
-- 자바에서 **객체 관계 매핑(ORM)**을 처리하기 위한 표준 API.
+## < 목차 >
+1. JPA (Java Persistence API)
+2. 공통으로 사용하는 추적정보를 위한 BaseEntity 생성
+3. 테이블 연관관계
+    - 회원권한테이블 추가
+    - 두 테이블의 연관관계 설정 후 FK값이 null로 저장되는 문제
+    - 연관관계에 있는 두 Entity의 데이터 조회
+    - 연관관계의 Entity 조회방식
+    - 연관관계에 있는 Entity에서 부모만 조회하기
+    - JPA 연관관계에서 지연로딩, 즉시로딩
+    - 연관관계에 있는 Entity의 저장방식
+    - 부모-자식 관계의 기본적인 동작
+4. 무한 순환 방지
+5. FETCH
+6. 상품수정 옵션 저장 시 발생한 에러 ObjectOptimisticLockingFailureException
+7. update문을 명시적으로 우선 수행헀는데 실제로는 후에 호출한 insert문을 먼저 수행하는 이유
+8. dirty 체크
+9. @Transaction 어노테이션을 이용한 flush()
+10. @Query에서 파라미터 바인딩 방법
+11. JPA에서 Entity에 없는 필드인 계산된 값을 사용하기
+12. 쿼리조회
+    - 조회 시 고려사항
+    - 쿼리 검색성능 개선하기
+    - 쿼리 정확도순 정렬하기
+13. 테이블 풀스캔 (Full Table Scan)
+14. 인덱스
+    - 대용량 데이터에서 인덱싱을 통한 성능 최적화
+    - 인덱스와 PK
+    - 복합 인덱스
+    - JPA 인덱스 생성
+    - LIKE 검색과 인덱스
+    - 클러스티드 인덱스와 넌클러스티드 인덱스
+
+
+---
+### < JPA (Java Persistence API) >
+자바에서 **객체 관계 매핑(ORM)**을 처리하기 위한 표준 API.
 - 객체지향 언어인 자바와 관계형 데이터베이스 간의 데이터를 변환하고, 관리하는 데 도움을 주는 기술.
 - 데이터베이스와 자바 객체 간의 매핑을 자동화하여, 
   개발자가 SQL 쿼리를 직접 작성하지 않고도 객체를 데이터베이스에 저장하고 조회가능.
@@ -34,9 +68,9 @@
    2. 트랜잭션 관리 
       - JPA는 트랜잭션을 관리.
       - 엔티티의 상태를 영속화하고 변경 사항을 데이터베이스에 반영할 때 트랜잭션 단위로 처리.
-   3. 캐시 기능 
-      - JPA는 영속성 컨텍스트 내에서 엔티티를 캐싱하여, 
-        동일한 엔티티를 여러 번 조회할 때 데이터베이스에 대한 불필요한 쿼리를 줄임.
+   3. 캐시 기능  
+      JPA는 영속성 컨텍스트 내에서 엔티티를 캐싱하여, 
+      동일한 엔티티를 여러 번 조회할 때 데이터베이스에 대한 불필요한 쿼리를 줄임.
    4. 쿼리 기능 
       - JPA는 JPQL을 사용하여 객체 지향적으로 데이터를 조회하고 수정가능. 
       - Criteria API를 사용하여 타입 안전한 쿼리 작성이 가능.
@@ -52,44 +86,45 @@
    - Hibernate 외에도 EclipseLink, OpenJPA와 같은 다른 구현체들이 있지만, Hibernate가 가장 널리 사용.
 
 4. JPA 사용 시의 장점
-   1. 생산성 향상 
-      - JPA는 SQL을 직접 작성하지 않고도 객체와 관계형 데이터베이스 간의 데이터를 쉽게 처리할 수 있어 개발 생산성을 높임.
-   2. 유지보수 용이 
-      - 엔티티 클래스를 사용하여 객체 지향적인 방식으로 데이터를 처리하므로, 비즈니스 로직과 데이터베이스 로직을 분리할 수 있어 유지보수가 용이.
-   3. DB 벤더 독립성 
-      - JPA는 특정 데이터베이스에 의존하지 않기 때문에, 데이터베이스가 변경되어도 코드 수정 없이 쉽게 대체가능.
+   1. 생산성 향상    
+      JPA는 SQL을 직접 작성하지 않고도 객체와 관계형 데이터베이스 간의 데이터를 쉽게 처리할 수 있어 개발 생산성을 높임.
+   2. 유지보수 용이   
+      엔티티 클래스를 사용하여 객체 지향적인 방식으로 데이터를 처리하므로, 비즈니스 로직과 데이터베이스 로직을 분리할 수 있어 유지보수가 용이.
+   3. DB 벤더 독립성    
+      JPA는 특정 데이터베이스에 의존하지 않기 때문에, 데이터베이스가 변경되어도 코드 수정 없이 쉽게 대체가능.
 
 
 ---
-###  <공통으로 사용하는 추적정보를 위한 BaseEntity 생성 >
+###  < 공통으로 사용하는 추적정보를 위한 BaseEntity 생성 >
 1. @MappedSuperclass
-    > - 객체 입장에서 공통 매핑 정보 필요 시 사용.
-    공통 매핑 정보 필요 시, 부모 클래스에 선언하고 속성만 상속받아 사용하고 싶을 때 사용.
-    > - 해당 어노테이션이 선언되어 있는 클래스는 엔티티가 아니다.   
-    따라서 테이블과 별도로 매핑되지 않는다.
-    > - 직접 생성해 사용할 일이 없으므로 추상 클래스로 만드는 것이 권장된다.
-    > - JPA에서 @Entity 클래스는 @Entity 클래스 또는 @MappedSuperclass로 지정한 클래스만 상속가능.   
-    > - ex) 생성자, 생성시간, 수정자, 수정시간 등
-    > - 참고 블로그 : https://ict-nroo.tistory.com/129
+   > - 객체 입장에서 공통 매핑 정보 필요 시 사용.
+       공통 매핑 정보 필요 시, 부모 클래스에 선언하고 속성만 상속받아 사용하고 싶을 때 사용.
+   > - 해당 어노테이션이 선언되어 있는 클래스는 엔티티가 아니다.   
+       따라서 테이블과 별도로 매핑되지 않는다.
+   > - 직접 생성해 사용할 일이 없으므로 추상 클래스로 만드는 것이 권장된다.
+   > - JPA에서 @Entity 클래스는 @Entity 클래스 또는 @MappedSuperclass로 지정한 클래스만 상속가능.
+   > - ex) 생성자, 생성시간, 수정자, 수정시간 등
+   > - 참고 블로그 : https://ict-nroo.tistory.com/129
 
 2. @EntityListeners(AuditingEntityListener.class)   
-   > - 해당 클래스에 Auditing 기능을 포함.
-   > - JPA Auditing 활성화   
-   >   : @SpringBootApplication 어노테이션이 있는 Application.java 파일에 @EnableJpaAuditing 어노테이션을 추가해
+   해당 클래스에 Auditing 기능을 포함.
+   1) JPA Auditing 활성화   
+      @SpringBootApplication 어노테이션이 있는 Application.java 파일에 @EnableJpaAuditing 어노테이션을 추가해
       JPA Auditing 기능을 활성화 해야 사용가능.
-   > - JPA의 Auditing       
-   >   : JPA에서는 Audit 기능을 제공한다.   
+   2) JPA의 Auditing       
+      JPA에서는 Audit 기능을 제공한다.   
       Audit은 spring data JPA에서 시간에 대해 자동으로 값을 넣어주는 기능이다.   
       도메인을 영속성 컨텍스트에 저장하거나 조회를 수행한 후 update 하는 경우 매번 시간 데이터를 입력해주어야하는데
       이 때 자동으로 시간을 매핑하여 데이터베이스의 테이블을 넣어주게 된다.
-   > - @CreatedDate    
-   >   : Entity가 생성되어 저장될 때 시간 자동 저장.   
-   > - @LastModifiedDate   
-   >   : 조회한 Entity의 값을 변경할 때 시간 자동 저장.
-   > - 참고 블로그 : https://webcoding-start.tistory.com/53
+   3) @CreatedDate    
+      Entity가 생성되어 저장될 때 시간 자동 저장.
+   4) @LastModifiedDate   
+      조회한 Entity의 값을 변경할 때 시간 자동 저장.
+   - 참고 블로그 : https://webcoding-start.tistory.com/53
 
 
 ---
+## 테이블 연관관계
 ### < 회원권한테이블 추가 >
 - 유저와 권한은 다대다 관계.
   한 유저가 여러 권한을 가질 수 있고, 한 권한도 여러 유저가 사용가능. 
@@ -104,65 +139,48 @@
       https://ttl-blog.tistory.com/126
 
 
---- 
 ### < 두 테이블의 연관관계 설정 후 FK값이 null로 저장되는 문제 >
-- 주인 Entity
-  - @ManyToOne
-  - @JoinColumn(name="memberId")
-    - 테이블 매핑 시 foreign key 지정 / 해당 외래 키를 관리하는 주인 Entity에 설정
-  - @JsonBackReference
-    - 양방향 연관관계에서 발생할 수 있는 무한 순환 참조 문제를 방지하기 위해 사용.
-    - 주로 직렬화(Serialization, 객체를 JSON으로 변환) 시, 서로 참조하는 두 객체가 무한히 참조하면서 순환하는 것을 막고자 할 때 유용.
-    - 직렬화 시 MemberAuthority 객체는 포함되지 않음. (없으면 무한호출됨)
-- 비주인 Entity
-  - @OneToMany(cascade = CascadeType.ALL, mappedBy = "member") 
-    - 테이블 연관관계 1(회원):N(권한) 설정.   
-      member_authority(사용자권한테이블) 테이블과 join해서 권한정보 가져옴.
-    - mappedBy : 비주인 설정
-    - cascade = CascadeType.ALL : Member가 저장될 때 관련된 MemberAuthority도 자동으로 저장.
-    - orphanRemoval = true :  Member에서 MemberRole을 제거할 때 MemberRole이 삭제.
-       테이블 연관관계 1:N 설정 / mappedBy : 비주인
-  - @JsonManagedReference
-    - 직렬화 시 MemberAuthority 리스트는 포함되지만, Member 객체는 포함되지 않음.
+1. 주인 Entity
+   1) @ManyToOne
+   2) @JoinColumn(name="memberId")   
+     테이블 매핑 시 foreign key 지정 / 해당 외래 키를 관리하는 주인 Entity에 설정
+   3) @JsonBackReference
+      - 양방향 연관관계에서 발생할 수 있는 무한 순환 참조 문제를 방지하기 위해 사용.
+      - 주로 직렬화(Serialization, 객체를 JSON으로 변환) 시, 서로 참조하는 두 객체가 무한히 참조하면서 순환하는 것을 막고자 할 때 유용.
+      - 직렬화 시 MemberAuthority 객체는 포함되지 않음. (없으면 무한호출됨)
+2. 비주인 Entity
+   1) @OneToMany(cascade = CascadeType.ALL, mappedBy = "member")
+      - 테이블 연관관계 1(회원):N(권한) 설정.   
+        member_authority(사용자권한테이블) 테이블과 join해서 권한정보 가져옴.
+      - mappedBy : 비주인 설정
+      - cascade = CascadeType.ALL : Member가 저장될 때 관련된 MemberAuthority도 자동으로 저장.
+      - orphanRemoval = true :  Member에서 MemberRole을 제거할 때 MemberRole이 삭제.
+        테이블 연관관계 1:N 설정 / mappedBy : 비주인
+    2) @JsonManagedReference   
+       직렬화 시 MemberAuthority 리스트는 포함되지만, Member 객체는 포함되지 않음.
 
-1. 연관관계의 주인을 N으로 둔다는 것
+3. 연관관계의 주인을 N으로 둔다는 것
    - 1:N 관게에서 N(다수)을 연관관게의 주인으로 설정하는 것. (Member 비주인, MemberAuthority 주인)
    - @OneToMany에서 mappedBy 옵션으로 비주인임을 설정.
    - @ManyToOne 어노테이션을 작성한 Entity에서 @JoinColumn에서 name 옵션에 FK를 작성해 외래키를 관리하는 주인으로 설정.
    - 주인 클래스인 MemberAuthority에서 비주인인 Member를 변경하거나 삭제할 때만 외래키 수정.
    - Member가 저장될 때 불필요한 update 쿼리가 발생 x.
 
-2. 기존 회원, 회원권한 저장 시 문제 
-   - 문제 발생 원인
-     - controller에서 우선으로 MemberAuthority(권한)을 생성해 Member(회원) 객체에 우선 데이터를 넣은 후 회원 저장을 수행.
-       따라서 MemberAuthority 클래스의 member 필드값이 memberRepository.save() 의 반환값 객체가 아니라
-       요청 시 전달받은 member 객체라 id 필드 값이 비어있기 때문에 잘못된 객체 전달로 인해 FK인 memberId값이 null로 저장된 것으로 판단.
-   - 문제 해결
-     >  memberRepository.save()의 반환값인 Member 객체를 MemberAuthority 객체의 member 필드에 저장해 
-        memberAuthorityRepository.save()를 수행해 FK값이 null로 저장되는 문제를 해결.
+4. 기존 회원, 회원권한 저장 시 문제
+   1) 문제 발생 원인   
+      controller에서 우선으로 MemberAuthority(권한)을 생성해 Member(회원) 객체에 우선 데이터를 넣은 후 회원 저장을 수행.
+      따라서 MemberAuthority 클래스의 member 필드값이 memberRepository.save() 의 반환값 객체가 아니라
+      요청 시 전달받은 member 객체라 id 필드 값이 비어있기 때문에 잘못된 객체 전달로 인해 FK인 memberId값이 null로 저장된 것으로 판단.
+    2) 문제 해결   
+      memberRepository.save()의 반환값인 Member 객체를 MemberAuthority 객체의 member 필드에 저장해
+      memberAuthorityRepository.save()를 수행해 FK값이 null로 저장되는 문제를 해결.
 
-3. 주인 Entity에 FK 필드 선언 제거
+5. 주인 Entity에 FK 필드 선언 제거
    - 연관관계 설정 시 @JoinColumn(name="memberId") 어노테이션을 통해 join column을 설정해주면 FK 필드가 자동 생성됨.   
      띠라서 memberId라는 별도의 필드가 필요없음.   
    - 기존 작성했던 FK 필드 제거.
 
 
----
-### < 무한 순환 방지 >
-- 아래 두 개의 어노테이션은 한 세트로 적용해야함.
-- 한쪽에서는 직렬화를 포함시키고, 다른 한쪽에서는 제외시켜 무한 순환을 방지.
-- 직렬화(Serialization)
-  - 객체를 바이트 스트림이나 다른 저장 가능한 형식(JSON, XML)으로 변환하는 과정
-  - 직렬화의 목적은 객체를 메모리 내에서 외부로 내보내거나(저장) 외부에서 불러오는 것(복원).
-- @JsonManagedReference
-  - "출발점" 객체에 사용되며, 직렬화 시 이 객체는 포함됨.
-  - 이 객체의 참조는 직렬화 과정에서 포함되고, 해당 객체가 참조하는 다른 객체들은 @JsonBackReference로 지정된 객체에 의해 직렬화에서 제외됨.
-- @JsonBackReference
-  - "대상" 객체에 사용되며, 직렬화 시 이 객체의 참조는 미포함. 
-  - 이 객체를 직렬화할 때 해당 객체가 참조하는 다른 객체는 직렬화에서 제외됨.
-
-
----
 ### < 연관관계에 있는 두 Entity의 데이터 조회 >
 - 에러발생 소스코드
     ~~~
@@ -220,127 +238,66 @@
       
    3. Production 엔티티 전체를 반환하려면, 
       SELECT 구문에서 Production과 ProductionOption을 엔티티로 반환하도록 해야함.
-      - 발생에러
-        - Entity 클래스명, 필드명을 사용해도 아래의 오류 발생.
-        > org.springframework.core.convert.ConversionFailedException: 
-          Failed to convert from type [java.lang.Object[]] to type [com.myecommerce.MyECommerce.entity.production.Production] for value [{...}]
-     - LEFT JOIN FETCH를 사용하여 Production과 ProductionOption을 함께 로딩.
-     - Production 엔티티를 직접 반환하므로, Production 객체를 그대로 반환할 수 있습니다.
-     - LEFT JOIN FETCH를 사용하면 productionOptions 컬렉션이 지연 로딩 대신 즉시 로딩됨.
+      - 발생에러   
+         Entity 클래스명, 필드명을 사용해도 아래의 오류 발생.
+         > org.springframework.core.convert.ConversionFailedException: 
+           Failed to convert from type [java.lang.Object[]] to type [com.myecommerce.MyECommerce.entity.production.Production] for value [{...}]
+         - LEFT JOIN FETCH를 사용하여 Production과 ProductionOption을 함께 로딩.
+         - Production 엔티티를 직접 반환하므로, Production 객체를 그대로 반환할 수 있습니다.
+         - LEFT JOIN FETCH를 사용하면 productionOptions 컬렉션이 지연 로딩 대신 즉시 로딩됨.
    
    4. Entity의 연관관계를 맺어줬는데도 JOIN해 조회가 불가한 문제
-      - 발생에러
-        > org.springframework.dao.InvalidDataAccessApiUsageException:
-          org.hibernate.query.SemanticException:
-          Entity join did not specify a join condition
-          [SqmEntityJoin(com.myecommerce.MyECommerce.entity.production.ProductionOption(OPTION))]
-          (specify a join condition with 'on' or use 'cross join')
+      1) 발생에러
+         > org.springframework.dao.InvalidDataAccessApiUsageException:
+           org.hibernate.query.SemanticException:
+           Entity join did not specify a join condition
+           [SqmEntityJoin(com.myecommerce.MyECommerce.entity.production.ProductionOption(OPTION))]
+           (specify a join condition with 'on' or use 'cross join')
     
-      - 발생원인
-        - 본래 위의 오류는 Hibernate에서 엔티티 간의 JOIN을 사용할 때, 조인 조건을 명시하지 않았다는 의미입니다. 
-          즉, LEFT JOIN FETCH를 사용했으나, Production과 ProductionOption 사이의 조인 조건이 명확하지 않기 때문에 발생합니다. 
-          따라서 JOIN 시 ON 조건을 명시해 해결할 수 있습니다. 
-        - 하지만 JPA에서 두 테이블의 연관관계를 설정해놓았다면, 일반적으로 ON 절을 명시적으로 사용할 필요는 없습니다.
-          연관 관계가 이미 엔티티 간에 설정되어 있다면, JPA는 이를 기반으로 내부적으로 JOIN을 처리합니다. 
-          ON 절은 주로 연관 관계가 없거나, 더 복잡한 조건을 추가할 때 사용됩니다.
-          LEFT JOIN FETCH와 같은 fetch join을 사용할 때는 연관 관계가 이미 설정되어 있으면 ON 절을 명시할 필요는 없습니다.
-        - 이번 경우에는 ON절을 작성하면 쿼리가 정상 동작하고 ON절을 작성하지 않으면 쿼리에서 오류를 발생시킵니다.
-        - 주된 문제는 **LEFT JOIN FETCH 사용 시 연관 관계를 정확히 지정하지 않았기 때문**입니다.
-          즉, ProductionOption에 Production에 대한 연관 관계가 설정되어 있어야 합니다.
-          만약 설정이 없다면 조인에 문제가 발생할 수 있습니다.
+      2) 발생원인
+         - 본래 위의 오류는 Hibernate에서 엔티티 간의 JOIN을 사용할 때, 조인 조건을 명시하지 않았다는 의미입니다. 
+           즉, LEFT JOIN FETCH를 사용했으나, Production과 ProductionOption 사이의 조인 조건이 명확하지 않기 때문에 발생합니다. 
+           따라서 JOIN 시 ON 조건을 명시해 해결할 수 있습니다. 
+         - 하지만 JPA에서 두 테이블의 연관관계를 설정해놓았다면, 일반적으로 ON 절을 명시적으로 사용할 필요는 없습니다.
+           연관 관계가 이미 엔티티 간에 설정되어 있다면, JPA는 이를 기반으로 내부적으로 JOIN을 처리합니다. 
+           ON 절은 주로 연관 관계가 없거나, 더 복잡한 조건을 추가할 때 사용됩니다.
+           LEFT JOIN FETCH와 같은 fetch join을 사용할 때는 연관 관계가 이미 설정되어 있으면 ON 절을 명시할 필요는 없습니다.
+         - 이번 경우에는 ON절을 작성하면 쿼리가 정상 동작하고 ON절을 작성하지 않으면 쿼리에서 오류를 발생시킵니다.
+         - 주된 문제는 **LEFT JOIN FETCH 사용 시 연관 관계를 정확히 지정하지 않았기 때문**입니다.
+           즉, ProductionOption에 Production에 대한 연관 관계가 설정되어 있어야 합니다.
+           만약 설정이 없다면 조인에 문제가 발생할 수 있습니다.
       
-      - 해결방법
-        - Entity에서 연관 관계 자체는 잘 설정되어 있지만, 쿼리의 **LEFT JOIN FETCH**에서 ProductionOption과 Production을 정확히 어떻게 조인할지를 명시적으로 지정해야 합니다.   
-          즉, **LEFT JOIN FETCH가 제대로 작동하려면 ProductionOption에서 Production을 참조하고 있어야 합니다.**
-        - LEFT JOIN FETCH에서 ProductionOption을 Production과 연결할 때, ProductionOption이 Production을 참조하는 필드 production을 명확하게 사용해야 합니다.
-        - 이렇게 PRD.ptions와 같이 LEFT JOIN FETCH에서 PRD의 옵션들을 명시적으로 참조하는 방식으로 변경 시 해결 가능했습니다.
-          Production 엔티티에서 options라는 필드가 ProductionOption 리스트를 참조하고 있으므로, prd.options로 ProductionOption과의 연관 관계를 가져와야 합니다.   
-          Production과 ProductionOption을 조인하는 부분으로, prd.options를 사용하여 두 테이블을 연결합니다.
-          해당 방식이 좀 더 명확하고, option이 Production에 종속적인 구조라면 잘 동작하게 됩니다.
-        ~~~
-        // - 연관관계를 명시적으로 작성한 것의 예시
-        //   : Production Entity의 필드로 List<ProductionOption> 타입의 options 변수가 존재할 경우
-        SELECT PRD
-        FROM Production PRD
-        LEFT JOIN FETCH PRD.options OPTION
-        ~~~
+      3) 해결방법
+         - Entity에서 연관 관계 자체는 잘 설정되어 있지만, 쿼리의 **LEFT JOIN FETCH**에서 ProductionOption과 Production을 정확히 어떻게 조인할지를 명시적으로 지정해야 합니다.   
+           즉, **LEFT JOIN FETCH가 제대로 작동하려면 ProductionOption에서 Production을 참조하고 있어야 합니다.**
+         - LEFT JOIN FETCH에서 ProductionOption을 Production과 연결할 때, ProductionOption이 Production을 참조하는 필드 production을 명확하게 사용해야 합니다.
+         - 이렇게 PRD.ptions와 같이 LEFT JOIN FETCH에서 PRD의 옵션들을 명시적으로 참조하는 방식으로 변경 시 해결 가능했습니다.
+           Production 엔티티에서 options라는 필드가 ProductionOption 리스트를 참조하고 있으므로, prd.options로 ProductionOption과의 연관 관계를 가져와야 합니다.   
+           Production과 ProductionOption을 조인하는 부분으로, prd.options를 사용하여 두 테이블을 연결합니다.
+           해당 방식이 좀 더 명확하고, option이 Production에 종속적인 구조라면 잘 동작하게 됩니다.
+         ~~~
+         // - 연관관계를 명시적으로 작성한 것의 예시
+         //   : Production Entity의 필드로 List<ProductionOption> 타입의 options 변수가 존재할 경우
+         SELECT PRD
+         FROM Production PRD
+         LEFT JOIN FETCH PRD.options OPTION
+         ~~~
 
 
----
-### < FETCH >
-- JPA에서 FETCH는 지연 로딩을 피하고 즉시 로딩을 하겠다는 의미. 
-- 기본적으로 JPA는 연관된 엔티티를 지연 로딩 방식으로 처리하는데, 
-  FETCH를 사용하면 연관된 엔티티들을 즉시 로딩하여 한 번의 쿼리로 결과를 가져오게 됨.
-
-1. LEFT JOIN FETCH
-   - LEFT JOIN FETCH는 SQL의 LEFT JOIN과 JPA의 FETCH 전략을 결합한 것.
-   - SQL에서 LEFT JOIN을 사용하면서 동시에 JPA의 FETCH 전략을 적용하여, 연관된 엔티티를 즉시 로딩하는 방식. 
-   - 주로 @OneToMany, @ManyToMany 관계에서 사용.
-     - Post가 여러 Comment를 가지는 경우 Comment들을 한 번의 쿼리로 가져올 수 있음.
-   - 연관된 엔티티가 너무 많으면 쿼리가 비효율적일 수 있으므로 필요에 따라 적절한 사용이 필요함.
-   - 연관된 엔티티를 한 번의 쿼리로 가져오기에 N+1 문제를 해결가능.
-   ~~~
-   SELECT p 
-   FROM Post p 
-   LEFT JOIN FETCH p.comments // Post.java Entity에서 comments로 선언한 필드 = List<Comments> comments;
-   ~~~
-
-2. SQL JOIN과 JPA FETCH
-- JPQL은 서브쿼리 내에서 FETCH를 사용할 수 없으며,
-  GROUP BY나 집계 함수와 관련된 쿼리를 FETCH와 함께 사용할 때 문제가 발생할 수 있습니다.
-
-- INNER JOIN FETCH
-  - 연관된 엔티티를 가져오기 위해 사용됩니다.
-- FETCH
-  - 단일 엔티티를 연관된 엔티티와 함께 로드하는 데만 사용.
-- 서브쿼리와 JOIN FETCH
-  - 일반적으로 서브쿼리는 SELECT에서 바로 사용할 수는 있지만, FETCH 와 결합하는 것은 허용되지 않습니다.
-
-- GROUP BY와 집계 함수
-  - JPQL에서 서브쿼리 내에서 집계 함수를 사용할 수 있지만, FETCH와 결합하는 것은 불가능합니다.
-
-- 해결 방법    
-  - 서브쿼리에서 MIN(option.price) 값을 계산하고, 
-    이를 결과에 포함시키기 위해서는 서브쿼리를 JOIN으로 처리하는 방식으로 접근해야 합니다. 
-  - FETCH는 연관 관계를 가져오는 데 사용되므로, 서브쿼리와 함께 사용하지 않고, 
-    서브쿼리 결과를 JOIN한 후 ORDER BY를 적용하는 방법이 적합합니다. 
-  ~~~
-  SELECT prd
-  FROM Production prd
-  JOIN prd.productionOptions option
-  WHERE prd.name LIKE CONCAT('%', ?1, '%')
-  AND prd.saleStatus = 'ON_SALE'
-  GROUP BY prd
-  ORDER BY MIN(option.price)
-  ~~~
-  - JOIN prd.productionOptions option
-    - Production 엔티티와 연관된 ProductionOption 엔티티를 JOIN합니다. 
-    - 이때 INNER JOIN이 기본적으로 적용됩니다.
-  - 서브쿼리
-    - 서브쿼리를 사용하여 각 Production에 대해 **가장 낮은 가격을 가진 ProductionOption**을 찾습니다.
-
-
-FETCH는 연관된 엔티티를 함께 로드할 때 사용되며, 집계 함수나 서브쿼리와는 잘 결합되지 않습니다. 
-대신 JOIN을 사용하여 연관된 데이터를 가져오는 방식으로 처리합니다.
-서브쿼리에서 MIN() 함수와 GROUP BY를 사용할 때는 JOIN을 통해 결과를 비교하고 필터링하는 방식이 적합합니다.
-이렇게 수정된 쿼리는 각 Production에 대해 관련된 ProductionOption 중 가장 낮은 가격을 가진 옵션을 찾아 그 가격을 기준으로 정렬된 결과를 반환합니다.
-
-
----
 ### < 연관관계의 Entity 조회방식 >
 1. JPA 단순조회
-    - 연관 관계가 잘 설정되어 있다면, **별도의 쿼리를 작성하지 않고 JPA가 자동으로 연관된 엔티티를 로드(조회)**.
+   - 연관 관계가 잘 설정되어 있다면, **별도의 쿼리를 작성하지 않고 JPA가 자동으로 연관된 엔티티를 로드(조회)**.
 2. JPQL 또는 @Query
-    - **특정 조건에 맞는 데이터를 조회**하고자 할 때는 JPQL이나 @Query를 사용.
-    - 연관관계가 있는 두 엔티티가 존재할 때 Production(one)과 관련된 특정 ProductionOption(many)만 조회하고 싶을 때는
-      직접 **@Query**를 사용하여 JPQL을 작성할 수 있습니다.
+   - **특정 조건에 맞는 데이터를 조회**하고자 할 때는 JPQL이나 @Query를 사용.
+   - 연관관계가 있는 두 엔티티가 존재할 때 Production(one)과 관련된 특정 ProductionOption(many)만 조회하고 싶을 때는
+     직접 **@Query**를 사용하여 JPQL을 작성할 수 있습니다.
 3. @EntityGraph 또는 연관관게 설정 시 FetchType.EAGER 옵션 사용
-    - 연관된 엔티티를 명시적으로 로드하려면 **@EntityGraph**나 **FetchType.EAGER**를 활용할 수 있습니다.
-    - @EntityGraph를 사용한 성능 최적화
-        - 특정 연관 관계를 명시적으로 로딩(조회)하려면 **@EntityGraph**를 사용하는 방법도 있습니다.
-        - @EntityGraph는 연관된 엔티티를 명시적으로 로드할 수 있도록 해주며, 이를 통해 성능 최적화도 가능합니다.
-        - @EntityGraph를 사용하면 연관관계에 있는 Production 엔티티의 필드인 List<ProductionOption> 타입의 options 변수를 명시적으로 로딩하도록 설정할 수 있습니다.
-          이 방법은 EAGER 로딩의 성능 문제를 피하면서, 특정 필드만을 즉시 로딩할 수 있게 도와줍니다.
+   - 연관된 엔티티를 명시적으로 로드하려면 **@EntityGraph**나 **FetchType.EAGER**를 활용할 수 있습니다.
+   - @EntityGraph를 사용한 성능 최적화
+     - 특정 연관 관계를 명시적으로 로딩(조회)하려면 **@EntityGraph**를 사용하는 방법도 있습니다.
+     - @EntityGraph는 연관된 엔티티를 명시적으로 로드할 수 있도록 해주며, 이를 통해 성능 최적화도 가능합니다.
+     - @EntityGraph를 사용하면 연관관계에 있는 Production 엔티티의 필드인 List<ProductionOption> 타입의 options 변수를 명시적으로 로딩하도록 설정할 수 있습니다.
+       이 방법은 EAGER 로딩의 성능 문제를 피하면서, 특정 필드만을 즉시 로딩할 수 있게 도와줍니다.
    ~~~
     // EntityGraph를 사용한 연관 관계 로딩
     
@@ -350,13 +307,12 @@ FETCH는 연관된 엔티티를 함께 로드할 때 사용되며, 집계 함수
    ~~~
    
 
----
 ## < 연관관계에 있는 Entity에서 부모만 조회하기 >
-- Production 엔티티가 productionOptions와 연관 관계가 있을 경우, 
-  prd만 선택해도 연관된 ProductionOption 정보가 함께 로드될 수 있습니다.
+Production 엔티티가 productionOptions와 연관 관계가 있을 경우,
+prd만 선택해도 연관된 ProductionOption 정보가 함께 로드될 수 있습니다.
 
-- 부모 Entity 정보만 로드하는 방법
-  - 이를 방지하려면, **JPQL 쿼리에서 productionOptions를 제외하거나 fetch를 제한**하는 방법이 필요합니다.
+- 부모 Entity 정보만 로드하는 방법   
+  이를 방지하려면, **JPQL 쿼리에서 productionOptions를 제외하거나 fetch를 제한**하는 방법이 필요합니다.
 
 1. JPQL 쿼리에서 자식 Entity 제외
    - JOIN을 단순히 사용하여 부모만 선택하고, 연관된 자식을 결과에 포함시키지 않도록 할 수 있습니다.
@@ -389,15 +345,14 @@ FETCH는 연관된 엔티티를 함께 로드할 때 사용되며, 집계 함수
    > FetchType.LAZY를 설정하면 ProductionOption은 지연 로딩되며, 쿼리 결과에 포함되지 않습니다.
    > LAZY 로딩은 실제로 연관된 엔티티가 필요할 때 로드되므로, ProductionOption 필드는 결과에 포함되지 않으며 필요할 때만 쿼리가 실행됩니다. 
 
-3. Query에서 fetch 전략 제어
-   - @Query에서는 JOIN FETCH를 사용하지 않으면 자식이 자동으로 로드되지 않습니다. 
+3. Query에서 fetch 전략 제어   
+   @Query에서는 JOIN FETCH를 사용하지 않으면 자식이 자동으로 로드되지 않습니다. 
 
 LAZY 로딩을 설정하면 ProductionOption이 즉시 로드되지 않도록 할 수 있으며, 필요한 경우에만 로드되게 할 수 있습니다.
 FETCH 전략을 LAZY로 설정하고, 쿼리에서 JOIN만 사용하면 ProductionOption이 쿼리 결과에 포함되지 않습니다.
 따라서, @OneToMany나 @ManyToOne 관계에서 LAZY 로딩을 설정하는 것이 연관된 데이터를 지연 로딩하도록 하는 가장 좋은 방법입니다.
 
 
----
 ### < JPA 연관관계에서 지연로딩, 즉시로딩 >
 - 엔티티를 언제 로드할지를 정의하는 방식.
 - JPA는 기본적으로 @OneToMany, @ManyToOne 관계를 인식하고, 조회 시 연관된 엔티티도 함께 가져올 수 있도록 설정가능. 
@@ -434,6 +389,164 @@ public class Order {
     private List<OrderItem> items;
 }
 ~~~    
+
+
+### < 연관관계에 있는 Entity의 저장방식 >
+- ProductionOption의 경우 Production Entity와 연관관계가 있기 때문에,
+  JPA에서 관리하는 영속성 컨텍스트 내에서 Production Entity가 변경되면
+  연관된 ProductionOption도 함께 변경되어야 할 것 같습니다.
+
+- 하지만 연관관계에 있는 자식 Entity(ProductionOption)가 자동으로 저장되지 않도록 설정된 경우,
+  직접적으로 save() 호출을 해줘야 합니다.
+
+1. 영속성 컨텍스트 내에서 자동 저장되는 경우
+    - JPA에서는 부모 Entity가 자식 Entity와 연관관계가 있을 때,  
+      cascade 속성이 설정된 경우 자식 Entity도 부모 Entity의 변경과 함께 자동으로 저장됩니다.
+    - @OneToMany 관계에서 cascade = CascadeType.PERSIST나 cascade = CascadeType.ALL이 설정되어 있다면,
+      부모 Entity가 저장될 때 자식 Entity도 자동으로 저장됩니다.
+   ~~~
+    public class Production extends BaseEntity {
+        // ...
+        
+        // 상품:옵션 (1:N)
+        // CascadeType.ALL로 설정 시, 부모 엔티티를 저장할 때 자식 엔티티도 자동 저장됨.
+        @OneToMany(cascade = CascadeType.ALL, mappedBy = "production")
+        private List<ProductionOption> options; // 한 상품이 여러 옵션을 가질 수 있음.
+    }
+   ~~~
+
+2. 수동으로 save()를 호출해야 하는 경우
+    - cascade 속성이 설정되지 않은 경우 Production 엔티티에 대한 변경만 이루어지고
+      연관된 ProductionOption Entity는 따로 명시적으로 저장해야 합니다.
+    - ProductionOption의 변경 사항이
+      영속성 컨텍스트에서 관리되지 않도록 설정되어 있거나, cascade가 설정되지 않았다면,
+      productionOptionRepository.save(option)을 통해 수동으로 ProductionOption을 저장해야 합니다.
+
+
+### < 부모-자식 관계의 기본적인 동작 >
+- 부모-자식 관계의 기본적인 동작은 상황에 따라 달라질 수 있습니다.
+- 부모 엔티티를 수정한다고 해서 자식 엔티티(옵션 데이터)가 자동으로 저장되지 않으며,
+  JPA에서 변경된 상태를 명시적으로 추적하지 않으면 자동으로 저장되지 않습니다.
+
+- 다만, 연관된 자식 엔티티가 영속성 컨텍스트에 의해 관리되고 있으면 트랜잭션 내에서 자식 엔티티도 자동으로 저장될 수 있습니다.
+
+1. 부모 엔티티와 자식 엔티티의 저장
+    - JPA에서 부모 엔티티가 수정되었다고 해서 자식 엔티티가 자동으로 저장되지 않습니다.
+    - 부모 엔티티가 수정되어도 자식 엔티티가 수정되지 않거나 변경된 상태로 추적되지 않으면
+      JPA는 자식 엔티티에 대한 save() 호출 없이 자동으로 DB에 반영하지 않습니다.
+
+2. 연관 관계에서 자식 엔티티 자동 저장
+    - 부모 엔티티와 자식 엔티티가 양방향 관계(예: @OneToMany와 @ManyToOne 등)일 때
+      영속성 컨텍스트에서 자식 엔티티가 이미 관리되고 있으면,
+      부모 엔티티의 상태가 변경되면서 자식 엔티티도 자동으로 저장될 수 있습니다.
+    - 다만, 이때도 자식 엔티티가 명시적으로 수정되었는지 여부를 확인하는 과정이 필요합니다.
+
+3. @Transactional과 관련된 동작
+    - @Transactional을 사용하면 트랜잭션이 종료될 때 영속성 컨텍스트에 변경된 상태가 자동으로 DB에 반영됩니다.
+    - 하지만 자식 엔티티의 변경 사항이 영속성 컨텍스트에 관리되지 않으면,
+      부모 엔티티의 수정만 반영되고 자식 엔티티는 따로 save()를 호출해줘야 저장됩니다.
+
+4. 영속성 컨텍스트에 의해 관리되는 엔티티들
+    - 부모 엔티티와 자식 엔티티가 모두 영속성 컨텍스트에 의해 관리되면,
+      트랜잭션이 끝날 때 JPA는 자동으로 부모와 자식 엔티티의 상태를 반영합니다.
+    - 즉, 자식 엔티티가 save()를 명시적으로 호출하지 않아도 JPA가 자동으로 DB에 반영합니다.
+
+5. CascadeType 설정
+    - 부모 엔티티에 @OneToMany, @ManyToMany 등 관계가 설정되어 있고
+      cascade = CascadeType.ALL 또는 cascade = CascadeType.PERSIST와 같은 Cascade 옵션이 설정되어 있으면
+      부모 엔티티를 저장할 때 자식 엔티티가 자동으로 저장됩니다.
+   ~~~
+   // 이 설정은 부모 엔티티인 Production이 저장될 때, 연관된 자식 엔티티인 options도 자동으로 저장되도록 합니다.
+   @OneToMany(mappedBy = "production", cascade = CascadeType.ALL)
+   private List<ProductionOption> options;
+   ~~~
+
+6. 부모 엔티티 수정만으로 자식 엔티티가 자동 저장을 위한 조건
+    - 자식 엔티티가 영속성 컨텍스트에 의해 관리되고, CascadeType이 적절히 설정되어야 합니다.
+      @Transactional이 적용된 메서드 내에서 영속성 컨텍스트가 관리하는 엔티티는 자동으로 저장됩니다.
+    - 그러나 @Transactional을 사용하여 트랜잭션 범위 내에서 부모 엔티티의 수정만 이루어진다고 하더라도,
+      자식 엔티티가 영속성 컨텍스트에 의해 관리되고 Cascade 옵션이 활성화되었을 경우에만 자식 엔티티가 자동으로 DB에 반영됩니다.    
+      그렇지 않으면 명시적으로 save()를 호출해야 자식 엔티티도 DB에 저장됩니다.
+
+7. Production과 ProductionOption
+    - production의 options 필드는 @OneToMany 또는 @ManyToMany 등의 관계로 **자식 엔티티(옵션 데이터)**와 연결된 경우,
+      options 데이터는 연관된 자식 엔티티로 영속성 컨텍스트에 의해 관리되고 있기 때문에
+      부모 엔티티인 production이 트랜잭션 내에서 수정되면, 자식 엔티티인 options도 자동으로 저장될 수 있습니다.
+
+
+---
+### < 무한 순환 방지 >
+- 아래 두 개의 어노테이션은 한 세트로 적용해야함.
+- 한쪽에서는 직렬화를 포함시키고, 다른 한쪽에서는 제외시켜 무한 순환을 방지.
+1. 직렬화(Serialization)
+    - 객체를 바이트 스트림이나 다른 저장 가능한 형식(JSON, XML)으로 변환하는 과정
+    - 직렬화의 목적은 객체를 메모리 내에서 외부로 내보내거나(저장) 외부에서 불러오는 것(복원).
+2. @JsonManagedReference
+    - "출발점" 객체에 사용되며, 직렬화 시 이 객체는 포함됨.
+    - 이 객체의 참조는 직렬화 과정에서 포함되고, 해당 객체가 참조하는 다른 객체들은 @JsonBackReference로 지정된 객체에 의해 직렬화에서 제외됨.
+3. @JsonBackReference
+    - "대상" 객체에 사용되며, 직렬화 시 이 객체의 참조는 미포함.
+    - 이 객체를 직렬화할 때 해당 객체가 참조하는 다른 객체는 직렬화에서 제외됨.
+
+
+---
+### < FETCH >
+- JPA에서 FETCH는 지연 로딩을 피하고 즉시 로딩을 하겠다는 의미.
+- 기본적으로 JPA는 연관된 엔티티를 지연 로딩 방식으로 처리하는데,
+  FETCH를 사용하면 연관된 엔티티들을 즉시 로딩하여 한 번의 쿼리로 결과를 가져오게 됨.
+
+1. LEFT JOIN FETCH
+    - LEFT JOIN FETCH는 SQL의 LEFT JOIN과 JPA의 FETCH 전략을 결합한 것.
+    - SQL에서 LEFT JOIN을 사용하면서 동시에 JPA의 FETCH 전략을 적용하여, 연관된 엔티티를 즉시 로딩하는 방식.
+    - 주로 @OneToMany, @ManyToMany 관계에서 사용.
+        - Post가 여러 Comment를 가지는 경우 Comment들을 한 번의 쿼리로 가져올 수 있음.
+    - 연관된 엔티티가 너무 많으면 쿼리가 비효율적일 수 있으므로 필요에 따라 적절한 사용이 필요함.
+    - 연관된 엔티티를 한 번의 쿼리로 가져오기에 N+1 문제를 해결가능.
+   ~~~
+   SELECT p 
+   FROM Post p 
+   LEFT JOIN FETCH p.comments // Post.java Entity에서 comments로 선언한 필드 = List<Comments> comments;
+   ~~~
+
+2. SQL JOIN과 JPA FETCH
+- JPQL은 서브쿼리 내에서 FETCH를 사용할 수 없으며,
+  GROUP BY나 집계 함수와 관련된 쿼리를 FETCH와 함께 사용할 때 문제가 발생할 수 있습니다.
+
+- INNER JOIN FETCH
+    - 연관된 엔티티를 가져오기 위해 사용됩니다.
+- FETCH
+    - 단일 엔티티를 연관된 엔티티와 함께 로드하는 데만 사용.
+- 서브쿼리와 JOIN FETCH
+    - 일반적으로 서브쿼리는 SELECT에서 바로 사용할 수는 있지만, FETCH 와 결합하는 것은 허용되지 않습니다.
+
+- GROUP BY와 집계 함수
+    - JPQL에서 서브쿼리 내에서 집계 함수를 사용할 수 있지만, FETCH와 결합하는 것은 불가능합니다.
+
+- 해결 방법
+    - 서브쿼리에서 MIN(option.price) 값을 계산하고,
+      이를 결과에 포함시키기 위해서는 서브쿼리를 JOIN으로 처리하는 방식으로 접근해야 합니다.
+    - FETCH는 연관 관계를 가져오는 데 사용되므로, 서브쿼리와 함께 사용하지 않고,
+      서브쿼리 결과를 JOIN한 후 ORDER BY를 적용하는 방법이 적합합니다.
+  ~~~
+  SELECT prd
+  FROM Production prd
+  JOIN prd.productionOptions option
+  WHERE prd.name LIKE CONCAT('%', ?1, '%')
+  AND prd.saleStatus = 'ON_SALE'
+  GROUP BY prd
+  ORDER BY MIN(option.price)
+  ~~~
+    - JOIN prd.productionOptions option
+        - Production 엔티티와 연관된 ProductionOption 엔티티를 JOIN합니다.
+        - 이때 INNER JOIN이 기본적으로 적용됩니다.
+    - 서브쿼리
+        - 서브쿼리를 사용하여 각 Production에 대해 **가장 낮은 가격을 가진 ProductionOption**을 찾습니다.
+
+
+FETCH는 연관된 엔티티를 함께 로드할 때 사용되며, 집계 함수나 서브쿼리와는 잘 결합되지 않습니다.
+대신 JOIN을 사용하여 연관된 데이터를 가져오는 방식으로 처리합니다.
+서브쿼리에서 MIN() 함수와 GROUP BY를 사용할 때는 JOIN을 통해 결과를 비교하고 필터링하는 방식이 적합합니다.
+이렇게 수정된 쿼리는 각 Production에 대해 관련된 ProductionOption 중 가장 낮은 가격을 가진 옵션을 찾아 그 가격을 기준으로 정렬된 결과를 반환합니다.
 
 
 ---
@@ -546,8 +659,8 @@ public class Order {
 
 ---
 ### < dirty 체크 >
-- **Entity의 속성이 변경된 상태**
-  - Entity가 변경되었음을 JPA가 인식하고, DB에 반영될 준비가 된 상태.
+- **Entity의 속성이 변경된 상태**   
+  Entity가 변경되었음을 JPA가 인식하고, DB에 반영될 준비가 된 상태.
 - ProductionOption 엔티티에서 quantity 값을 변경했다면, 해당 엔티티는 "dirty" 상태로 간주.
 - JPA는 해당 엔티티가 변경되었음을 추적합니다.
 
@@ -558,16 +671,14 @@ public class Order {
      flush() 또는 save()가 호출될 때 자동으로 DB에 반영합니다.
 
 2. Entity의 상태
-   - Entity가 처음 로드된 경우
-     - 데이터베이스에서 엔티티를 가져오면 영속성 컨텍스트에 보관되고, 
-       이 상태에서 **Entity는 변경되지 않은 상태**.
-     
-   - Entity가 수정된 경우
-     - Entity의 필드값을 변경하면, JPA는 이 Entity가 "dirty" 상태로 바뀌었다고 인식. 
-     - 필드값이 변경되었으므로 **수정된 상태는 flush()나 save()가 호출될 때 DB에 변경사항이 반영**됨.
-
-   - Entity에 저장되지 않은 변경사항이 있는 경우
-     - Entity가 "dirty" 상태로 **변경되었지만 save() 또는 flush()가 호출되지 않으면 
+   1) Entity가 처음 로드된 경우   
+      데이터베이스에서 엔티티를 가져오면 영속성 컨텍스트에 보관되고, 
+      이 상태에서 **Entity는 변경되지 않은 상태**.
+   2) Entity가 수정된 경우
+      - Entity의 필드값을 변경하면, JPA는 이 Entity가 "dirty" 상태로 바뀌었다고 인식. 
+      - 필드값이 변경되었으므로 **수정된 상태는 flush()나 save()가 호출될 때 DB에 변경사항이 반영**됨.
+    3) Entity에 저장되지 않은 변경사항이 있는 경우   
+       Entity가 "dirty" 상태로 **변경되었지만 save() 또는 flush()가 호출되지 않으면
        변경사항은 DB에 반영되지 않음.**
 
 3. dirty 상태 추적과 DB반영
@@ -589,9 +700,9 @@ public class Order {
    - **트랜잭션이 완료될 때, 영속성 컨텍스트에 있는 모든 변경사항을 자동으로 DB에 반영.** 
    - 트랜잭션 범위 내에서 엔티티의 상태가 변경되면 **메서드가 끝날 때 자동으로 flush가 발생**하고 commit.
 
-2. 영속성 컨텍스트에서 관리되는 Entity
-   - @Transactional이 적용된 메서드 내에서 이미 영속성 컨텍스트에 관리되는 엔티티가 수정되면, 
-     트랜잭션이 종료될 때 JPA가 자동으로 변경 사항을 감지하고, flush()를 호출하여 DB에 반영합니다.
+2. 영속성 컨텍스트에서 관리되는 Entity   
+   @Transactional이 적용된 메서드 내에서 이미 영속성 컨텍스트에 관리되는 엔티티가 수정되면, 
+   트랜잭션이 종료될 때 JPA가 자동으로 변경 사항을 감지하고, flush()를 호출하여 DB에 반영합니다.
    ~~~
     @Transactional
     public ResponseProductionDto modifyProduction(RequestModifyProductionDto requestProductionDto, Member member) {
@@ -624,91 +735,6 @@ public class Order {
    - 만약 Entity가 영속성 컨텍스트 외부에서 생성되었거나 별도로 관리되지 않는 Entity인 경우,  
      @Transactional은 그 엔티티의 변경사항을 자동으로 DB에 반영하지 않습니다. 
    - 이 경우, 명시적으로 save()를 호출해야 DB에 반영됩니다.
-
-
----
-### < 연관관계에 있는 Entity의 저장방식 >
-- ProductionOption의 경우 Production Entity와 연관관계가 있기 때문에, 
-  JPA에서 관리하는 영속성 컨텍스트 내에서 Production Entity가 변경되면 
-  연관된 ProductionOption도 함께 변경되어야 할 것 같습니다. 
-
-- 하지만 연관관계에 있는 자식 Entity(ProductionOption)가 자동으로 저장되지 않도록 설정된 경우, 
-  직접적으로 save() 호출을 해줘야 합니다.
-
-1. 영속성 컨텍스트 내에서 자동 저장되는 경우
-   - JPA에서는 부모 Entity가 자식 Entity와 연관관계가 있을 때,  
-     cascade 속성이 설정된 경우 자식 Entity도 부모 Entity의 변경과 함께 자동으로 저장됩니다. 
-   - @OneToMany 관계에서 cascade = CascadeType.PERSIST나 cascade = CascadeType.ALL이 설정되어 있다면, 
-     부모 Entity가 저장될 때 자식 Entity도 자동으로 저장됩니다.
-   ~~~
-    public class Production extends BaseEntity {
-        // ...
-        
-        // 상품:옵션 (1:N)
-        // CascadeType.ALL로 설정 시, 부모 엔티티를 저장할 때 자식 엔티티도 자동 저장됨.
-        @OneToMany(cascade = CascadeType.ALL, mappedBy = "production")
-        private List<ProductionOption> options; // 한 상품이 여러 옵션을 가질 수 있음.
-    }
-   ~~~
-
-2. 수동으로 save()를 호출해야 하는 경우
-   - cascade 속성이 설정되지 않은 경우 Production 엔티티에 대한 변경만 이루어지고
-     연관된 ProductionOption Entity는 따로 명시적으로 저장해야 합니다. 
-   - ProductionOption의 변경 사항이 
-     영속성 컨텍스트에서 관리되지 않도록 설정되어 있거나, cascade가 설정되지 않았다면, 
-     productionOptionRepository.save(option)을 통해 수동으로 ProductionOption을 저장해야 합니다.
-
-
----
-### < 부모-자식 관계의 기본적인 동작 >
-- 부모-자식 관계의 기본적인 동작은 상황에 따라 달라질 수 있습니다. 
-- 부모 엔티티를 수정한다고 해서 자식 엔티티(옵션 데이터)가 자동으로 저장되지 않으며, 
-  JPA에서 변경된 상태를 명시적으로 추적하지 않으면 자동으로 저장되지 않습니다.
-
-- 다만, 연관된 자식 엔티티가 영속성 컨텍스트에 의해 관리되고 있으면 트랜잭션 내에서 자식 엔티티도 자동으로 저장될 수 있습니다.
-
-1. 부모 엔티티와 자식 엔티티의 저장
-   - JPA에서 부모 엔티티가 수정되었다고 해서 자식 엔티티가 자동으로 저장되지 않습니다. 
-   - 부모 엔티티가 수정되어도 자식 엔티티가 수정되지 않거나 변경된 상태로 추적되지 않으면 
-     JPA는 자식 엔티티에 대한 save() 호출 없이 자동으로 DB에 반영하지 않습니다.
-
-2. 연관 관계에서 자식 엔티티 자동 저장
-   - 부모 엔티티와 자식 엔티티가 양방향 관계(예: @OneToMany와 @ManyToOne 등)일 때 
-     영속성 컨텍스트에서 자식 엔티티가 이미 관리되고 있으면, 
-     부모 엔티티의 상태가 변경되면서 자식 엔티티도 자동으로 저장될 수 있습니다. 
-   - 다만, 이때도 자식 엔티티가 명시적으로 수정되었는지 여부를 확인하는 과정이 필요합니다.
-
-3. @Transactional과 관련된 동작
-   - @Transactional을 사용하면 트랜잭션이 종료될 때 영속성 컨텍스트에 변경된 상태가 자동으로 DB에 반영됩니다. 
-   - 하지만 자식 엔티티의 변경 사항이 영속성 컨텍스트에 관리되지 않으면, 
-     부모 엔티티의 수정만 반영되고 자식 엔티티는 따로 save()를 호출해줘야 저장됩니다.
-
-4. 영속성 컨텍스트에 의해 관리되는 엔티티들
-   - 부모 엔티티와 자식 엔티티가 모두 영속성 컨텍스트에 의해 관리되면, 
-     트랜잭션이 끝날 때 JPA는 자동으로 부모와 자식 엔티티의 상태를 반영합니다. 
-   - 즉, 자식 엔티티가 save()를 명시적으로 호출하지 않아도 JPA가 자동으로 DB에 반영합니다.
-   
-5. CascadeType 설정
-   - 부모 엔티티에 @OneToMany, @ManyToMany 등 관계가 설정되어 있고 
-     cascade = CascadeType.ALL 또는 cascade = CascadeType.PERSIST와 같은 Cascade 옵션이 설정되어 있으면 
-     부모 엔티티를 저장할 때 자식 엔티티가 자동으로 저장됩니다.
-   ~~~
-   // 이 설정은 부모 엔티티인 Production이 저장될 때, 연관된 자식 엔티티인 options도 자동으로 저장되도록 합니다.
-   @OneToMany(mappedBy = "production", cascade = CascadeType.ALL)
-   private List<ProductionOption> options;
-   ~~~
-
-6. 부모 엔티티 수정만으로 자식 엔티티가 자동 저장을 위한 조건 
-   - 자식 엔티티가 영속성 컨텍스트에 의해 관리되고, CascadeType이 적절히 설정되어야 합니다. 
-     @Transactional이 적용된 메서드 내에서 영속성 컨텍스트가 관리하는 엔티티는 자동으로 저장됩니다.
-   - 그러나 @Transactional을 사용하여 트랜잭션 범위 내에서 부모 엔티티의 수정만 이루어진다고 하더라도, 
-     자식 엔티티가 영속성 컨텍스트에 의해 관리되고 Cascade 옵션이 활성화되었을 경우에만 자식 엔티티가 자동으로 DB에 반영됩니다.    
-     그렇지 않으면 명시적으로 save()를 호출해야 자식 엔티티도 DB에 저장됩니다.
-
-7. Production과 ProductionOption
-   - production의 options 필드는 @OneToMany 또는 @ManyToMany 등의 관계로 **자식 엔티티(옵션 데이터)**와 연결된 경우,
-     options 데이터는 연관된 자식 엔티티로 영속성 컨텍스트에 의해 관리되고 있기 때문에
-     부모 엔티티인 production이 트랜잭션 내에서 수정되면, 자식 엔티티인 options도 자동으로 저장될 수 있습니다.
 
 
 ---
@@ -807,6 +833,7 @@ public class Order {
 
 
 ---
+## 쿼리 조회
 ### < 조회 시 고려사항 >
 1. 검색 성능 최적화 (효율성)
     - 대량의 데이터가 있을 경우 검색 성능을 고려해야 합니다.
@@ -835,6 +862,22 @@ public class Order {
             - 데이터베이스는 **인덱싱과 최적화된 검색 기능**을 가지고 있기 때문에 필터링 성능이 매우 뛰어납니다.
 
 
+### < 쿼리 검색성능 개선하기 >
+- 추후 반영해서 구현해볼 것
+- 참고블로그   
+  https://velog.io/@juhyeon1114/MySQL-%EA%B2%80%EC%83%89-%EC%84%B1%EB%8A%A5-%EA%B0%9C%EC%84%A0%ED%95%98%EA%B8%B0-like%EC%99%80-full-text-search
+
+
+### < 쿼리 정확도순 정렬하기 >
+- like로 검색 후 유사한 결과 먼저 정렬하기
+    - 참고블로그   
+      https://blog.naver.com/rorean/221566107729
+
+- like 검색의 단점과 FullTextSearch (10000건 정도되면 like검색과 차이난다고 함.)
+    - 참고블로그
+      https://annajin.tistory.com/218
+
+
 ---
 ### < 테이블 풀스캔 (Full Table Scan) >
 - 데이터베이스에서 쿼리를 실행할 때 인덱스를 사용하지 않고 테이블의 모든 행을 순차적으로 읽는 작업. 
@@ -842,28 +885,28 @@ public class Order {
 - 쿼리 성능 최적화를 위해 풀스캔이 발생하는지 확인하고, 필요하다면 인덱스 최적화나 쿼리 변경을 고려하는 것이 중요.
 
 1. 풀스캔이 발생하는 경우
-   - 인덱스가 없을 때
-     - 쿼리에서 사용한 컬럼에 인덱스가 없다면, 데이터베이스는 해당 컬럼을 기준으로 테이블의 모든 데이터를 읽어야 하므로 풀스캔이 발생.
-   - 인덱스를 무시할 때 
-     - 쿼리에서 인덱스를 사용하지 않도록 유도할 수 있는 힌트나 조건이 있을 때, DB는 인덱스를 사용하지 않고 풀스캔 실행가능.
-   - 전체 테이블을 조회하는 경우
-     - SELECT * FROM 테이블명처럼 전체 데이터 조회 쿼리 실행 시 데이터베이스는 테이블의 모든 행을 가져오기 위해 풀스캔을 사용.
-   - 필터 조건이 불효율적일 때
-     - WHERE 절에 사용된 조건이 대부분의 행에 대해 참이어서 인덱스를 사용하는 것보다 풀스캔이 더 효율적일 경우에도 풀스캔 발생가능.
+   1) 인덱스가 없을 때   
+      쿼리에서 사용한 컬럼에 인덱스가 없다면, 데이터베이스는 해당 컬럼을 기준으로 테이블의 모든 데이터를 읽어야 하므로 풀스캔이 발생.
+   2) 인덱스를 무시할 때    
+      쿼리에서 인덱스를 사용하지 않도록 유도할 수 있는 힌트나 조건이 있을 때, DB는 인덱스를 사용하지 않고 풀스캔 실행가능.
+   3) 전체 테이블을 조회하는 경우   
+      SELECT * FROM 테이블명처럼 전체 데이터 조회 쿼리 실행 시 데이터베이스는 테이블의 모든 행을 가져오기 위해 풀스캔을 사용.
+   4) 필터 조건이 불효율적일 때   
+      WHERE 절에 사용된 조건이 대부분의 행에 대해 참이어서 인덱스를 사용하는 것보다 풀스캔이 더 효율적일 경우에도 풀스캔 발생가능.
 
 2. 풀스캔의 문제점
-   - 성능 저하
-     - 테이블에 데이터가 많을 경우, 풀스캔은 모든 행을 읽어야 하므로 성능저하.
-   - 리소스 사용
-     - CPU와 I/O 자원을 많이 사용하게 되어 서버의 성능에 부하를 줄 수 있음.
+   1) 성능 저하   
+      테이블에 데이터가 많을 경우, 풀스캔은 모든 행을 읽어야 하므로 성능저하.
+   2) 리소스 사용   
+      CPU와 I/O 자원을 많이 사용하게 되어 서버의 성능에 부하를 줄 수 있음.
 
 3. 풀스캔을 방지하는 방법
-   - 적절한 인덱스 사용
-     - 자주 쿼리에서 사용되는 컬럼에 인덱스를 추가하여 인덱스를 통한 검색을 유도.
-   - 쿼리 최적화
-     - 조건을 최적화하여 인덱스를 잘 활용할 수 있도록 함.
-   - 테이블 파티셔닝
-     - 데이터 양이 너무 많을 경우, 테이블을 파티셔닝하여 부분적으로 데이터를 나누어 관리가능.
+    1) 적절한 인덱스 사용   
+       자주 쿼리에서 사용되는 컬럼에 인덱스를 추가하여 인덱스를 통한 검색을 유도.
+    2) 쿼리 최적화   
+       조건을 최적화하여 인덱스를 잘 활용할 수 있도록 함.
+    3) 테이블 파티셔닝   
+       데이터 양이 너무 많을 경우, 테이블을 파티셔닝하여 부분적으로 데이터를 나누어 관리가능.
 
 4. 풀스캔이 유리한 경우
    - 데이터의 양이 적을 때
@@ -872,6 +915,7 @@ public class Order {
 
 
 ---
+## 인덱스
 ### < 대용량 데이터에서 인덱싱을 통한 성능 최적화 >
 1. 인덱스
    - 인덱스는 **테이블의 특정 컬럼에 대한 검색을 빠르게 하기 위한 데이터 구조.**
@@ -894,16 +938,16 @@ public class Order {
 3. 인덱스의 종류
    - 인덱스는 여러 종류가 있으며, 각각의 경우에 따라 성능 최적화 방식 상이.
    - 주요 인덱스 종류
-     1. B-Tree 인덱스
+     1) B-Tree 인덱스
         - 가장 일반적으로 사용되는 인덱스 형태
         - 범위검색(ex) 가격 범위)과 정렬된 데이터에 최적화.
-     2. Hash 인덱스
+     2) Hash 인덱스
         - 주로 등가 비교(=)에 최적화된 인덱스.
         - 값이 정확히 일치하는 데이터를 빠르게 찾을 수 있음.
-     3. Bitmap 인덱스
+     3) Bitmap 인덱스
         - 작은 데이터셋에 대해 효과적인 인덱스
         - 다중 조건 검색에 유리.
-     4. GiST (Generalized Search Tree) 인덱스
+     4) GiST (Generalized Search Tree) 인덱스
         - 공간 검색(ex)위치 기반 검색)이나 비정형 데이터에 최적화된 인덱스.
    > 가격 필터링을 위한 인덱스 예시
    >
@@ -922,36 +966,54 @@ public class Order {
      ~~~
 
 5. 인덱스의 장점
-   - 검색 성능 향상
-     - 인덱스는 데이터를 빠르게 찾을 수 있게 도움.
-   - 정렬 성능 향상
-     - 데이터베이스에서 데이터를 정렬하는 쿼리도 인덱스를 활용해 더 효율적으로 처리.
-   - 범위 쿼리 최적화
-     - 범위 기반 검색(ex) 가격 범위, 날짜 범위)을 매우 빠르게 처리가능.
+   1) 검색 성능 향상   
+      인덱스는 데이터를 빠르게 찾을 수 있게 도움.
+   2) 정렬 성능 향상   
+      데이터베이스에서 데이터를 정렬하는 쿼리도 인덱스를 활용해 더 효율적으로 처리.
+   3) 범위 쿼리 최적화   
+      범위 기반 검색(ex) 가격 범위, 날짜 범위)을 매우 빠르게 처리가능.
 
 6. 인덱스의 단점
-   - 디스크 공간 사용
-     - 인덱스는 별도의 공간을 차지.
-     - 많은 인덱스를 생성하면 디스크 공간이 많이 소모될 수 있음.
-   - 쓰기 성능 저하
-     - 데이터베이스에 **데이터를 삽입, 수정, 삭제할 때마다 인덱스를 갱신**해야 하므로 쓰기 성능이 떨어질 수 있음.
-   - 과도한 인덱스 생성
-     - 너무 많은 인덱스를 생성하면 **관리가 복잡**해지고, **성능이 저하**될 수 있음.
+   1) 디스크 공간 사용   
+      - 인덱스는 별도의 공간을 차지.
+      - 많은 인덱스를 생성하면 디스크 공간이 많이 소모될 수 있음.
+   2) 쓰기 성능 저하   
+      데이터베이스에 **데이터를 삽입, 수정, 삭제할 때마다 인덱스를 갱신**해야 하므로 쓰기 성능이 떨어질 수 있음.
+   3) 과도한 인덱스 생성   
+      너무 많은 인덱스를 생성하면 **관리가 복잡**해지고, **성능이 저하**될 수 있음.
 
 7. 인덱스 사용 시 주의사항
-   - 필요한 컬럼에만 인덱스 생성
-     - 모든 컬럼에 인덱스를 생성하는 것이 아니라, **실제로 자주 검색되는 검색 조건에 해당하는 컬럼에만 인덱스를 생성**하는 것이 좋음.
-   - 쿼리 성능 모니터링 후 불필요 인덱스 제거
-     - 인덱스를 생성하고 나서 실제로 쿼리 성능이 어떻게 달라지는지 모니터링하고, 불필요한 인덱스는 삭제하는 것이 중요합.
-   - 복합 인덱스
-     - 여러 컬럼을 동시에 자주 검색하는 경우, 복합 인덱스를 사용하는 시 성능 향상가능.
-     > 가격과 카테고리로 동시에 검색하는 경우
-     > ~~~
-     > CREATE INDEX idx_price_category ON products(price, category);
-     > ~~~
+   1) 필요한 컬럼에만 인덱스 생성   
+      모든 컬럼에 인덱스를 생성하는 것이 아니라, **실제로 자주 검색되는 검색 조건에 해당하는 컬럼에만 인덱스를 생성**하는 것이 좋음.
+   2) 쿼리 성능 모니터링 후 불필요 인덱스 제거   
+      인덱스를 생성하고 나서 실제로 쿼리 성능이 어떻게 달라지는지 모니터링하고, 불필요한 인덱스는 삭제하는 것이 중요합.
+   3) 복합 인덱스   
+      여러 컬럼을 동시에 자주 검색하는 경우, 복합 인덱스를 사용하는 시 성능 향상가능.
+      > 가격과 카테고리로 동시에 검색하는 경우
+      > ~~~
+      > CREATE INDEX idx_price_category ON products(price, category);
+      > ~~~
 
 
----
+### < 인덱스와 PK >
+- 기본 키(Primary Key, PK)는 인덱스 역할을 수행.
+- 실제로 대부분의 데이터베이스에서는 Primary Key가 자동으로 클러스터드 인덱스(Clustered Index)를 생성.
+
+1. 인덱스와 PK의 관계
+   - Primary Key는 각 레코드의 고유성을 보장하고, 이를 통해 조회 성능 향상.
+   - 대부분의 데이터베이스 시스템에서 Primary Key는 자동으로 인덱스가 생성되며 이 인덱스는 기본적으로 클러스터드 인덱스임.
+   - 데이터베이스 내의 실제 데이터 행들이 해당 인덱스의 순서대로 저장됨.
+
+2. 인덱스와 PK의 차이
+   1) PK
+      - 기본적으로 고유성을 보장하기 위한 제약 조건.
+      - 기본적으로 NULL 값을 허용하지 않으며, 데이터의 고유한 식별자로 사용.
+      - PK는 이미 인덱스를 가지고 있기 때문에 별도로 추가적인 인덱스를 만들지 않아도 됨.
+    2) 인덱스
+       - 데이터베이스에서 검색 성능을 최적화하기 위해 사용하는 자료 구조.
+       - 기본 키뿐만 아니라, 다른 컬럼에도 인덱스를 추가가능.
+
+
 ### < 복합 인덱스 >
 > 복합 인덱스는 하나 이상의 컬럼을 동시에 자주 조회하는 쿼리에서 성능을 크게 향상시킬 수 있는 합리적인 선택.
 > 각각의 인덱스를 만드는 것보다 복합 인덱스를 사용하는 것이 더 효율적. 
@@ -1000,7 +1062,6 @@ public class Order {
     너무 많은 인덱스는 데이터 삽입, 수정, 삭제 시 성능을 저하 가능성 있음.
 
 
----
 ### < LIKE 검색과 인덱스 >
 > 인덱스 컬럼을 활용한 검색 최적화
 > LIKE 연산자 대신 = 연산자나 BETWEEN 등으로 검색 범위를 좁히는 방식이 성능이 더 좋을 수 있음.
@@ -1034,7 +1095,6 @@ public class Order {
    ~~~
 
 
----
 ### < JPA 인덱스 생성 >
 - JPA에서 인덱스를 생성하려면 @Table 어노테이션과 함께 **@Index 어노테이션을 사용**하여 
   엔티티 클래스의 필드에 인덱스를 정의해 엔티티에 대한 **테이블 생성 시 인덱스를 지정가능.**
@@ -1072,27 +1132,6 @@ public class Order {
   ~~~
   
 
----
-### < 인덱스와 PK >
-- 기본 키(Primary Key, PK)는 인덱스 역할을 수행. 
-- 실제로 대부분의 데이터베이스에서는 Primary Key가 자동으로 클러스터드 인덱스(Clustered Index)를 생성.
-
-1. 인덱스와 PK의 관계
-   - Primary Key는 각 레코드의 고유성을 보장하고, 이를 통해 조회 성능 향상.
-   - 대부분의 데이터베이스 시스템에서 Primary Key는 자동으로 인덱스가 생성되며 이 인덱스는 기본적으로 클러스터드 인덱스임. 
-   - 데이터베이스 내의 실제 데이터 행들이 해당 인덱스의 순서대로 저장됨.
-
-2. 인덱스와 PK의 차이
-   - PK
-     - 기본적으로 고유성을 보장하기 위한 제약 조건. 
-     - 기본적으로 NULL 값을 허용하지 않으며, 데이터의 고유한 식별자로 사용.
-     - PK는 이미 인덱스를 가지고 있기 때문에 별도로 추가적인 인덱스를 만들지 않아도 됨.
-   - 인덱스
-     - 데이터베이스에서 검색 성능을 최적화하기 위해 사용하는 자료 구조. 
-     - 기본 키뿐만 아니라, 다른 컬럼에도 인덱스를 추가가능.
-     
-
----
 ### < 클러스티드 인덱스와 넌클러스티드 인덱스 >
 - 데이터베이스에서 인덱스의 두 가지 주요 유형이 클러스터드 인덱스와 비클러스터드 인덱스.
 - 데이터가 저장되는 방식과 쿼리 성능에 미치는 영향에 따라 상이함.
@@ -1100,16 +1139,16 @@ public class Order {
 1. **클러스터드 인덱스** (Clustered Index)
    > 클러스터드 인덱스는 데이터를 실제로 정렬하는 방식이기 때문에 데이터가 많이 변경되지 않고 조회가 범위 기반일 때 유리.
    > 테이블에서 주요 식별자로 자주 사용되는 컬럼에 대해 사용합니다. 보통 Primary Key나 Unique Key 필드에 사용.
-   - 물리적인 정렬
-     - 데이터는 클러스터드 인덱스의 순서대로 저장되기 때문에, 인덱스와 데이터가 같은 구조를 가짐.
-     - 데이터가 인덱스 순서대로 물리적으로 저장되는 방식으로 **저장 순서를 결정.**
-   - 하나의 테이블에 하나만 존재
-     - 각 테이블은 하나의 클러스터드 인덱스만 가질 수 있음. (클러스티드 인덱스 = PK)
-   - 수정 비용 발생 가능
-     - 데이터를 삽입하거나 수정할 때 인덱스를 유지하기 위해 데이터를 재정렬해야 하므로 비용이 발생가능.
-     - 수정 시 영향을 줄 수 있지만 조회 성능 향상가능.
-   - 빠른 범위 조회
-     - WHERE 절에 **범위 조건(BETWEEN, >=, <=)을 사용하는 쿼리에서 매우 빠르게 동작.**
+   1) 물리적인 정렬
+      - 데이터는 클러스터드 인덱스의 순서대로 저장되기 때문에, 인덱스와 데이터가 같은 구조를 가짐.
+      - 데이터가 인덱스 순서대로 물리적으로 저장되는 방식으로 **저장 순서를 결정.**
+   2) 하나의 테이블에 하나만 존재   
+      각 테이블은 하나의 클러스터드 인덱스만 가질 수 있음. (클러스티드 인덱스 = PK)
+   3) 수정 비용 발생 가능
+      - 데이터를 삽입하거나 수정할 때 인덱스를 유지하기 위해 데이터를 재정렬해야 하므로 비용이 발생가능.
+      - 수정 시 영향을 줄 수 있지만 조회 성능 향상가능.
+   4) 빠른 범위 조회   
+      WHERE 절에 **범위 조건(BETWEEN, >=, <=)을 사용하는 쿼리에서 매우 빠르게 동작.**
    
 2. **비클러스티드 인덱스** (Non-clustered Index)
    > 비클러스터드 인덱스는 특정 컬럼에 대한 빠른 검색을 지원하며, 여러 개를 만들 수 있기 때문에 다양한 쿼리 성능 최적화에 유용.
@@ -1132,21 +1171,4 @@ public class Order {
    ~~~ 
    CREATE INDEX idx_username ON Users (username);   -- 비클러스터드 인덱스
    ~~~
-
-
----
-### < 쿼리 검색성능 개선하기 >
-- 추후 반영해서 구현해볼 것
-- 참고블로그   
-  https://velog.io/@juhyeon1114/MySQL-%EA%B2%80%EC%83%89-%EC%84%B1%EB%8A%A5-%EA%B0%9C%EC%84%A0%ED%95%98%EA%B8%B0-like%EC%99%80-full-text-search
-
-
-### < 쿼리 정확도순 정렬하기 >
-- like로 검색 후 유사한 결과 먼저 정렬하기
-    - 참고블로그   
-      https://blog.naver.com/rorean/221566107729
-
-- like 검색의 단점과 FullTextSearch (10000건 정도되면 like검색과 차이난다고 함.)
-    - 참고블로그
-      https://annajin.tistory.com/218
 

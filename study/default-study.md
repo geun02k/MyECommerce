@@ -3,6 +3,50 @@
 
 
 ---
+## <목차>
+1. Spring
+   - Spring core
+   - 스프링부트 의존성추가 키워드
+   - Spring 어노테이션
+2. 라이브러리
+   - 매핑 라이브러리 MapStruct
+   - 유효성 검사 라이브러리 validation
+3. 유효성 검증
+   - 검증관련처리
+   - 유효성검사 정규식
+   - 비밀번호 유효성검사 정규식
+4. git 사용하기
+   - slack과 github 연동
+   - git push 내역 되돌리기
+5. 데이터베이스
+   - Mysql 데이터타입 결정 
+   - 데이터베이스의 커서(Cursor)
+   - 커서의 hasNext(), isClosed()
+   - 커서가 닫힌 것과 읽을 데이터가 없는 것
+6. DTO
+   - DTO, VO, MODEL 차이
+   - 도메인과 DTO
+   - 요청과 응답으로 DTO 사용해야하는 이유
+   - request, response DTO 분리
+7. 인터페이스
+   - 인터페이스 사용 이유
+   - 인터페이스와 추상화 클래스의 차이
+   - service, service impl 분리하지 않는 이유
+8. 예외처리
+9. JWT 이용한 로그아웃
+10. 로그 레벨 결정
+11. 상수 선언
+12. Enum값 비교 연산자
+13. Pageable
+    - Pageable - 페이지 기능을 지원 
+    - Pageable 페이지, 사이즈 디폴트값 지정
+14. Controller 메서드 파라미터
+    - Controller에서 @RequestParam을 DTO로 받는 이유 
+    - 스프링 MVC 파라미터 바인딩 (컨트롤러에서 파라미터값 받는 방법) 
+
+
+---
+## 1. Spring
 ### < Spring core >
 1. Spring Core
     - Spring Framework의 핵심 모듈로, 애플리케이션 개발에 필요한 기본적인 기능들을 제공.
@@ -30,8 +74,7 @@
         - Spring Core는 객체의 생성, 초기화, 소멸 등의 생명 주기를 관리하며, 객체가 필요한 자원을 효율적으로 관리할 수 있도록 도와줍니다.
 
 
----
-### < 스프링부트 의존성추가 >
+### < 스프링부트 의존성추가 키워드 >
 1. Gradle에서 종속성 추가 시 사용가능한 키워드
    - dependencies 
      - Gradle에서 종속 항목을 추가할 때 사용하는 키워드.
@@ -54,19 +97,50 @@
        ex) Lombok 같은 라이브러리들이 컴파일 시 애너테이션을 처리하는 데 사용됨.
      - 런타임 시에는 필요하지 않으며, 컴파일 타임에만 필요한 의존성을 지정할 때 사용됨.
      - 코드 생성이나 바이트코드 수정을 담당하는 툴들에 필요.
-
-   - Lombok         
-        
-         // Lombok 애너테이션을 처리하기 위해 컴파일 시 애너테이션 프로세서를 추가   
-         compileOnly 'org.projectlombok:lombok'   
-         annotationProcessor 'org.projectlombok:lombok'   
-     - Lombok은 @Getter, @Setter 등의 어노테이션에 대해 **컴파일 시에 자동으로 메서드 생성.**
+   - 사용 예시   
+     Lombok   
+     Lombok은 @Getter, @Setter 등의 어노테이션에 대해 **컴파일 시에 자동으로 메서드 생성.**
+     ~~~
+     // Lombok 애너테이션을 처리하기 위해 컴파일 시 애너테이션 프로세서를 추가   
+     compileOnly 'org.projectlombok:lombok'   
+     annotationProcessor 'org.projectlombok:lombok'   
+     ~~~
 
 3. org.springframework.boot:spring-boot-starter-web 의존성추가
    - 참고블로그 https://priming.tistory.com/144
 
 
+### < Spring 어노테이션 >
+1. @RequestHeader
+    - public @interface RequestHeader.java 파일 오픈해서 확인.
+    - 메서드 매개변수가 웹 요청 헤더에 바인딩되어야 함을 나타내는 애너테이션.
+    - 매서드 매개변수가 Map<String, String>, MultiValueMap<String, Strng>, HttpHeaders 이면 Map은 모든 헤더 이름과 값으로 채워짐.
+   ~~~
+    @PostMapping("/signout")
+    public ResponseEntity<String> signOut(@RequestHeader Map<String, String> headers) {
+        String authority = headers.get("authorization");
+        // ...
+    }
+   ~~~
+    1. @Name
+        - The name of the request header to bind to.   
+          요청 헤더에 바인딩할 이름 선택가능.
+       ~~~
+         @PostMapping("/signout")
+         public ResponseEntity<String> signOut(@RequestHeader @Name("Authorization") String authorization) {
+             // ...
+         }
+       ~~~
+    2. Spring core에 있는 상수를 사용
+     ~~~
+       public ResponseEntity<String> signOut(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+           // ...
+       } 
+     ~~~
+
+
 ---
+## 2. 라이브러리
 ### < 매핑 라이브러리 MapStruct >
 - MapStruct
     - 자바 Bean 매핑 라이브러리로, 컴파일 타임에 매핑 코드를 자동으로 생성.    
@@ -93,7 +167,6 @@
    ~~~
   
 
----
 ### < 유효성 검사 라이브러리 validation >
 1. 작동방식
    - 지원하는 어노테이션으로 클래스의 필드에 대한 제약조건을 정의.
@@ -321,12 +394,13 @@
    ~~~
 
 7. 프로그래밍 방식으로 검증   
-   - 하단의 링크 참조      
-     - https://reflectoring.io/bean-validation-with-spring-boot/
+   - 하단의 링크 참조         
+     https://reflectoring.io/bean-validation-with-spring-boot/
 
 
 ---
-### < 검증관련처리 >
+## 3. 유효성 검증
+### < 검증관련처리 > 
 1. DTO에서 처리
    > 단순한 검증 로직은 DTO에서 @Valid 어노테이션을 사용.   
      기본적인 @NotNull, @Size, @Pattern 등의 검증 어노테이션으로 처리하는 것이 더 효율적.
@@ -401,11 +475,45 @@
      - DTO의 필드에 대해 간단한 유효성 검증은 @NotBlank, @Size 등의 내장 어노테이션을 사용하면 되지만, 비즈니스 로직에서 필요로 하는 복잡한 검증은 사용자 정의 어노테이션으로 처리하기 어려운 경우가 있을 수 있습니다.
 
 
+### < 유효성검사 정규식 >
+- ^[a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ0-9\s]+$
+    - ^ : 문자열의 시작을 의미합니다.
+    - [ ] : 대괄호 안의 모든 문자는 허용된 문자 범위입니다.
+    - a-zA-Z : 영어 대소문자 (a부터 z까지, A부터 Z까지).
+    - 가-힣 : 한글 완성형 글자 (한글 음절).
+    - ㄱ-ㅎ : 한글 자음 (초성).
+    - ㅏ-ㅣ : 한글 모음.
+    - 0-9 : 숫자 (0부터 9까지).
+    - \s : 공백 문자 (스페이스, 탭, 줄 바꿈 등).
+    - + : 앞의 패턴이 하나 이상 반복되는 것을 허용합니다.
+    - $ : 문자열의 끝을 의미합니다.
+    - * : 앞의 패턴이 0개 이상 반복되는 것을 허용합니다.
+
+### < 비밀번호 유효성검사 정규식 >
+- (?= ...)
+    - 긍정형 전방 탐색(lookahead)를 의미하며 특정 패턴이 뒤따라야 한다는 조건을 확인하지만, 문자열에서 그 부분을 소비하지(매칭으로 소모하지) 않습니다.
+- (?=.[!@#$%^+=-])
+    - 문자열에 하나 이상의 지정된 특수 문자가 포함되어 있는지 확인합니다.
+- 정규식 참고블로그 https://gocoding.tistory.com/93
+- 참고블로그 https://ddyes.tistory.com/6
+- 참고블로그 https://kin.naver.com/qna/detail.naver?d1id=1&dirId=1040202&docId=468186271&enc=utf8&kinsrch_src=pc_nx_kin&qb=7KCV6rec7ZGc7ZiE7Iud&rank=1&search_sort=0&section=kin.qna_ency_cafe&spq=0
+- 비밀번호 추가 유효성검사
+    ~~~
+    // ~!@#$%^&*-=_+ 특수문자 중 1개 필수포함
+    String pwPattern = "(?=.[~!@#$%^&*-=_+])";
+    if(!(Pattern.matches(pwPattern, member.getPassword()))) {
+        System.out.println("비밀번호에 특수문자 ~ ! @ # $ % ^ & * - = _ + 중 하나를 필수 포함해야합니다.");
+        return false;
+    }
+    // 연속으로 동일문자 3번 반복 불가
+    ~~~
+
+
 ---
+## 4. git 사용하기
 ### < slack과 github 연동 >
 - 참고블로그 : https://sepiros.tistory.com/37
 
----
 ### < git push 내역 되돌리기 >
 1. 로그내역 조회 명령어
    - git log --oneline
@@ -434,1016 +542,11 @@
 
 
 ---
+## 5. 데이터베이스
 ### < Mysql 데이터타입 결정 >
 - 참고블로그 https://dev-coco.tistory.com/54
 
----
-### < DTO, VO, MODEL 차이 >
-https://010562.tistory.com/11
-https://velog.io/@chae_ag/Model-DTO-VO-DAO-%EA%B0%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80%EC%9A%94
 
----
-### < 유효성검사 정규식 >
-- ^[a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ0-9\s]+$
-  - ^ : 문자열의 시작을 의미합니다.
-  - [ ] : 대괄호 안의 모든 문자는 허용된 문자 범위입니다.
-  - a-zA-Z : 영어 대소문자 (a부터 z까지, A부터 Z까지).
-  - 가-힣 : 한글 완성형 글자 (한글 음절).
-  - ㄱ-ㅎ : 한글 자음 (초성).
-  - ㅏ-ㅣ : 한글 모음.
-  - 0-9 : 숫자 (0부터 9까지).
-  - \s : 공백 문자 (스페이스, 탭, 줄 바꿈 등).
-  - + : 앞의 패턴이 하나 이상 반복되는 것을 허용합니다.
-  - $ : 문자열의 끝을 의미합니다.
-  - * : 앞의 패턴이 0개 이상 반복되는 것을 허용합니다. 
-- 
-
-### < 비밀번호 유효성검사 정규식 >
-- (?= ...)
-    - 긍정형 전방 탐색(lookahead)를 의미하며 특정 패턴이 뒤따라야 한다는 조건을 확인하지만, 문자열에서 그 부분을 소비하지(매칭으로 소모하지) 않습니다.
-- (?=.[!@#$%^+=-])
-    - 문자열에 하나 이상의 지정된 특수 문자가 포함되어 있는지 확인합니다.
-- 정규식 참고블로그 https://gocoding.tistory.com/93
-- 참고블로그 https://ddyes.tistory.com/6
-- 참고블로그 https://kin.naver.com/qna/detail.naver?d1id=1&dirId=1040202&docId=468186271&enc=utf8&kinsrch_src=pc_nx_kin&qb=7KCV6rec7ZGc7ZiE7Iud&rank=1&search_sort=0&section=kin.qna_ency_cafe&spq=0
-- 비밀번호 추가 유효성검사
-    ~~~
-    // ~!@#$%^&*-=_+ 특수문자 중 1개 필수포함
-    String pwPattern = "(?=.[~!@#$%^&*-=_+])";
-    if(!(Pattern.matches(pwPattern, member.getPassword()))) {
-        System.out.println("비밀번호에 특수문자 ~ ! @ # $ % ^ & * - = _ + 중 하나를 필수 포함해야합니다.");
-        return false;
-    }
-    // 연속으로 동일문자 3번 반복 불가
-    ~~~
-
-
----
-### < service, service impl 분리하지 않는 이유 >
-- 참고블로그 https://zhfvkq.tistory.com/76
-
-spring은 객체간의 의존성을 관리해주는데 이 의존성은 테스트 코드 단위테스트를 작성할때 문제가 생긴다.    
-의존성을 가지는 다른 객체에 의해 테스트 결과가 영향을 받는다.    
-그래서 내가 원하는 동작만 하도록 하는것이 Mock 객체다.    
-이를 편하게 사용하도록 지원하는것이 Mockito 이다.    
-
-Service와 ServiceImpl 구조를 사용하면 단위 테스트가 어려울 수 있다.    
-이 구조를 사용하면 Service 인터페이스와 ServiceImpl 구현체를 모두 생성해야 하므로 테스트 코드를 작성하기 어렵다.    
-또한, 구현체와 인터페이스 간의 의존성이 높아져 테스트 케이스 작성이 복잡해질 수 있다.     
-결론적으로 Service ServiceImpl 구조를 사용해야 할까?    
-OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 원칙 때문에 사용한다. 보통 흔히 얘기하는 느슨한 결합 혹은 유연해지도록 설계하기 위해 사용된다.    
-그렇다면 Spring에서 Service는 다형성이 필요한가?    
-우리가 사용하는 대부분의 Service는 하나의 Service가 여러 개의 SerivceImpl을 가지고 있는 경우가 아닌 1:1 구조를 띄고 있다.    
-그러므로 Service를 사용하고, 추후 다형성이 필요해지면 그때 해당 Service에 대해서 인터페이스를 적용해도 늦지 않는 것 같다.    
-
-
---- 
-### < 테스트코드 >
-- MyECommerceApplicationTests.java   
-  스프링 어플리케이션이 뜨는지를 테스트해주는 기본적으로 내장되어있는 test코드.   
-  서버가 실행중일 떄 테스트코드를 실행하면 redis 포트를 사용하고있다고 에러가 발생한다.   
-  그래서 전체 테스트 시 AccountApplicationTests이 포함되어있고 서버가 실행중이라면
-  스프링 어플리케이션 서버를 종료해야 AccountApplicationTests 에러가 발생하지 않는다.  
-
-- main함수가 아니지만 실행가능한 이유 : Junit 프레임워크가 대신 실행해주기 때문.
-
-1. @SpringBootTest나 @WebMvcTest 어노테이션 미사용 시 (단위테스트)
-   - Spring 애플리케이션의 빈이나 컨텍스트를 로드하지 않고, 단위 테스트 시 @WebMvcTest나 @SpringBootTest 불필요.
-   - JUnit 5는 기본적으로 SpringRunner(또는 @ExtendWith(SpringExtension.class))와 함께 사용할 때 Spring이 제공하는 기능들을 활성화. 
-   - @SpringBootTest나 @WebMvcTest를 사용하지 않으면, **단위테스트**로만 실행가능.
-   - 단위테스트 실행
-     - @Test 어노테이션을 사용한 메서드는 Spring 컨텍스트를 로드하지 않고도 실행.
-     - 빈 주입이 필요 없다면 @Autowired나 @MockBean 같은 어노테이션을 사용하지 않고, 
-       @Mock을 사용해서 수동으로 객체를 만들어 테스트 가능.
-   - @WebMvcTest, @SpringBootTest를 사용하지 않으면 기본적으로 컨트롤러, 서비스, 레포지토리 등이 로드되지 않음. 
-     그 대신 @Mock이나 @InjectMocks를 사용하여 필요한 객체들을 직접 주입하여 테스트. 따라서 빈 로딩 없음.
-   - 특정 객체만 테스트하고자 할 때, @Mock으로 의존성 객체들을 수동으로 모킹하여 컨텍스트를 로드하지 않고도 테스트 가능.
-
-2. @SpringBootTest (애플리케이션 통합테스트)
-    - 애플리케이션 전체가 제대로 통합되어 동작하는지 확인하고 싶은 경우 사용.
-    - 테스트 실행 시 전체 애플리케이션이 로드되기 때문에 속도가 느릴 수 있음.
-    - @SpringBootTest를 사용 시 Spring 컨텍스트가 로드되고 애플리케이션의 전체 빈을 활용하여 **통합테스트** 가능.
-    - 애플리케이션의 전체 빈을 로드하고, 실제 서비스, 리포지토리, 데이터베이스, 웹 계층 등이 잘 연결되고 동작하는지 확인.
-    - 통합 테스트를 통해 시스템의 다양한 레이어가 서로 잘 동작하는지 검증.
-    - springboot context loader를 실제 어플리케이션처럼 테스트용으로 만들어줌.
-    - context(설정 등)를 실제 환경과 동일하게 모든 기능을 생성해 빈들을 등록한 것을 이용해 테스트 가능하므로 의존성 주입을 이용해 테스트가능.
-      ~~~
-      private AccountService accountService = new AccountService(new AccountRepository());
-      ~~~
-      위와같이 작성하지 않고 아래와 같이 작성.
-      ~~~
-      @Autowired
-      private AccountService accountService;
-      ~~~
-    - org.springframework.boot:spring-boot-starter-test 에 포함된 기능.
-
-3. @WebMvcTest (웹 계층 통합테스트)
-   - 웹 계층(컨트롤러)만 테스트할 때 사용.   
-     주로 컨트롤러, 필터, 인터셉터 등과 관련된 동작을 확인할 때 사용.
-   - HTTP 요청과 컨트롤러 간의 상호작용을 테스트.
-   - 컨트롤러와 관련된 빈만 로드하며, 서비스나 리포지토리 같은 비즈니스 계층은 mocking을 통해 가짜 객체로 대체.
-   - 기존 @WebMvcTest 어노테이션을 사용하면 MockMvc를 자동 생성해 주입해주었지만
-     스프링부트 3.4 버전 이후로는 직접 MockMvc를 생성해주어야 하므로 해당 어노테이션은 사실상 아무런 역할도 하지 않음.
-
-
-### < 테스트코드작성 mocking >
-- Mock을 사용해 테스트 하는 이유
-  - 동일 테스트코드를 함께 실행해도 하나는 성공하고 하나는 실패하는 문제 해결가능.   
-  - DB에 데이터가 바뀌든 의존하고 있는 repository의 로직이 변경되든 관계없이 내가 맡은 역할만 테스트가능.
-
-- given-when-then(BDD 스타일) 패턴
-    - 테스트는 given-when-then(BDD 스타일) 패턴으로 작성한다.
-    1. 예상 동작 정의
-        - willReturn(),willThrow() 등 메서드를 통해 mock 객체(userRepositoy)의 예상 동작을 미리 정의해준다.
-    2. exception을 검사
-        - assertThrows와 함께 사용하면 된다.
-    3. 메서드 호출 여부 검증
-        - should() 메서드로 해당 메서드가 제대로 호출되었는지 검증한다.
-
-- Mockito 와 BDDMockito 라이브러리
-  1. Mockito
-     - JAVA 오픈소스 프레임워크로 단위테스트를 위해 모의 객체(Mock Object)를 생성하고 관리하는데 사용.
-     - 모의 객체를 생성하여 모의 객체의 행위를 정의함으로써 의존 객체로부터 독립적으로 테스트를 수행가능.
-  2. BDDMockito (BDD, Behavior Driven Development)
-     - BDD 스타일을 따름.
-     - 테스트 코드의 가독성을 높이기 위해 given-when-then 패턴을 따름.
-  - 참고블로그 https://soso-shs.tistory.com/109
-
-- 참고블로그 https://soonmin.tistory.com/85
-
-1. Mock
-   - mock 객체를 생성.
-   - mock으로 생성된 모의 객체는 stub을 통해 예상동작 정의가능.
-   
-   1. 명시적으로 mock 객체 생성
-      - 테스트 메서드 내에서 직접 mock 객체를 생성하고 사용.
-      - Mockito.mock() 방식은 더 세밀하게 제어가능.
-      ~~~
-       @Test
-       void createMock() {
-           // Mockito.mock(UserService.class) : UserService 타입의 mock 객체 생성
-           // 생성된 mock 객체는 createMock() 테스트 메서드 내에서만 사용됨.
-       
-           UserService mockUserService = Mockito.mock(UserService.class);
-       }
-      ~~~
-      
-   2. @Mock 어노테이션을 이용해 객체를 자동으로 mock 처리
-      - 클래스 레벨에서 필드로 선언한 후 **해당 객체를 직접 초기화하지 않고** Mockito가 자동으로 mock 객체를 주입.
-      - @Mock은 코드가 깔끔.
-      - 여러 테스트 메서드에서 동일한 mock 객체를 공유할 수 있어 편리.
-      - @Mock 어노테이션 사용 시 MockitoAnnotations.initMocks(this)를 사용해 어노테이션을 초기화 필수.
-      - 최신 버전의 Mockito에서는 **@ExtendWith(MockitoExtension.class)**를 사용해 초기화 가능.
-      ~~~
-       @Mock
-       UserService mockUserService;
-      ~~~
-
-2. Stub
-   - 생성된 mock 객체의 예상 동작 정의
-   - 아래의 두 구문은 동일한 기능 수행.
-   1. **given().willReturn()**
-      - given()은 Mockito 2.x 버전부터 BDDMockito 스타일로 도입된 구문.
-      - given-when-then 스타일의 테스트 코드 작성 시 선호.
-      - stub(가설) : 생성된 mock 객체의 예상 동작을 정의 (mock 객체 리턴내용 지정)
-      ~~~
-      given(memberRepository.findByTel1AndTel2AndTel3(any(), any(), any()))
-           .willReturn(Optional.empty());
-      ~~~
-   2. when().thenReturn()
-      - when()은 Mockito 1.x 버전부터 존재하는 기본적인 구문.
-      - 일반적으로 사용.
-      ~~~
-      User user = new User("mockUser", 30, false);
-      when(mockUserService.getUser()).thenReturn(user);
-      ~~~
-
-3. Spy
-   - Spy로 만든 mock 객체는 원본 동작을 유지 또는 새로운 정의 가능.
-   - 실제 객체를 감싸서 해당 객체의 메서드를 모니터링하거나, 특정 메서드만 스텁(stub)하거나 모킹(mocking) 가능하게 함.
-   - Stub 하지 않으면 원본 동작대로 실행.
-     ~~~
-     @Test
-     void mockTest2() {
-         UserService mockUserService = Mockito.spy(UserService.class); // spy
-         User realUser = mockUserService.getUser();
-
-         assertThat(realUser.getName()).isEqualTo("realUser");
-     }   
-     ~~~
-   - Stub 을 해주면 정의한 동작대로 실행.
-     ~~~
-     @Test
-     void mockTest1() {
-         UserService mockUserService = Mockito.spy(UserService.class); // spy
-         User user = new User("mockUser", 30, false);
-         when(mockUserService.getUser()).thenReturn(user);
-
-         User mockUser = mockUserService.getUser();
-
-         assertThat(mockUser.getName()).isEqualTo("mockUser");
-     }
-     ~~~
-   1. 명시적으로 Spy로 mock 객체 생성
-   2. @Spy
-   
-4. Verification
-   - mock 객체의 메서드 호출을 확인하는 것을 의미
-   ~~~
-   @Test
-   void mockTest1() {
-       UserService mockUserService = Mockito.mock(UserService.class);
-       mockUserService.getUser();
-
-      // verification (1회 호출 검증)
-      verify(mockUserService).getUser();  
-      
-      // Verification (2회 호출 검증)
-      // verify(mockUserService, times(2)).getUser();
-   }
-   ~~~
-
-- @ExtendWith(MockitoExtension.class)
-   - 애너테이션이 적용된 클래스는 **Mockito의 기능을 자동으로 활성화.**
-   - 필드에 있는 @Mock, @InjectMocks 등은 Mockito가 자동으로 초기화하고, 관련 객체 주입.
-   - JUnit 5에서 MockitoExtension을 사용 시, 테스트 클래스에 @ExtendWith(MockitoExtension.class) 애너테이션을 추가 필요.
-   - MockitoExtension.class
-     - JUnit 5에서 Mockito를 사용 시 필요한 확장(Extension).
-     - MockitoExtension.class 사용 시 @Mock, @InjectMocks, @Captor 등의 Mockito 애너테이션을 자동으로 초기화해주고, 테스트 클래스에서 mock 객체를 관리해주는 역할.
-   - 테스트코드 mock 생성 예시 (MemberServiceTest.java)
-     MemberService는 MemberRepository에 의존하고있다.
-     MemberRepository에 가짜로 생성해 MemberService에 의존성을 추가해준다.   
-     DB에서 독립적인 테스트가 가능해진다.
-     ~~~      
-     @ExtendWith(MockitoExtension.class)  // JUnit 5에서 MockitoExtension 활성화
-     public class MemberServiceTest {
-         // @Mock: MemberRepository를 가짜로 생성해 memberRepository에 담아준다.
-         @Mock
-         private MemberRepository memberRepository; // mock 객체
-     
-         // @InjectMocks : Mock으로 생성해준 memberRepository를 memberService에 inject(의존성주입).      
-         @InjectMocks
-         private MemberService memberService; // mock 객체를 주입 받을 대상
-         
-         ...
-     }
-     ~~~
-   
-
-### < repository의 메서드를 stub하지 않아도 테스트코드 오류가 발생하지 않는 이유 >
-1. 궁금증 발생원인
-   - ProductionService.saveProduction() 메서드에서 productionRepository.findBySellerAndCode() 메서드를 서비스 로직에 추가했는데 
-     테스트코드에서 해당 메서드 호출 시 오류가 발생하지 않았다. (기존 다른 테스트코드 작성시에는 repository의 메서드 호출 시 stub 하지 않으면 오류가 발생했다.)
-
-2. 테스트코드 정상 수행된 이유
-   - productionRepository.findBySellerAndCode() 메서드가 실제로 호출되지 않아서입니다. 
-   - Mockito에서 @Mock 어노테이션을 사용해 ProductionRepository를 모킹했기 때문에, 해당 메서드는 실제로 실행되지 않고, 대신 빈 값을 반환하거나 아무 일도 일어나지 않게 됩니다.
-   - productionRepository.findBySellerAndCode() 메서드는 Optional<Production>을 반환하고, 해당 값이 존재할 경우 예외를 던지는 코드입니다.
-   - Mockito는 기본적으로 모킹된 객체가 호출되면 빈 값 (예: null 또는 Optional.empty())을 반환하기 때문에 ifPresent 블록이 실행되지 않습니다.
-   - 즉, productionRepository.findBySellerAndCode(sellerId, productionCode) 메서드를 모킹하지 않더라도, Mockito는 이 메서드가 호출되는 대신 아무 작업도 하지 않으므로, 예외가 발생하지 않는 것입니다.
-   > 결론     
-   > 모킹되지 않으면 기본값인 빈 값(null 또는 Optional.empty())이 반환됨.    
-   > 만약 메서드가 빈값을 반환해도 되는 경우, 테스트의 명확성과 일관성을 보장하기 위해 명시적으로 모킹해주는 것이 더 좋을 방법일 수 있음.    
-   > 테스트의 정확성을 위해서 Optional.empty()와 Optional.of(existingProduction) 두 가지 경우를 모두 테스트해 보는 것이 좋음.    
-
-3. 올바른 테스트코드 작성방법
-   - productionRepository.findBySellerAndCode() 메서드를 명시적으로 모킹해야 합니다.
-   - 예를 들어, 해당 메서드가 Optional.empty()를 반환하도록 설정하거나, 이미 존재하는 상품을 반환하도록 설정할 수 있습니다.
-
- 
-### < 테스트코드 검증 >
-- 전달인자, 반환값에 대한 검증
-  - 검증할 때 변경되지 않는 값들에 대해서는 반드시 검증할 필요없음.
-  - 특히, 테스트의 목표가 변경된 값들이 올바르게 처리되었는지를 확인하는 것이라면, 변경되지 않은 값들은 검증 대상에서 제외가능.
-
-- 변경된 값들 필수 검증
-  - 효율성
-    - 모든 값을 검증하면 너무 많은 검증이 이루어지게 되며, 테스트 코드가 불필요하게 복잡해짐. 
-    - 특히 변경되지 않은 값들은 이미 예상할 수 있기 때문에 검증을 생략해도 문제없음.
-  - 테스트 목적
-    - 테스트는 로직이 예상대로 작동하는지 확인해 수정된 값들이 제대로 처리되는지 것이므로 변경된 값에 대해서만 집중.
-
-- 변경되지 않은 값들에 대한 간접적 검증.
-  > 변경되지 않아야 할 부분도 간접적으로 검증하는 것이 중요.
-  > 만약 변경되지 않은 값이 의도치 않게 변경되면, 버그나 논리적 오류가 발생한 가능성 있음.
-  > 하지만 **모든 값을 검증하는 것은 비효율적**이므로,
-    **변경되지 않는 값 중 핵심적인 값들만 검증**하여 테스트의 효율성을 유지.
-  - 핵심 식별자(예: id, seller, code, name 등)가 의도치 않게 변경되지 않았는지 간단히 검증.
-  - 비즈니스 로직에 따라 중요한 값이 변경되지 않아야 하는 경우, 해당 값도 검증.
-
-1. Mockito의 verify()
-   ~~~
-    // then
-    // 토큰이 redis에 1번 등록됨.(1번 수행됨)
-    Date now = new Date();
-    long validTime = expirationDate.getTime() - now.getTime();
-    verify(redisSingleDataService, times(1))
-            .saveSingleData(eq(token), eq("blacklist"), argThat(duration ->
-                    duration.compareTo(Duration.ofMillis(validTime)) >= 0));
-   ~~~
-   - 특정 메서드가 특정 횟수만큼 호출되었는지 검증.
-     ~~~
-     // Mockito.verity(mockObject, times(n)).method()
-     
-     // redisSingleDataService.saveSingleData() 메서드가 호출되었는지 검증.
-     verify(redisSingleDataService, times(1)).saveSingleData();
-     ~~~
-   - eq()
-     - Mockito의 Argument Matcher 중 하나.
-     - 특정 인자가 기대하는 값과 정확히 일치하는지 검증.              .
-     ~~~
-     // 호출이 정확한 값들로 이뤄졌는지 확인. 
-     verify(redisSingleDataService, times(1))
-            .saveSingleData(eq(token), eq("blacklist"), any());
-     ~~~
-   - Mockito의 ArgumentMatcher는 eq()와 같은 기본 메서드 외에도, 임의의 조건을 설정하여 검증할 수 있는 방법을 제공.
-     1. argThat()
-        - 사용자정의 조건을 지정.
-        ~~~
-        // 전달된 duration값이 Duration.ofMillis(validTime)보다 크거나 같은지 비교하는 사용자정의 조건 설정.
-        // compareTo() : 객체간 크기 비교 시 사용.
-        //             : duration이 크면 1 / duration이 작으면 -1 / duration과 값이 동일하면 0
-        argThat(duration -> duration.compareTo(Duration.ofMillis(validTime)) <= 0);
-        ~~~
-     2. ArgumentCaptor를 사용해 값을 캡쳐하고 검증.
-        - 메서드에 전달된 값을 캡쳐한 후 이를 비교.
-        - 실제로 메서드 호출 시 전달된 값을 캡쳐한 후 후속 검증을 통해 조건 검사.
-        ~~~
-        // duration값 캡쳐를 위해 ArgumentCaptor<Duration> 객체생성
-        ArgumentCaptor<Duration> durationCaptor = ArgumentCaptor.forClass(Duration.class);
-
-        // duration값 캡쳐를 위해 duration값 자리에 durationCaptor.capture() 전달.
-        verify(redisSingleDataService, times(1)).saveSingleData(eq(token), eq("blacklist"), durationCaptor.capture());
-
-        // Duration 캡쳐값 가져와 유효시간이 validTime 이상인지 검증
-        Duration capturedDuration = durationCaptor.getValue();
-        assertTrue(capturedDuration.toMillis() <= validTime, "Duration should be less than or equal to validTime");
-        ~~~
-
-
-### < 테스트코드작성 ArgumentCaptor >
-- 참고블로그 https://hanrabong.com/entry/Test-ArgumentCaptor%EB%9E%80
-- capture()
-  - 말 그대로 해당 인자를 낚아채는 메서드입니다.   
-- getValue()
-  - 낚아챈 인자의 값을 불러올 때 사용합니다.    
-    만약 해당 메서드가 여러번 호출이 되었을 경우 가장 마지막으로 호출된 메서드의 인자를 갖고옵니다.   
-- getAllValues()
-  - 낚아챈 인자 전부를 List 형태로 받아옵니다.   
-- verify() 
-  - 서비스 내부 로직이 실행됐는지 여부 체크
-  - memberRepository.save() 실행 여부 체크
-
-
-### < 테스트코드 전달인자 검증 >
-- 참고 ProductionServiceTest.successModifyProduction()
-- 주로 toDto **메소드에 전달된 값들이 의도한 대로 정확히 전달되었는지를 확인**.
-
-- 전달인자 검증방법
-  - ArgumentCaptor를 사용하여 전달인자를 캡처한 뒤 이를 검증하면 해당 객체가 수정된 값들을 정확하게 포함하고 있는지 확인가능.
-  - 이 테스트 코드에서는 전달인자 검증이 중요한 부분이므로
-    ArgumentCaptor를 사용해 toDto 메소드로 전달된 Production 객체의 속성값들이 예상대로 처리되었는지 검증하는 핖요.
-
-- ArgumentCaptor 사용해 전달인자 검증 예시
-  ~~~
-    // ArgumentCaptor 생성
-    ArgumentCaptor<Production> productionCaptor = ArgumentCaptor.forClass(Production.class);
-    
-    // stub(가설) : productionMapper.toDto() 실행 시 productionCaptor로 인자를 캡처하도록 설정.
-    given(productionMapper.toDto(productionCaptor.capture()))
-        .willReturn(expectedResultProductionDto);
-    
-    // when
-    ResponseProductionDto responseProductionDto =
-        productionService.modifyProduction(requestProductionDto, member);
-    
-    // then
-    // 1. 상품 수정 검증
-    assertEquals(requestProductionDto.getId(), responseProductionDto.getId());
-    assertEquals(requestProductionDto.getDescription(), responseProductionDto.getDescription());
-    assertEquals(requestProductionDto.getSaleStatus(), responseProductionDto.getSaleStatus());
-    assertEquals(originProductionEntity.getSeller(), responseProductionDto.getSeller());
-    assertEquals(originProductionEntity.getCode(), responseProductionDto.getCode());
-    assertEquals(originProductionEntity.getName(), responseProductionDto.getName());
-    assertEquals(originProductionEntity.getCategory(), responseProductionDto.getCategory());
-    
-    // 2. 상품옵션 수정 검증
-    RequestModifyProductionOptionDto requestUpdateOption = requestProductionDto.getOptions().get(0);
-    ResponseProductionOptionDto responseUpdatedOption = responseProductionDto.getOptions().get(0);
-    assertEquals(requestUpdateOption.getId(), responseUpdatedOption.getId());
-    assertEquals(requestUpdateOption.getQuantity(), responseUpdatedOption.getQuantity());
-    
-    // 3. 상품옵션 신규등록 검증
-    RequestModifyProductionOptionDto requestInsertOption = requestProductionDto.getOptions().get(1);
-    ResponseProductionOptionDto responseInsertedOption = responseProductionDto.getOptions().get(1);
-    assertNull(requestInsertOption.getId());
-    assertEquals(3L, responseInsertedOption.getId());
-    
-    // 4. toDto에 전달된 인자 캡처 후 검증
-    Production capturedProduction = productionCaptor.getValue();
-    assertEquals(updateDescription, capturedProduction.getDescription());
-    assertEquals(updateSaleStatus, capturedProduction.getSaleStatus());
-    assertEquals(productionId, capturedProduction.getId());
-  ~~~
-    1. Production 객체에 대한 검증
-       - toDto 메소드로 전달된 Production 객체가 수정된 설명(updateDescription)과 판매 상태(updateSaleStatus)를 정확히 포함하는지 검증.
-    
-    2. ProductionOption 객체에 대한 검증
-       - ResponseProductionOptionDto가 수정된 quantity와 일치하는지, 그리고 신규 추가된 옵션에 대해서도 id 값이나 quantity 값이 예상대로 처리되는지 검증.
-    
-    3. toDto에 전달된 Production 객체 검증
-       - ArgumentCaptor를 사용하여 productionMapper.toDto()로 전달된 Production 객체를 캡처하고, 그 값들을 검증합니다.
-    
-    4. 옵션 quantity 및 price 값이 올바르게 전달되는지 확인
-       - ProductionOption에 대해 업데이트와 삽입된 옵션이 quantity와 price를 올바르게 갖고 있는지 검증합니다.
-
-1. productionMapper.toDto() 메소드의 전달인자 검증
-    - 메소드가 호출되었을 때, 실제로 Production 객체가 올바르게 전달되었는지 확인가능.
-    - expectedProductionEntity가 productionMapper.toDto()에 전달된 객체일 때,
-      그 객체가 올바르게 수정된 값들을 포함하고 있는지 확인하는 것입니다.
-
-2. modifyProductionOptionMapper.toEntity() 메소드의 전달인자 검증
-    - RequestModifyProductionOptionDto 객체를 ProductionOption으로 변환하는 로직.
-    - 이 과정에서 전달되는 DTO 값들이 실제로 Entity로 올바르게 변환되는지 검증.
-    - quantity나 price 값이 제대로 전달되는지 검증가능.
-
-3. ProductionOption 관련 인자들 검증
-    - 수정된 옵션(RequestModifyProductionOptionDto)들이
-      실제로 서비스 로직에 전달될 때 값들이 올바르게 전달되었는지 확인 필요.
-    - RequestModifyProductionOptionDto에서 quantity, price, optionCode 등이 올바르게 설정되었는지 확인가능.
-    - expectedResponseOptionDtoList에 있는 값들이 요청 DTO에서 예상한 값과 일치하는지 검증가능.
-
-4. 서비스 내에서 인자 검증
-    - productionService.modifyProduction()에서 인자들이 올바르게 처리되는지도 중요한 검증 대상.
-    - requestProductionDto의 값들이 제대로 전달되었는지.
-    - productionService.modifyProduction() 내부에서 originProductionEntity에 대한 수정이 예상대로 이루어졌는지.
-
-      
-### < Reflection - private 메서드 테스트코드 작성 >
-- 리플렉션을 사용 시 클래스의 메서드나 필드에 직접 접근할 수 없더라도 접근 제어자에 관계없이 해당 클래스의 메서드나 필드를 검사하거나 수정가능.
-- 자바의 java.lang.reflect 패키지에서 제공되는 클래스를 사용.
-- 프로그램 실행 중에 클래스, 메서드, 필드 등을 동적으로 다룰 수 있는 기능.
-- 리플렉션을 사용할 때는 정말 필요한 경우에만 사용하고, 과도하게 사용하지 않아야함.
-
-- 리플렉션을 사용할 때의 주의점
-  - 성능 저하
-    - 리플렉션은 일반적인 메서드 호출보다 성능이 낮음.
-  - 컴파일 시점 검사 불가능
-    - 리플렉션을 사용하면 컴파일 타임에 오류를 잡기 어렵고, 런타임 시에만 오류가 발생가능.
-  - 불완전한 설계
-    - 리플렉션을 지나치게 많이 사용하면 코드가 복잡해지고, 객체 지향 설계 원칙에 어긋날 수 있음.
-
-1. 메서드 호출
-   - Class.getDeclaredMethod() 또는 Class.getMethod() 
-     - 해당 클래스의 메서드 **객체를 가져옴.**
-   - setAccessible(true)
-     - private 메서드에 **접근가능하도록 변경.**
-   - Method.invoke()
-     - 해당 메서드를 **실행.**
-   ~~~
-    class JwtAuthenticationProviderTest {
-    
-        private JwtAuthenticationProvider jwtAuthenticationProvider;
-    
-        @BeforeEach
-        void setUp() {
-            // 테스트용 JwtAuthenticationProvider 객체 생성
-            jwtAuthenticationProvider = new JwtAuthenticationProvider("bXlTZWNyZXRLZXk=");  // Base64로 인코딩된 비밀키
-        }
-    
-        @Test
-        void getDecodedSecretKey_shouldReturnValidSecretKey_usingReflection() throws Exception {
-            // 리플렉션을 사용하여 private 메서드 접근
-            Method method = JwtAuthenticationProvider.class.getDeclaredMethod("getDecodedSecretKey");
-            method.setAccessible(true);  // private 메서드 접근을 허용
-    
-            // 메서드 호출
-            SecretKey secretKey = (SecretKey) method.invoke(jwtAuthenticationProvider);
-    
-            // then
-            assertNotNull(secretKey, "SecretKey should not be null");
-            assertTrue(secretKey instanceof SecretKey, "Returned object should be an instance of SecretKey");
-        }
-    }   
-   ~~~
-
-2. 필드값 변경
-   - Field.setAccessible(true)
-     - private 필드에 접근가능하도록 변경.
-   - Field.set()
-     - 값을 수정.
-
-
-### < Controller 테스트케이스 작성 - 도저히 안되서 Chat gpt를 통해 작성 >
-- MockMvc를 이용한 테스트 목적
-  -  컨트롤러의 엔드포인트를 호출하여 HTTP 클라이언트의 요청을 모방하고 적절한 응답을 확인하기 위해 테스트 수행.
-- @WebMvcTest(MemberController.class)
-   - MockMvc 객체를 생성해 컨트롤러와 상호작용함.
-   - 명시한 해당 컨트롤러만 격리시켜 단위테스트 수행가능.
-   - value : 테스트 할 controller 클래스 명시.
-- @MockBean
-   - 테스트 환경에서 애플리케이션 컨텍스트(ApplicationContext)의 빈을 모킹하도록 설정.
-   - Spring Boot 3.4.0부터 deprecated된 @MockBean과 거의 동일.
-   - 빈으로 등록해주는 mock
-   - 자동으로 빈으로 등록되어 컨트롤러에 주입됨.
-
-
-1. 일반적으로 **@WebMvcTest**와 **MockMvc**를 사용하여 Controller를 테스트할 수 있습니다.    
-   이 테스트는 Controller의 HTTP 요청과 응답을 실제로 처리하는 방식으로 동작합니다.   
-   다음은 signUpSeller() 메서드의 성공적인 테스트 케이스입니다.   
-   이 예제에서는 @MockBean을 사용하여 의존성 주입되는 MemberService를 mock하고, MockMvc를 사용하여 실제 HTTP 요청을 시뮬레이션합니다.
-   - 코드 설명
-       - MockMvc 설정
-           - MockMvcBuilders.standaloneSetup(memberController).build()로 MockMvc를 설정하여 Controller를 테스트할 수 있게 만듭니다.
-       - Mock 객체 설정
-           - @Mock 어노테이션을 통해 MemberService를 mock하고, @InjectMocks를 사용하여 MemberController에 mock된 MemberService를 주입합니다.
-       - MockMvc로 HTTP 요청 시뮬레이션
-           - mockMvc.perform(post("/member/signup/seller")...)로 HTTP POST 요청을 시뮬레이션합니다.
-           - andExpect(status().isOk())는 응답 상태 코드가 200 OK임을 검증.
-           - andExpect(jsonPath("$.name").value("John Doe"))는 JSON 응답 본문에서 name 값이 "John Doe"인지 확인합니다.
-
-    ~~~
-    package com.myecommerce.MyECommerce.controller;
-    
-    import com.fasterxml.jackson.databind.ObjectMapper;
-    import com.myecommerce.MyECommerce.dto.MemberDto;
-    import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
-    import com.myecommerce.MyECommerce.service.member.MemberService;
-    import com.myecommerce.MyECommerce.type.MemberAuthorityType;
-    import org.junit.jupiter.api.BeforeEach;
-    import org.junit.jupiter.api.Test;
-    import org.mockito.InjectMocks;
-    import org.mockito.Mock;
-    import org.mockito.Mockito;
-    import org.springframework.http.HttpStatus;
-    import org.springframework.http.MediaType;
-    import org.springframework.test.web.servlet.MockMvc;
-    import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-    import org.springframework.web.context.WebApplicationContext;
-    
-    import java.util.Collections;
-    
-    import static org.mockito.ArgumentMatchers.any;
-    import static org.mockito.Mockito.when;
-    import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-    import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-    
-    class MemberControllerTest {
-    
-        private MockMvc mockMvc;
-    
-        @Mock
-        private MemberService memberService;
-    
-        @InjectMocks
-        private MemberController memberController;
-    
-        private ObjectMapper objectMapper;
-    
-        @BeforeEach
-        void setUp() {
-            objectMapper = new ObjectMapper();
-            mockMvc = MockMvcBuilders.standaloneSetup(memberController).build();
-        }
-    
-        @Test
-        void signUpSeller_Success() throws Exception {
-            // given
-            MemberDto memberDto = new MemberDto();
-            memberDto.setName("John Doe");
-            memberDto.setTel1("010");
-            memberDto.setTel2("1234");
-            memberDto.setTel3("5678");
-            memberDto.setPassword("password123");
-    
-            // 권한 설정
-            MemberAuthority authority = new MemberAuthority();
-            authority.setAuthority(MemberAuthorityType.SELLER);
-            memberDto.setAuthorities(Collections.singletonList(authority));
-    
-            // when
-            when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
-    
-            // then
-            mockMvc.perform(post("/member/signup/seller")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(memberDto)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.name").value("John Doe"))
-                    .andExpect(jsonPath("$.tel1").value("010"))
-                    .andExpect(jsonPath("$.tel2").value("1234"))
-                    .andExpect(jsonPath("$.tel3").value("5678"))
-                    .andExpect(jsonPath("$.password").value("password123"))
-                    .andExpect(jsonPath("$.authorities[0].authority").value("SELLER"));
-        }
-    }
-    ~~~
-
-
-2. 스프링부트 3.4.0 버전 이상인 경우 @Mock 어노테이션 사용 불가.
-   다른방식으로 테스트코드 작성 필요.
-   - @Mock 어노테이션 대신 Mockito.mock()을 사용하여 mock 객체를 생성해야 합니다. (Mockito.mock 사용)
-   - @Mock 어노테이션을 사용하지 않고, Mockito.mock()을 사용하여 MemberService의 mock 객체를 생성합니다. 
-     ~~~
-     // mock 객체  생성
-     memberService = Mockito.mock(MemberService.class);
-     ~~~
-   - @InjectMocks
-     - @InjectMocks는 여전히 MemberController에 mock 객체를 주입하는 데 사용됩니다. 
-       ~~~
-       // mock 객체를 직접 생성하여 주입
-       new MemberController(memberService);
-       ~~~
-   - Mockito로 Mock 객체 설정
-     ~~~
-     // memberService.saveMember 메서드 호출 시 mock된 MemberDto를 반환하도록 설정
-     when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
-     ~~~
-
-    ~~~
-    package com.myecommerce.MyECommerce.controller;
-    
-    import com.fasterxml.jackson.databind.ObjectMapper;
-    import com.myecommerce.MyECommerce.dto.MemberDto;
-    import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
-    import com.myecommerce.MyECommerce.service.member.MemberService;
-    import com.myecommerce.MyECommerce.type.MemberAuthorityType;
-    import org.junit.jupiter.api.BeforeEach;
-    import org.junit.jupiter.api.Test;
-    import org.mockito.InjectMocks;
-    import org.mockito.Mockito;
-    import org.springframework.http.HttpStatus;
-    import org.springframework.http.MediaType;
-    import org.springframework.test.web.servlet.MockMvc;
-    import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-    
-    import java.util.Collections;
-    
-    import static org.mockito.ArgumentMatchers.any;
-    import static org.mockito.Mockito.when;
-    import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-    import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-    
-    class MemberControllerTest {
-    
-        private MockMvc mockMvc;
-    
-        private MemberService memberService;  // @Mock 대신 필드로 사용
-    
-        @InjectMocks
-        private MemberController memberController;
-    
-        private ObjectMapper objectMapper;
-    
-        @BeforeEach
-        void setUp() {
-            // Mockito.mock을 사용하여 mock 객체 생성
-            memberService = Mockito.mock(MemberService.class);
-            
-            // InjectMocks로 Controller에 mock 객체 주입
-            memberController = new MemberController(memberService);
-            
-            objectMapper = new ObjectMapper();
-            mockMvc = MockMvcBuilders.standaloneSetup(memberController).build();
-        }
-    
-        @Test
-        void signUpSeller_Success() throws Exception {
-            // given
-            MemberDto memberDto = new MemberDto();
-            memberDto.setName("John Doe");
-            memberDto.setTel1("010");
-            memberDto.setTel2("1234");
-            memberDto.setTel3("5678");
-            memberDto.setPassword("password123");
-    
-            // 권한 설정
-            MemberAuthority authority = new MemberAuthority();
-            authority.setAuthority(MemberAuthorityType.SELLER);
-            memberDto.setAuthorities(Collections.singletonList(authority));
-    
-            // when
-            when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
-    
-            // then
-            mockMvc.perform(post("/member/signup/seller")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(memberDto)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.name").value("John Doe"))
-                    .andExpect(jsonPath("$.tel1").value("010"))
-                    .andExpect(jsonPath("$.tel2").value("1234"))
-                    .andExpect(jsonPath("$.tel3").value("5678"))
-                    .andExpect(jsonPath("$.password").value("password123"))
-                    .andExpect(jsonPath("$.authorities[0].authority").value("SELLER"));
-        }
-    }
-    ~~~
-
-
-3. 테스트코드를 작성시 @MockMvc 어노테이션을 적용하지 않는 이유
-   - @MockMvc는 테스트 클래스에 적용할 수 없고, 객체를 수동으로 생성해야하기 때문입니다.   
-     @MockMvc 어노테이션은 실제로 MockMvc 객체를 설정하는 것이 아니라, MockMvc 객체를 자동으로 초기화하기 위한 테스트 클래스의 기본적인 설정을 도와줍니다.    
-     그러나, 이 어노테이션은 Spring 3.4.0 이상에서는 사용되지 않으며, @MockMvc를 클래스에 붙여도 동작하지 않습니다.
-   - @MockMvc 어노테이션 역할
-     - 실제로 MockMvc 객체를 생성해주는 역할을 하지만, **@MockMvc**를 클래스 레벨에 직접 적용하는 것은 지원되지 않습니다.    
-       대신, MockMvc 객체는 테스트 클래스에서 직접 **MockMvcBuilders**를 사용하여 설정하고 초기화합니다.
-   - MockMvc를 초기화
-     - **MockMvcBuilders**를 사용해 MockMvc 객체를 수동으로 설정해야 합니다. 
-     - 예를 들어, MockMvcBuilders.standaloneSetup(memberController).build();로 MockMvc 객체를 설정하여 Controller를 테스트할 수 있습니다.   
-   - @WebMvcTest 사용 시 @MockMvc 자동 설정
-     - 만약 @WebMvcTest를 사용하면, @MockMvc가 자동으로 주입되지만, @WebMvcTest는 기본적으로 Spring Boot에서 웹 레이어를 테스트할 때 사용됩니다. 
-     - @MockMvc는 @WebMvcTest 내에서만 자동으로 동작하는 것입니다.
-   - 권장
-     - @MockMvc는 클래스를 통해 자동 주입되지 않기 때문에 MockMvcBuilders를 사용하여 MockMvc를 수동으로 설정해야 합니다.   
-       **@MockMvc**는 @WebMvcTest에서 사용되지만, 일반적으로 @WebMvcTest 없이 사용할 때는 MockMvc를 수동으로 설정하는 방식이 필요합니다.   
-       따라서 MockMvc 객체를 수동으로 초기화하는 방식이 더 유연하고, 명시적으로 테스트가 필요한 컨트롤러만 설정할 수 있습니다.    
-     - MockMvcBuilders.standaloneSetup(memberController).build() 방식이 더 권장됩니다.
-
-    
----
-### < 인터페이스 사용 이유 >
-- 기능(메소드)의 구현을 강제함으로써, 클래스의 설계 또는 표준화를 유도하기위해 사용함.
-- 참고블로그 https://0soo.tistory.com/62
-
-### < 인터페이스와 추상화 클래스의 차이 >
-    기능(메소드)의 구현을 강제함으로써, 클래스의 설계 또는 표준화를 유도를 위해 
-    인터페이스와 추상화 클래스로 Error Code와 Custom Exception을 생성했다.      
-    RuntimeException을 확장해 Custom Exception을 생성한다는 의미로 추상클래스로 구현했고
-    Error Code 생성 시 필수 선언해야하는 필드들의 getter()를 추상메서드로 선언해 필수 구현하도록 했다.
-
-- 인터페이스
-    - 인터페이스에 정의된 메서드를 각 클래스의 목적에 맞게 기능을 구현하는 느낌.
-    - 클래스와 별도로 구현 객체가 같은 동작을 한다는 것을 보장하기 위해 사용하는 것에 초점을 맞춘다.
-- 추상클래스
-    - 자신의 기능들을 하위 클래스로 확장 시키는 느낌.
-    - 추상화(추상 메서드)를 하면서 중복되는 클래스 멤버들을 통합 및 확장을 할 수 있다.   
-    - 같은 추상화인 인터페이스와 다른점은, 추상클래스는 클래스간의 연관 관계를 구축하는 것에 초점을 맞춘다는 것에 있다.
-- 참고블로그 https://inpa.tistory.com/entry/JAVA-%E2%98%95-%EC%9D%B8%ED%84%B0%ED%8E%98%EC%9D%B4%EC%8A%A4-vs-%EC%B6%94%EC%83%81%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%B0%A8%EC%9D%B4%EC%A0%90-%EC%99%84%EB%B2%BD-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0
-
-
----
-### < 예외처리 >
-- Custom Exception을 생성해 예외처리하는 이유
-  - throw new NullPointerException("error message") 와 같이 에러를 처리하면   
-    통일성이 전혀 없고 또 정확한 에러 원인과 이유도 알 수 없다.
-  - 참고블로그 https://velog.io/@mindfulness_22/%EC%98%88%EC%99%B8%EC%B2%98%EB%A6%AC%EB%8A%94-%EC%99%9C-Custom%ED%95%B4%EC%84%9C-%EC%8D%A8%EC%95%BC%ED%95%A0%EA%B9%8C   
-
-- Custom Exception 생성 시 RuntimeException 상속받는 이유
-  - 호출자가 예외를 처리하도록 강제받지 않기위해 Exception이 아닌 RuntimeException 상속받음.
-  1. Checked Exception을 피할 수 있음
-     커스텀 예외를 정의할 때 RuntimeException을 상속받으면 언체크 예외가 됩니다. 이는 호출자가 예외를 처리하도록 강제받지 않기 때문에 코드가 더 간결해질 수 있습니다.
-  2. 사용자 편의성
-     개발자가 특정한 상황에서 발생하는 예외를 명확하게 정의할 수 있어, 코드의 가독성을 높이고 예외 처리 로직을 간단하게 유지할 수 있습니다. 불필요한 예외 처리를 피할 수 있는 장점이 있습니다.
-  3. 비즈니스 로직과의 일관성
-     대부분의 비즈니스 로직에서 발생하는 예외는 런타임 예외로 간주되므로, 커스텀 예외도 이를 따르는 것이 자연스럽습니다.   
-  - 참고블로그 https://pixx.tistory.com/409
-  
-- CommonErrorResponse.java
-  - 에러 발생 시 응답을 위한 모델.
-  - 모든 에러에 대해 일괄적인 응답을 위해 사용.
-
-- CommonExceptionHandler.java
-  - 발생한 예외처리를 수행.
-    ~~~
-    // 모든 BaseAbstractException을 상속하는 에외객체에 대한 예외처리 수행.
-    @ExceptionHandler
-    protected ResponseEntity<CommonErrorResponse> commonHandler(BaseAbstractException e) {
-        // 응답 객체 생성
-        // 응답 객체 반환
-      }
-    ~~~
-  - HttpStatus.resolve(e.getStatusCode())  : HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
-    ~~~ 
-      return new ResponseEntity<>(errorResponse,
-                Objects.requireNonNull(HttpStatus.resolve(e.getStatusCode())));
-    ~~~
-
-
----
-### < Redis >
-1. Redis(Remote Dictionary Server)
-   - NoSQL 데이터베이스 중 하나이며 오픈소스 소프트웨어. 
-   - **키-값(Key-Value)** 형태로 데이터를 저장. 
-     다양한 종류의 value 저장 가능. 
-     value로 문자열, 리스트, 셋, 정렬된 셋, 해시 등의 타입을 지원. 
-   - 데이터를 **인-메모리 데이터 저장소**에 저장. 
-     서버의 메인 메모리에 모든 데이터를 저장하므로, 디스크 I/O를 거치는 다른 데이터베이스 시스템보다 훨씬 빠른 성능을 보여줌.
-   - 메모리에 저장되는 데이터 베이스는 디스크에 저장하여 휘발성으로 사용되는 **데이터를 영구적으로 저장**하는 기능을 제공하여 서버가 다운되더라도 데이터를 복구가능.
-
-2. redis 의존성 추가
-  - spring-boot-starter-data-redis
-    - Spring Data Redis를 쉽게 사용할 수 있도록 도와주는 라이브러리.
-    - 내장 Lettuce Client를 사용해 Redis의 데이터를 키-값 형태의 저장소로 이용이 가능.
-    - Lettuce Client를 이용해 Redis 데이터베이스에 접근하고 데이터를 저장, 조회하는 등의 작업을 수행가능.
-    - Redis 서버와 연결하여 데이터를 처리하기 위해 해당 서버의 호스트와 포트 정보를 설정 필요.
-
-3. redis 실행하기
-   redis를 설치했음을 가정한다.
-   - redis 서버 실행
-     - C:\Program Files\Redis\redis-server.exe
-   - redis client 실행
-     - C:\Program Files\Redis\redis-cli.exe
-   - redis insight
-     - redis 데이터베이스를 시각화하고 관리하기 위한 GUI 도구. (redis client로 보면 될듯)
-  - 참고 블로그   
-    https://seodaeya.tistory.com/248
-
-3. Java에서 redis client (Lettuce 선택)
-   - redis client를 통해 할 수 있는 작업을 Java로 작성가능하도록 한다.
-   1. Lettuce
-      - 동기, 비동기 통신을 모두 지원하는 non-blocking 자바 레디스 클라이언트.
-      - 대량의 요청과 응답 처리에 있어서, Lettuce가 더욱 유리하다. TPS, CPU, Connection 수, 응답속도 등 모든 면에서 Lettuce가 우위이기 때문이다.
-   2. Jedis
-      - 사용 편의성을 위해 설계된 레디스 자바 클라이언트.
-      - 동기식으로만 작동.
-      - 타 redis client에 비해 가벼움.
-  - 참고블로그    
-    https://devforme.tistory.com/46
-
-- 참고블로그   
-  https://adjh54.tistory.com/459   
-  https://adjh54.tistory.com/448
-
-- redis 사용 명령어
-  https://jang8584.tistory.com/290
-
-
-### < redis 설정파일 >
-1. RedisConnectionFactory 인터페이스
-   - Redis와의 연결을 위한 Connection을 생성하고 관리.
-
-2. LettuceConnectionFactory
-   - 해당 클래스는 RedisConnectionFactory 인터페이스를 구현한 클래스.
-   
-3. RedisTemplate<String, Object>
-   - Spring Data Redis에서 제공하는 클래스. 
-   - Redis 데이터베이스에 접근하고 데이터를 처리하는 데 사용. 
-   - 타입 안전성을 제공하고, 직렬화 및 역직렬화를 처리하며, Redis의 기본적인 데이터 구조를 지원.
-
-- 발생오류
-  > ava.lang.IllegalArgumentException: template not initialized; call afterPropertiesSet() before using it
-at org.springframework.util.Assert.isTrue(Assert.java:116) ~[spring-core-6.2.1.jar:6.2.1]
-at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:394) ~[spring-data-redis-3.4.1.jar:3.4.1]
-at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:378) ~[spring-data-redis-3.4.1.jar:3.4.1]
-at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:117) ~[spring-data-redis-3.4.1.jar:3.4.1]
-at org.springframework.data.redis.core.DefaultValueOperations.set(DefaultValueOperations.java:208) ~[spring-data-redis-3.4.1.jar:3.4.1]
-at org.springframework.data.redis.core.ValueOperations.set(ValueOperations.java:75) ~[spring-data-redis-3.4.1.jar:3.4.1]
-at com.myecommerce.MyECommerce.service.redis.RedisSingleDataService.saveSingleData(RedisSingleDataService.java:18) ~[main/:na]
-
-- 발생원인
-  - RedisTemplate 또는 유사한 Spring Bean이 초기화되지 않았거나 설정되지 않은 상태에서 사용하려고 시도했을 때 발생
-
-- 해결방법
-  - RedisConfig.java에 설정한 redisTemplate() 메서드 호출 시 오류발생.
-  - 빈으로 등록하지 않아 발생한 오류.
-  - redisTemplate() 위에 @Bean 어노테이션 추가해 해결.
-
-
-### < 설정클래스(설정파일)을 직접 의존성 주입하는 방식에 대한 우려 >
-1. 설정클래스(설정파일)을 직접 의존성 주입
-   - 보통 설정 파일(또는 설정 클래스)을 직접 의존성 주입하는 것은 권장되지 않습니다. 
-   - 그 이유는 설정 파일은 주로 애플리케이션의 설정을 구성하고 빈을 등록하는 역할을 하기 때문입니다. 
-   - 설정 파일은 일반적으로 스프링 컨테이너에 의해 자동으로 관리되며, 해당 설정이 적용된 빈을 다른 클래스에서 사용할 수 있도록 하는 것이 목표입니다.
-   - 설정 파일을 직접적으로 의존성 주입하는 것은 애플리케이션의 설계 원칙에 위배될 수 있고, 유지보수 및 확장성 측면에서 바람직하지 않습니다. 
-   - **설정 클래스에서 관리하는 빈을 다른 컴포넌트에서 주입받는 것이 권장**되는 방법입니다.
-
-2. 설정파일을 직접 의존성 주입하는 방법이 권장되지 않는 이유
-   1. 설정 파일의 책임
-      - 설정 클래스는 주로 빈 등록과 환경 설정을 담당합니다. 
-      - 직접적으로 비즈니스 로직을 담당하는 클래스에 의존성을 주입하는 것은 관심사의 분리 원칙을 위반할 수 있습니다. 
-      - 설정 클래스는 애플리케이션의 설정을 제공하는 역할에 집중해야 합니다.
-   2. 스프링 컨테이너의 관리
-      - 스프링 컨테이너는 설정 클래스를 관리하고, 이를 기반으로 필요한 빈을 자동으로 생성하여 주입합니다. 
-      - 설정 클래스를 직접적으로 주입하는 대신, 스프링 컨테이너가 관리하는 빈(예: RedisTemplate)을 주입받는 것이 더 자연스럽고, 
-        이를 통해 의존성 주입이 잘 이루어집니다.
-   3. 재사용성
-      - 설정 클래스를 다른 서비스나 컴포넌트에서 직접 주입받는다면, 해당 설정을 사용할 때마다 불필요하게 설정 파일을 직접 의존하게 됩니다. 
-      - 반면, 설정 클래스에서 필요한 빈을 @Bean으로 등록해 두면, 스프링 컨테이너가 해당 빈을 관리하고
-        필요한 클래스에서 이 빈만 주입받아 사용하면 됩니다.
-
-3. 설정파일의 직접 의존성 주입을 피하는 방식
-   - 설정 클래스를 의존성 주입하는 대신, 설정 클래스는 단지 빈을 등록하고 관리하는 역할만 합니다. 
-   - 예를 들어, RedisConfig 클래스를 통해 RedisTemplate을 생성하고, 다른 클래스에서 이를 주입받아 사용하는 방식이 이상적입니다. 
-   - 이렇게 설정 클래스에서 RedisTemplate을 @Bean으로 등록한 후, RedisTemplate을 사용하는 다른 서비스 클래스에서는 다음과 같이 주입받습니다.
-
-4. 편리한 테스트 및 유지보수
-   - 설정 클래스를 직접 주입받지 않고, 빈을 주입받는 방식은 단위 테스트와 유지보수 측면에서도 더 유리합니다. 
-   - 설정 클래스는 구현 세부사항을 숨기고, 빈을 주입하는 방식으로 구성 요소들의 독립성을 높이는 데 유리합니다.
-
-
-5. Redis 설정파일 직접 의존하지 않도록 변경하기    
-RedisTemplate을 @Bean으로 등록했기 때문에 RedisSingleDataService에서 redisConfig.redisTemplate()처럼 직접 주입하는 것이 아니라, 
-필요한 곳에서 RedisTemplate을 주입하는 방식이 더 나은 설계입니다.    
-
-현재 RedisConfig 클래스에서 @Bean을 사용하여 redisTemplate을 생성 및 등록하고 있습니다.     
-스프링의 의존성 주입 방식 중 redisTemplate을 다른 컴포넌트에서 사용하기 위해서 설정 클래스에서 빈을 등록합니다.   
-
-설정 클래스인 RedisConfig를 다른 컴포넌트에서 의존성으로 주입받는 대신, 
-redisTemplate을 직접 필요한 클래스에서 주입받도록 합니다.
-RedisConfig를 다른 클래스에서 직접 주입받는 것보다 RedisTemplate을 주입받는 것이 더 자연스럽고, 더 직관적인 방식입니다.
-
-**설정 클래스에서 @Bean으로 RedisTemplate을 정의**했기 때문에, 이를 **필요한 클래스에서 @Autowired나 생성자 주입을 통해 주입받는 것이 좋습니다.**
-RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으로 관리되기 때문에 다른 클래스에서 이를 주입받아 사용하면 됩니다. 
-따라서 RedisTemplate을 사용하면 되는데 굳이 RedisConfig 클래스를 의존성 주입으로 사용할 필요는 없습니다.
-
-- redis 설정
-    ~~~
-    @Configuration
-    public class RedisConfig {
-    
-        @Value("${spring.data.redis.host}")
-        private String host;
-        @Value("${spring.data.redis.port}")
-        private int port;
-    
-        /** Lettuce를 사용한 Connection 객체 생성 **/
-        @Bean
-        public RedisConnectionFactory redisConnectionFactory() {
-            final RedisStandaloneConfiguration redisStandaloneConfig = new RedisStandaloneConfiguration();
-    
-            // ...
-            
-            return new LettuceConnectionFactory(redisStandaloneConfig);
-        }
-    
-        /** RedisTemplate 설정
-         *  : Redis에 저장할 데이터형식 제공 **/
-        @Bean
-        public RedisTemplate<String, Object> redisTemplate() {
-            RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
-    
-            // 사용할 Connection 설정
-            redisTemplate.setConnectionFactory(redisConnectionFactory());
-             
-            // ...
-             
-            return redisTemplate;
-        }
-    }
-    ~~~
-- redis 사용부분 올바르게 수정
-    ~~~
-    @Service
-    @RequiredArgsConstructor
-    public class RedisSingleDataService {
-        // 설정파일이 아닌 bean에 의존하도록 의존성주입
-        // 기존 : private final RedisConfig redisConfig;
-        private final RedisTemplate<String, Object> redisTemplate;
-    
-        /** Redis 단일 데이터 등록 **/
-        public void saveSingleData(String key, Object value, Duration duration) {
-            // 기존 : redisConfig.redisTemplate().opsForValue().set(key, value, duration);        
-            redisTemplate.opsForValue().set(key, value, duration);
-        }
-    
-        // ... 
-    }
-    ~~~
-
-
-### < Redis 연결과 해제 >
-- Spring Data Redis에서 자동 연결 관리를 수행하기 때문에 
-  RedisTemplate을 사용하게되면 Redis 연결을 명시적으로 생성하거나 끊는 로직은 일반적으로 불필요.
-  
-1. Spring Data Redis의 자동 연결 관리
-   - RedisTemplate은 RedisConnectionFactory를 통해 Redis와의 연결을 자동으로 관리.
-   - Spring Data Redis는 연결 풀(connection pool)을 사용하여 Redis와의 연결을 효율적으로 처리. 
-     이로 인해 별도의 연결 및 종료 로직 없이도 Redis와의 연결이 자동으로 관리됨.
-   
-2. RedisTemplate과 connection pool
-   - RedisTemplate은 기본적으로 Lettuce나 Jedis와 같은 Redis 클라이언트를 사용. 
-     이들 클라이언트는 연결 풀을 사용하여 연결을 재사용. 
-     즉, 연결을 반복적으로 생성하고 끊는 대신, 연결 풀에서 연결을 가져오고 반환하는 방식으로 동작.
-   - Spring에서는 LettuceConnectionFactory 또는 JedisConnectionFactory를 사용하여 연결 풀을 설정.
-     Redis 연결이 필요한 작업을 할 때마다 RedisTemplate은 자동으로 이 연결을 사용하고, 작업이 끝난 후 연결을 풀에 반환.
-
-3. connection pool의 이점
-   - Redis 서버와의 연결을 효율적으로 재사용하여 성능을 최적화 가능. 
-   - 연결 풀을 사용하면 새로운 연결을 생성하는 데 드는 비용을 줄이고, 자원의 낭비를 막을 수 있음.
-   - Redis 서버와의 연결이 자주 생성되고 끊어지는 대신, 한 번 연결된 세션을 여러 작업에서 재사용 가능.
-
-4. 연결을 끊는 로직이 필요한 경우
-   - 특정 종료 작업이 필요한 경우가 있을 수 있습니다. 
-   - Redis와의 연결을 명시적으로 종료하고자 할 때는 @PreDestroy 어노테이션 사용 가능. 
-   - 하지만 대부분의 경우, Spring의 연결 관리 시스템에 맡겨두면 충분.
-   - 예외상황
-     - Redis 서버와의 연결을 명시적으로 종료하고자 할 때 (예: 애플리케이션 종료 시).
-     - 테스트 환경에서 Redis 연결을 명시적으로 종료해야 할 경우.
-     - 네트워크 문제로 Redis 연결이 끊어졌을 때, 다시 연결을 시도하는 로직이 필요할 수 있습니다.
-
-   ~~~ 
-    @PreDestroy
-    public void close() {
-        // 직접적으로 연결 종료가 필요한 경우
-        if (redisConnectionFactory != null) {
-            redisConnectionFactory.destroy();
-        }
-    }
-   ~~~
-
-
----
 ### < 데이터베이스의 커서(Cursor) >
 - 데이터베이스에서 데이터를 읽거나 쿼리 결과를 순차적으로 한 번에 하나씩 처리하기 위한 객체로 포인터 역할을 수행.
 - 커서는 결과셋을 탐색하고 각 항목에 접근하는 방법을 제공.
@@ -1543,6 +646,152 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
 
 
 ---
+## 6. DTO
+### < DTO, VO, MODEL 차이 >
+https://010562.tistory.com/11
+https://velog.io/@chae_ag/Model-DTO-VO-DAO-%EA%B0%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80%EC%9A%94
+
+### < 도메인과 DTO >
+1. 도메인
+    - 하나의 비즈니스 업무 영역과 관련된 개념.
+    - 실제 비즈니스 로직이나 규칙, 도메인 정보 등을 포함.
+2. DTO
+    - 계층간의 데이터 전달을 위해 사용하는 객체.
+- 참고블로그
+  https://shyun00.tistory.com/214
+
+
+### < 요청과 응답으로 DTO 사용해야하는 이유 >
+1. Entity 내부 구현 캡슐화해 은닉
+    - Entity
+        - 도메인의 핵심 로직, 속성을 가짐.
+        - 실제 DB 테이블과 매칭되는 클래스.
+    - Entity가 getter, setter를 갖게 되면 controller 같은 비즈니스 로직과 관계없는 곳에서 자원의 속성이 실수로라도 변경될 수 있음.
+    - Entity UI 계층을 노출하는 것은 테이블 설계 화면을 공개하는 것과 같으므로 보안상 바람직하지 않음.
+
+2. 화면에 필요한 데이터 선별
+    - 요청과 응답으로 Entity 사용 시, 요청하는 화면에서 불필요한 속성까지 전달됨. -> 속도 느려짐.
+    - 요청과 응답으로 Entity 사용 시 다양한 요청과 응답에 따른 속성들을 동적 선택 불가.
+    - 특정 api에 필요한 데이터를 포함한 DTO 별도 생성 시 화면이 요구하는 필요 데이터들만 선별해 용청과 응답가능.
+
+3. 순환참조 예방
+    - JPA로 개발 시 양방향 참조인 경우 순환참조를 조심해야함.
+    - 양방향 참조된 Entity를 응답으로 return 하게되면  
+      entity가 참조하고 있는 객체 지연로딩 -> 로딩된 객체는 또 다시 본인이 참조하고 있는 객체를 호출
+      을 반복하면 무한루프에 빠진다.
+    - 순환참조가 일어나지 않도록 응답의 return으로 DTO를 사용하는 것이 순환참조에서 안전.
+
+4. validation코드와 모델링코드 분리가능.
+    - Entity 클래스는 DB의 테이블과 매칭되는 필드가 속성으로 선언되어 있고, 복잡한 비즈니스 로직이 작성되어있음.
+      띠리서 속성에 @Column, @JoinColumn , @ManyToOne, @OneToOne 등의 모델링을 위한 코드가 추가됨.
+      여기에 추가로 @NotNull, @NotEmpty @NotBlank 같은 요청에 대한 값에 대한 validation 코드가 들어가면 Entity 클래스는 더 복잡해지고 가독성이 저하됨.
+    - DTO에는 요청에 필요한 validation 정의.
+    - Entity 클래스는 모델링과 비즈니스 로직에만 집중가능.
+
+- DTO를 모든 API마다 구별해서 만들다보면 너무 많은 DTO가 생겨서 관리하기 어렵다고 하기도 한다.
+  그럼에도 불구하고 요청과 응답으로 엔티티를 사용하면, 개발의 편리함을 얻는 대신 애플리케이션의 결함을 얻게 될 수 있다.
+  API 스펙과 엔티티 사이에 의존성이 생기는 문제도 간과할 수 없다
+  UI와 도메인이 서로 의존성을 갖zx지 않고 독립적으로 개발하는 것을 지향하기 때문에 이를 중간에서 연결시켜주는 DTO의 역할은 꽤나 중요
+  요청과 응답으로 DTO를 사용하면 각각의 DTO 클래스가 데이터를 전송하는 클래스로서의 역할을 명확히 가질 수 있게 되고, 이는 하나의 클래스가 하나의 역할을 해야 한다는 객체지향의 정신과도 부합
+
+- 참고블로그   
+  https://shyun00.tistory.com/214
+
+  
+### < request, response DTO 분리 >
+- client->controller에 들어오는 request 정보와 controller->client로 내보내는 response는
+  사용하는 목적이 다르고 전달하는 데이터도 다르기에 분리하는 것이 좋다.
+- DTO는 주고받는 데이터를 정의한 api 명세서와 다름없다.
+- 단건, 복수 건 조회 정도만 동일 DTO 사용으로 운명을 함께할 수 있다.
+
+1. request DTO   
+   validation check 어노테이션을 사용 -> 데이터의 유효성 검사.
+2. response DTO   
+   단순히 데이터를 반환.
+
+
+---
+## 7. 인터페이스
+### < 인터페이스 사용 이유 >
+- 기능(메소드)의 구현을 강제함으로써, 클래스의 설계 또는 표준화를 유도하기위해 사용함.
+- 참고블로그 https://0soo.tistory.com/62
+
+### < 인터페이스와 추상화 클래스의 차이 >
+    기능(메소드)의 구현을 강제함으로써, 클래스의 설계 또는 표준화를 유도를 위해 
+    인터페이스와 추상화 클래스로 Error Code와 Custom Exception을 생성했다.      
+    RuntimeException을 확장해 Custom Exception을 생성한다는 의미로 추상클래스로 구현했고
+    Error Code 생성 시 필수 선언해야하는 필드들의 getter()를 추상메서드로 선언해 필수 구현하도록 했다.
+
+1. 인터페이스
+    - 인터페이스에 정의된 메서드를 각 클래스의 목적에 맞게 기능을 구현하는 느낌.
+    - 클래스와 별도로 구현 객체가 같은 동작을 한다는 것을 보장하기 위해 사용하는 것에 초점을 맞춘다.
+2. 추상클래스
+    - 자신의 기능들을 하위 클래스로 확장 시키는 느낌.
+    - 추상화(추상 메서드)를 하면서 중복되는 클래스 멤버들을 통합 및 확장을 할 수 있다.
+    - 같은 추상화인 인터페이스와 다른점은, 추상클래스는 클래스간의 연관 관계를 구축하는 것에 초점을 맞춘다는 것에 있다.
+- 참고블로그 https://inpa.tistory.com/entry/JAVA-%E2%98%95-%EC%9D%B8%ED%84%B0%ED%8E%98%EC%9D%B4%EC%8A%A4-vs-%EC%B6%94%EC%83%81%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%B0%A8%EC%9D%B4%EC%A0%90-%EC%99%84%EB%B2%BD-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0
+
+
+### < service, service impl 분리하지 않는 이유 >
+- 참고블로그 https://zhfvkq.tistory.com/76
+
+spring은 객체간의 의존성을 관리해주는데 이 의존성은 테스트 코드 단위테스트를 작성할때 문제가 생긴다.    
+의존성을 가지는 다른 객체에 의해 테스트 결과가 영향을 받는다.    
+그래서 내가 원하는 동작만 하도록 하는것이 Mock 객체다.    
+이를 편하게 사용하도록 지원하는것이 Mockito 이다.
+
+Service와 ServiceImpl 구조를 사용하면 단위 테스트가 어려울 수 있다.    
+이 구조를 사용하면 Service 인터페이스와 ServiceImpl 구현체를 모두 생성해야 하므로 테스트 코드를 작성하기 어렵다.    
+또한, 구현체와 인터페이스 간의 의존성이 높아져 테스트 케이스 작성이 복잡해질 수 있다.     
+결론적으로 Service ServiceImpl 구조를 사용해야 할까?    
+OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 원칙 때문에 사용한다. 보통 흔히 얘기하는 느슨한 결합 혹은 유연해지도록 설계하기 위해 사용된다.    
+그렇다면 Spring에서 Service는 다형성이 필요한가?    
+우리가 사용하는 대부분의 Service는 하나의 Service가 여러 개의 SerivceImpl을 가지고 있는 경우가 아닌 1:1 구조를 띄고 있다.    
+그러므로 Service를 사용하고, 추후 다형성이 필요해지면 그때 해당 Service에 대해서 인터페이스를 적용해도 늦지 않는 것 같다.
+
+
+---
+## 8. 예외처리
+### < 예외처리 >
+1. Custom Exception을 생성해 예외처리하는 이유
+   - throw new NullPointerException("error message") 와 같이 에러를 처리하면   
+     통일성이 전혀 없고 또 정확한 에러 원인과 이유도 알 수 없다.
+   - 참고블로그 https://velog.io/@mindfulness_22/%EC%98%88%EC%99%B8%EC%B2%98%EB%A6%AC%EB%8A%94-%EC%99%9C-Custom%ED%95%B4%EC%84%9C-%EC%8D%A8%EC%95%BC%ED%95%A0%EA%B9%8C   
+
+2. Custom Exception 생성 시 RuntimeException 상속받는 이유
+   - 호출자가 예외를 처리하도록 강제받지 않기위해 Exception이 아닌 RuntimeException 상속받음.
+   1) Checked Exception을 피할 수 있음   
+      커스텀 예외를 정의할 때 RuntimeException을 상속받으면 언체크 예외가 됩니다. 이는 호출자가 예외를 처리하도록 강제받지 않기 때문에 코드가 더 간결해질 수 있습니다.
+   2) 사용자 편의성   
+      개발자가 특정한 상황에서 발생하는 예외를 명확하게 정의할 수 있어, 코드의 가독성을 높이고 예외 처리 로직을 간단하게 유지할 수 있습니다. 불필요한 예외 처리를 피할 수 있는 장점이 있습니다.
+   3) 비즈니스 로직과의 일관성   
+      대부분의 비즈니스 로직에서 발생하는 예외는 런타임 예외로 간주되므로, 커스텀 예외도 이를 따르는 것이 자연스럽습니다.   
+   - 참고블로그 https://pixx.tistory.com/409
+  
+3. CommonErrorResponse.java
+   - 에러 발생 시 응답을 위한 모델.
+   - 모든 에러에 대해 일괄적인 응답을 위해 사용.
+
+4. CommonExceptionHandler.java
+   - 발생한 예외처리를 수행.
+     ~~~
+     // 모든 BaseAbstractException을 상속하는 에외객체에 대한 예외처리 수행.
+     @ExceptionHandler
+     protected ResponseEntity<CommonErrorResponse> commonHandler(BaseAbstractException e) {
+        // 응답 객체 생성
+        // 응답 객체 반환
+     }
+     ~~~
+  - HttpStatus.resolve(e.getStatusCode())     
+    HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
+    ~~~ 
+      return new ResponseEntity<>(errorResponse,
+                Objects.requireNonNull(HttpStatus.resolve(e.getStatusCode())));
+    ~~~
+
+
+---
+## 9. JWT 이용한 로그아웃
 ### < JWT 이용한 로그아웃 >
 1. 로그인, 로그아웃 구현방식
     - 세션 방식
@@ -1651,67 +900,7 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
 
 
 ---
-### < DTO >
-1. 도메인
-   - 하나의 비즈니스 업무 영역과 관련된 개념.
-   - 실제 비즈니스 로직이나 규칙, 도메인 정보 등을 포함.
-2. DTO
-   - 계층간의 데이터 전달을 위해 사용하는 객체.
-- 참고블로그
-  https://shyun00.tistory.com/214
-
-
-### < 요청과 응답으로 DTO 사용해야하는 이유 >
-1. Entity 내부 구현 캡슐화해 은닉
-   - Entity
-     - 도메인의 핵심 로직, 속성을 가짐.
-     - 실제 DB 테이블과 매칭되는 클래스.
-   - Entity가 getter, setter를 갖게 되면 controller 같은 비즈니스 로직과 관계없는 곳에서 자원의 속성이 실수로라도 변경될 수 있음.
-   - Entity UI 계층을 노출하는 것은 테이블 설계 화면을 공개하는 것과 같으므로 보안상 바람직하지 않음.
-    
-2. 화면에 필요한 데이터 선별
-   - 요청과 응답으로 Entity 사용 시, 요청하는 화면에서 불필요한 속성까지 전달됨. -> 속도 느려짐.
-   - 요청과 응답으로 Entity 사용 시 다양한 요청과 응답에 따른 속성들을 동적 선택 불가.
-   - 특정 api에 필요한 데이터를 포함한 DTO 별도 생성 시 화면이 요구하는 필요 데이터들만 선별해 용청과 응답가능.
-
-3. 순환참조 예방
-   - JPA로 개발 시 양방향 참조인 경우 순환참조를 조심해야함.
-   - 양방향 참조된 Entity를 응답으로 return 하게되면  
-     entity가 참조하고 있는 객체 지연로딩 -> 로딩된 객체는 또 다시 본인이 참조하고 있는 객체를 호출
-     을 반복하면 무한루프에 빠진다.
-   - 순환참조가 일어나지 않도록 응답의 return으로 DTO를 사용하는 것이 순환참조에서 안전.
-
-4. validation코드와 모델링코드 분리가능.
-   - Entity 클래스는 DB의 테이블과 매칭되는 필드가 속성으로 선언되어 있고, 복잡한 비즈니스 로직이 작성되어있음. 
-     띠리서 속성에 @Column, @JoinColumn , @ManyToOne, @OneToOne 등의 모델링을 위한 코드가 추가됨.
-     여기에 추가로 @NotNull, @NotEmpty @NotBlank 같은 요청에 대한 값에 대한 validation 코드가 들어가면 Entity 클래스는 더 복잡해지고 가독성이 저하됨.
-   - DTO에는 요청에 필요한 validation 정의.
-   - Entity 클래스는 모델링과 비즈니스 로직에만 집중가능.
-
-- DTO를 모든 API마다 구별해서 만들다보면 너무 많은 DTO가 생겨서 관리하기 어렵다고 하기도 한다.
-  그럼에도 불구하고 요청과 응답으로 엔티티를 사용하면, 개발의 편리함을 얻는 대신 애플리케이션의 결함을 얻게 될 수 있다.
-  API 스펙과 엔티티 사이에 의존성이 생기는 문제도 간과할 수 없다
-  UI와 도메인이 서로 의존성을 갖zx지 않고 독립적으로 개발하는 것을 지향하기 때문에 이를 중간에서 연결시켜주는 DTO의 역할은 꽤나 중요
-  요청과 응답으로 DTO를 사용하면 각각의 DTO 클래스가 데이터를 전송하는 클래스로서의 역할을 명확히 가질 수 있게 되고, 이는 하나의 클래스가 하나의 역할을 해야 한다는 객체지향의 정신과도 부합
-
-- 참고블로그   
-  https://shyun00.tistory.com/214
-
-  
----
-### < request, response DTO 분리 >
-- client->controller에 들어오는 request 정보와 controller->client로 내보내는 response는
-  사용하는 목적이 다르고 전달하는 데이터도 다르기에 분리하는 것이 좋다.
-- DTO는 주고받는 데이터를 정의한 api 명세서와 다름없다.
-- 단건, 복수 건 조회 정도만 동일 DTO 사용으로 운명을 함께할 수 있다.
-
-1. request DTO
-    - validation check 어노테이션을 사용 -> 데이터의 유효성 검사.
-2. response DTO
-    - 단순히 데이터를 반환.
-
-
----
+## 10. 로그 레벨 결정
 ### < 로그 레벨 결정 >
 - 로그 레벨
   - 해당 로그 메시지가 얼마나 중요한지 알려주는 정보.
@@ -1788,36 +977,7 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
 
 
 ---
-### < Spring 어노테이션 >
-1. @RequestHeader
-   - public @interface RequestHeader.java 파일 오픈해서 확인.
-   - 메서드 매개변수가 웹 요청 헤더에 바인딩되어야 함을 나타내는 애너테이션.
-   - 매서드 매개변수가 Map<String, String>, MultiValueMap<String, Strng>, HttpHeaders 이면 Map은 모든 헤더 이름과 값으로 채워짐.
-   ~~~
-    @PostMapping("/signout")
-    public ResponseEntity<String> signOut(@RequestHeader Map<String, String> headers) {
-        String authority = headers.get("authorization");
-        // ...
-    }
-   ~~~
-   1. @Name
-      - The name of the request header to bind to.   
-        요청 헤더에 바인딩할 이름 선택가능.
-      ~~~
-        @PostMapping("/signout")
-        public ResponseEntity<String> signOut(@RequestHeader @Name("Authorization") String authorization) {
-            // ...
-        }
-      ~~~
-   2. Spring core에 있는 상수를 사용
-     ~~~
-       public ResponseEntity<String> signOut(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
-           // ...
-       } 
-     ~~~
-
-
----
+## 11. 상수 선언
 ### < 상수 선언 >
 1. final
    - 변수에 final 선언 시 해당 변수는 한 번만 초기화 가능.
@@ -1835,43 +995,44 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
 
 
 ---
+## 12. Enum값 비교 연산자
 ### < Enum값 비교 연산자 >
 - Java에서 Enum 값을 비교할 때는 **== 연산자를 사용**하는 것이 더 안전하고 효율적.
-- 연산자 비교하기
-    1. == 연산자
-        - == 연산자는 참조 비교를 수행합니다.
-        - Enum은 싱글턴 패턴을 따르므로, 각 Enum 인스턴스는 고유하고 애플리케이션 내에서 유일합니다.
-        - 따라서 == 연산자는 Enum 값들이 동일한지 비교할 때 항상 참조가 동일한지 확인합니다.
-        - Enum 값들은 JVM 내에서 고정된 값으로 관리되기 때문에, 두 Enum 값이 동일한 값을 갖고 있다면 동일한 객체를 참조하게 됩니다.
-          이런 이유로 ==를 사용하면 성능과 안정성 면에서 최적화됩니다.
+1. == 연산자
+    - == 연산자는 참조 비교를 수행합니다.
+    - Enum은 싱글턴 패턴을 따르므로, 각 Enum 인스턴스는 고유하고 애플리케이션 내에서 유일합니다.
+    - 따라서 == 연산자는 Enum 값들이 동일한지 비교할 때 항상 참조가 동일한지 확인합니다.
+    - Enum 값들은 JVM 내에서 고정된 값으로 관리되기 때문에, 두 Enum 값이 동일한 값을 갖고 있다면 동일한 객체를 참조하게 됩니다.
+      이런 이유로 ==를 사용하면 성능과 안정성 면에서 최적화됩니다.
 
-    2. equals() 메서드
-        - equals() 메서드는 내용 비교를 수행합니다.
-        - Enum은 기본적으로 Object 클래스를 상속받고, Object 클래스의 equals() 메서드는 참조를 비교하는 방식으로 구현되어 있습니다.
-        - Enum 값에서 equals() 메서드를 호출하면, 사실상 == 연산자와 동일한 결과를 반환합니다.
-        - equals()를 사용하는 것은 불필요한 오버헤드를 발생시킬 수 있습니다.
-        - equals()는 일반적으로 객체의 상태를 비교하는 데 사용되므로, Enum과 같은 상수 객체에서는 == 연산자가 더 명확하고 효율적입니다.
+2. equals() 메서드
+    - equals() 메서드는 내용 비교를 수행합니다.
+    - Enum은 기본적으로 Object 클래스를 상속받고, Object 클래스의 equals() 메서드는 참조를 비교하는 방식으로 구현되어 있습니다.
+    - Enum 값에서 equals() 메서드를 호출하면, 사실상 == 연산자와 동일한 결과를 반환합니다.
+    - equals()를 사용하는 것은 불필요한 오버헤드를 발생시킬 수 있습니다.
+    - equals()는 일반적으로 객체의 상태를 비교하는 데 사용되므로, Enum과 같은 상수 객체에서는 == 연산자가 더 명확하고 효율적입니다.
 
-    3. instanceof 연산자
-        - 객체가 특정 클래스의 인스턴스인지를 확인하는 연산자.
-        - instanceof를 사용하여 특정 Enum 클래스의 값인지 확인하는 것은 불가능합니다.
-        - 이유는 Enum 값이 클래스 타입으로 존재하는 객체가 아니기 때문입니다.
-        - 대신, Enum의 값 자체가 Enum 클래스의 인스턴스가 아니라,
-          Enum 클래스에 정의된 고유한 상수 값으로 존재하기 때문에 instanceof를 사용하여 Enum 값을 직접 확인하는 방식은 적합하지 않습니다.
-        - Enum 값은 클래스의 인스턴스가 아니라, 해당 Enum 클래스의 고정된 상수입니다.
-          즉, Enum 값은 Enum 클래스의 정적 필드일 뿐, 클래스의 객체가 아닙니다.
-          그래서 instanceof를 사용하여 Enum 값이 특정 Enum 타입의 인스턴스인지 확인하는 것은 불가능.
-        - Enum 값이 특정 Enum 타입인지 확인하려면 Enum 클래스의 getClass() 메서드를 활용하는 방법을 사용가능.
-          ~~~
-          // status가 Status enum의 인스턴스인지 확인. 
-          // Enum 상수는 getClass()를 호출할 수 있으며, 해당 Enum의 타입을 반환.
-          if(status.getClass() == Status.class) { 
-              // ...
-          }
-          ~~~
+3. instanceof 연산자
+    - 객체가 특정 클래스의 인스턴스인지를 확인하는 연산자.
+    - instanceof를 사용하여 특정 Enum 클래스의 값인지 확인하는 것은 불가능합니다.
+    - 이유는 Enum 값이 클래스 타입으로 존재하는 객체가 아니기 때문입니다.
+    - 대신, Enum의 값 자체가 Enum 클래스의 인스턴스가 아니라,
+      Enum 클래스에 정의된 고유한 상수 값으로 존재하기 때문에 instanceof를 사용하여 Enum 값을 직접 확인하는 방식은 적합하지 않습니다.
+    - Enum 값은 클래스의 인스턴스가 아니라, 해당 Enum 클래스의 고정된 상수입니다.
+      즉, Enum 값은 Enum 클래스의 정적 필드일 뿐, 클래스의 객체가 아닙니다.
+      그래서 instanceof를 사용하여 Enum 값이 특정 Enum 타입의 인스턴스인지 확인하는 것은 불가능.
+    - Enum 값이 특정 Enum 타입인지 확인하려면 Enum 클래스의 getClass() 메서드를 활용하는 방법을 사용가능.
+      ~~~
+      // status가 Status enum의 인스턴스인지 확인. 
+      // Enum 상수는 getClass()를 호출할 수 있으며, 해당 Enum의 타입을 반환.
+      if(status.getClass() == Status.class) { 
+          // ...
+      }
+      ~~~
 
 
 ---
+## 13. Pageable
 ### < Pageable - 페이지 기능을 지원 >
 - 개발기간 단축
   - 페이지 기능은 흔하지만 서비스의 핵심적인 기능은 아니다.
@@ -1977,7 +1138,6 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
    ~~~
 
 
----
 ### < Pageable 페이지, 사이즈 디폴트값 지정 >
 1. @PageableDefault 어노테이션
    - Pageable 객체의 기본 설정을 Controller 메서드에서 직접 지정할 때 사용.
@@ -2054,7 +1214,8 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
 
 
 ---
-### < 컨트롤러에서 @RequestParam을 DTO(Data Transfer Object)로 받는 이유 >
+14. Controller 메서드 파라미터
+### < Controller에서 @RequestParam을 DTO로 받는 이유 >
 > 컨트롤러에서 @RequestParam을 DTO로 받는 것은 코드의 가독성, 유지보수성, 확장성을 높이는 좋은 설계 방식.
 > 파라미터를 하나의 객체로 묶어 관리하고, 유효성 검사를 적용하며, 비즈니스 로직을 더욱 명확하고 일관되게 처리가능.
 
@@ -2101,28 +1262,34 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
      - DTO는 다른 컨트롤러나 서비스에서 재사용할 수 있어 중복 코드 줄어듦.
 
 
----
-### < 컨트롤러에서 파라미터값 받는 방법 >
-- DTO (Data Transfer Object)를 사용할 때 @RequestParam을 사용하지 않는 이유는
-  DTO 객체를 자동으로 매핑하기 위해 Spring이 사용하는 방식 때문입니다.
+### < 스프링 MVC 파라미터 바인딩 (컨트롤러에서 파라미터값 받는 방법) >
+- @RequestParam을 DTO(Data Transfer Object)에서 생략 가능한 이유
+  DTO를 파라미터로 받을 경우,
+  Spring MVC의 데이터 바인딩(Data Binding) 기능(@ModelAttribute)에 의해
+  쿼리 파라미터가 DTO 필드에 자동 매핑되므로
+  개별 필드마다 @RequestParam을 사용할 필요 없음.
 
-1. GET 쿼리파라미터
-    - @RequestParam은 개별 쿼리 파라미터를 메서드 파라미터로 매핑할 때 사용.
-    - 쿼리 파라미터가 하나하나 대응되어야 하는데, DTO 객체처럼 여러 필드를 묶어서 전달하는 경우에는
-      @RequestParam으로 직접 받는 것이 번거롭고 불편할 수 있습니다.
+1. GET 쿼리파라미터 - @RequestParam 사용
+    - @RequestParam은 ***개별 쿼리 파라미터를 개별 메서드 파라미터로 매핑*** 시 사용.
+    - 각 파라미터마다 @RequestParam을 명시해주어야 하기 때문에 필드가 많을 경우 코드가 길어지고 불편.
+    - 쿼리 파라미터가 하나하나 대응되어야 하므로 DTO 객체처럼 여러 필드를 묶어서 전달하는 경우에는
+      @RequestParam으로 직접 받는 것이 번거롭고 불편할 수 있음.
    ~~~
-    // 각 파라미터마다 @RequestParam을 명시해주어야 하기 때문에 필드가 많을 경우 코드가 길어지고 불편.
-   
     @RequestMapping("/search")
-    public String search(@RequestParam("name") String name, @RequestParam("status") String status) {
+    public String search(@RequestParam("name") String name, 
+                         @RequestParam("status") String status) {
         // name과 status를 각각 받아서 처리
     }
    ~~~
 
-2. GET 쿼리파라미터와 DTO
+2. GET 쿼리파라미터 - DTO 사용
     - Spring MVC에서는 DTO 객체를 쿼리 파라미터와 자동으로 매핑가능.
     - @RequestParam 없이 DTO의 필드 이름과 동일한 쿼리 파라미터가 있을 경우
-      자동으로 해당 값을 DTO에 주입해주기 때문에, 하나의 객체로 여러 파라미터를 묶어 처리가능.
+      자동으로 해당 값을 DTO 필드에 바인딩하기 때문에, 하나의 객체로 여러 파라미터를 묶어 처리가능.
+    - Spring MVC에서는
+      @RequestBody가 없고, 단순 객체 타입 파라미터인 경우
+      기본적으로 @ModelAttribute 방식으로 처리되며,
+      이때 쿼리 파라미터를 DTO의 필드 이름 기준으로 자동 바인딩한다.
    ~~~
     // 이 방식에서는 name, status 같은 쿼리 파라미터가 있으면, 
     //  Spring이 자동으로 RequestSearchProductionDto 객체의 필드에 매핑. 
@@ -2134,8 +1301,17 @@ RedisTemplate을 @Bean으로 등록하면 스프링 컨테이너에서 자동으
     }
    ~~~
 
-3. GET,POST requestBody
-    - @RequestBody는 HTTP 요청의 본문에 포함된 데이터를 객체로 변환해서 받는 방식.
-    - 보통 POST 요청에서 JSON 데이터를 받을 때 사용.
-    - 쿼리파라미터와 달리 DTO로 데이터를 받을 때 @requestBody 어노테이션을 사용해야함.
+3. POST JSON requestBody - @RequestBody 사용 / POST Form 데이터 - @ModelAttribute  
+   HTTP 요청의 본문에 포함된 데이터를 객체로 변환해서 받는 방식.
+   1) POST 요청에서 JSON 데이터   
+      ***POST 요청에서 JSON 데이터***를 Body로 받을 경우 ***@RequestBody***를 사용.   
+      Jackson(ObjectMapper)가 HTTP Body의 JSON 데이터를 지정한 DTO 객체로 변환.   
+      requestBody가 JSON인데 @RequestBody가 없는 경우,
+      Spring은 Body를 파싱하지 않으므로 DTO 필드가 null이 되거나 바인딩에 실패.
+   2) POST 요청에서 form 데이터
+      POST 요청이라도 form 데이터의 경우는 ***@ModelAttribute*** 방식으로 바인딩됨.
+      ex) content type이 application/x-www-form-urlencoded, multipart/form-data
+   3) GET은 Body 사용 비권장
+      HTTP 스펙 상 GET은 Body 사용을 권장하지 않기 때문에 
+      일부 서버, 프록시, 캐시가 Body를 무시하므로 GET에 @RequestBody를 쓰지 않음.
 

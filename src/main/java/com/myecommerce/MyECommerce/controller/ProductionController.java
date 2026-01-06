@@ -8,7 +8,7 @@ import com.myecommerce.MyECommerce.dto.production.ResponseSearchDetailProduction
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.service.production.ProductionService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -58,7 +58,7 @@ public class ProductionController {
      **/
     @GetMapping("/{id}")
     public ResponseEntity<ResponseSearchDetailProductionDto> searchDetailProduction(
-            @PathVariable @NotNull Long id) {
+            @PathVariable @Positive Long id) {
         return ResponseEntity.ok(
                 productionService.searchDetailProduction(id));
     }

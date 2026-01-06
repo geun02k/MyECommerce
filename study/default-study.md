@@ -13,6 +13,7 @@
    - 유효성 검사 라이브러리 validation
 3. 유효성 검증
    - 검증관련처리
+   - PathVariable에 대한 @NotNull 검증 제외 판단
    - 유효성검사 정규식
    - 비밀번호 유효성검사 정규식
 4. git 사용하기
@@ -473,6 +474,23 @@
      - 사용자 정의 어노테이션을 만들고, 검증 로직을 작성하는 데 시간이 소요됩니다. 또한, 너무 많은 사용자 정의 어노테이션이 존재하면 프로젝트가 복잡해질 수 있습니다.
    - 제한된 검증
      - DTO의 필드에 대해 간단한 유효성 검증은 @NotBlank, @Size 등의 내장 어노테이션을 사용하면 되지만, 비즈니스 로직에서 필요로 하는 복잡한 검증은 사용자 정의 어노테이션으로 처리하기 어려운 경우가 있을 수 있습니다.
+
+
+### < PathVariable에 대한 @NotNull 검증 제외 판단 >
+- 참조 : ProductionController.searchDetailProduction()
+1. 검증 제외 판단 사유 
+   - PathVariable은 요청 레벨에서 차단되어 Null 도달 불가
+   상품 상세 조회는 GET /production/{id} 형태로 요청된다.
+   이 떄, id 값은 PathVariable로 전달된다.
+   Spring MVC는 PathVariable을 반드시 바인딩해야 하므로, 
+   값이 없을 경우 컨트롤러 메서드에 진입하기 전에 요청이 실패한다.
+   즉, PathVariable 특성상 id 값이 누락된 요청은 컨트롤러 진입 이전에 404(Not Found) 또는 400(Bad Request) 처리된다.
+   이로 인해 id == null 상태는 사실상 발생할 수 없기에 @NotNull 검증은 불필요.
+2. 대안 검증 제시
+   - @Positive
+   추가적으로 상품 ID는 양수라는 도메인 제약을 가지므로,
+   @NotNull을 이용한 단순 존재 여부 검증 보다는 값의 범위 및 형식 검증이 더 의미있고 적절한 선택이다.
+   ex) @Positive : 값이 0보다 큰지 검증.
 
 
 ### < 유효성검사 정규식 >

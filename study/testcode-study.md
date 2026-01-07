@@ -9,7 +9,20 @@
    - @Test (단위테스트)
    - @WebMvcTest (웹 계층 슬라이스 테스트)
    - @SpringBootTest (애플리케이션 통합테스트)
-2. mocking
+2. 단위테스트와 통합테스트
+   - 순수 Mockito 테스트 vs Spring 테스트
+3. 단위 테스트
+   - Service 테스트코드 작성 범위
+   - Controller 테스트케이스 작성 - 도저히 안되서 Chat gpt를 통해 작성
+4. 슬라이스 테스트
+   - Controller 슬라이스 테스트
+   - Controller 단위테스트에서 슬라이스 테스트로 변경
+   - Controller 단위테스트를 슬라이스 테스트로 변경 시 스프링 시큐리티 문제
+5. @WebMvcTest
+   - @WebMvcTest와 MockMvc
+   - @WebMvcTest에서 Security 설정
+   - @WebMvcTest와 ObjectMapper DI
+6. mocking
    - mocking
    - Mock 라이브러리
    - Mock 객체 생성
@@ -18,14 +31,15 @@
    - mock 객체 호출 검증
    - @ExtendWith(MockitoExtension.class)
    - repository의 메서드를 stub하지 않아도 테스트코드 오류가 발생하지 않는 이유
-4. 테스트코드 검증
+   - @MockBean vs @Mock
+7. 테스트코드 검증
    - 테스트코드 검증
    - 테스트코드 검증과 ArgumentCaptor
    - 테스트코드 전달인자 검증
-7. Reflection - private 메서드 테스트코드 작성
-8. Controller 테스트케이스 작성 - 도저히 안되서 Chat gpt를 통해 작성
-9. JPA의 Dirty Checking을 사용 시 테스트코드 작성
-
+8. 테스트코드에서 필드주입
+9. Reflection - private 메서드 테스트코드 작성
+10. JPA의 Dirty Checking을 사용 시 테스트코드 작성
+11. 프로덕션, 테스트 config 파일
 
 --- 
 ## 1. 테스트코드
@@ -119,7 +133,603 @@
 
 
 ---
-## 2. mocking
+2. 단위테스트와 통합테스트
+- 참고블로그        
+  https://binco.tistory.com/entry/Unit%EB%8B%A8%EC%9C%84-%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%99%80-Integration%ED%86%B5%ED%95%A9-%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%A0%95%EB%A6%AC%EB%B0%8F%EC%98%88%EC%8B%9C
+
+
+### < 순수 Mockito 테스트 vs Spring 테스트 >
+> @WebMvcTest를 사용하는 경우, @ExtendWith(MockitoExtension.class)를 쓰지 않는다.   
+Mockito가 아니라 Spring TestContext가 테스트를 실행/관리하기 때문이다.
+
+1. @ExtendWith(MockitoExtension.class) (순수 Mockito 테스트)
+   JUnit5에 해당 테스트는 Mockito가 테스트 생명주기를 관리함을 알림.
+   @Mock, @InjectMocks 어노테이션 등 사용이 가능하고 Mockito 기반 객체 생성/주입이 가능해진다.
+   테스트는 Spring 컨테이너(ApplicationContext) 없이 실행된다.
+   즉, 해당 테스트는 ***순수 단위 테스트용***으로 사용된다.
+   Spring없이 실행되므로 매우 빠르지만, HTTP/Validation/Security 테스트 불가.
+   ~~~
+   @ExtendWith(MockitoExtension.class)
+   class ProductionControllerUnitTest {
+       @Mock
+       ProductionService productionService;
+
+       @InjectMocks
+       ProductionController controller;
+   }
+   ~~~
+2. @WebMvcTest (Spring 테스트)   
+   Spring이 테스트를 관리하는 테스트.
+   Spring에 Spring TestContext Framework를 띄우고, Web MVC 계층만 로딩해 테스트를 수행하라고 알림.
+   즉, 테스트의 실행 주체는 Spring이고, 테스트 컨텍스트로 Spring ApplicationContext를 사용하며 Spring과 Mockito를 통합해 Mock을 관리.
+   ***Spring 슬라이스 테스트 시 사용.***   
+   @MockitoBean을 이용해 Mock 생성 및 주입 가능.
+   Spring Context 안에 Mock Bean을 등록해 Controller에 자동 주입함.
+   Spring MVC 동작을 하므로 Validation/Binding/Security 테스트가 가능.
+   ~~~
+   @WebMvcTest(ProductionController.class)
+   class ProductionControllerTest {
+       @Autowired
+       MockMvc mockMvc;
+
+       @MockitoBean
+       ProductionService productionService;
+   }
+   ~~~
+
+
+---
+## 3. 단위 테스트
+### < Service 테스트코드 작성 범위 >
+Service 코드에서 메서드로 추출된 내용에 대한 단위 테스트 코드 작성은
+테스트의 목적과 메서드의 책임에 따라 달라질 수 있음.
+
+1. Service 메서드의 단위 테스트 작성 원칙   
+   단위 테스트는 기본적으로 한 가지 책임만을 테스트하는 것이 권장.
+   각 메서드가 독립적으로 테스트 가능하도록 잘 분리되어 있다면,
+   각 메서드에 대한 단위 테스트를 별도로 작성해야 할 필요성이 생김.
+   따라서, ***서비스 코드에서 각 기능이 메서드로 잘 추출되어 있다면 각 메서드의 단위 테스트를 작성하는 것이 원칙적***입니다.
+   1. 독립성   
+      메서드가 하나의 작은 책임만 담당한다면, 해당 메서드를 독립적으로 테스트 가능.
+   2. 단일 책임 원칙(SRP)   
+      각 메서드가 특정 작업을 담당하고 있다면, 그 작업에 대해 독립적으로 테스트 가능.
+   3. 유지 보수   
+      메서드를 추출한 뒤 각 메서드에 대해 단위 테스트를 작성하면,
+      이후에 해당 메서드의 변경이 있을 때 테스트가 실패하는지 확인할 수 있어 리팩토링이나 수정에 유리.   
+      <br>
+
+2. Service 코드 단위 테스트 예시   
+   예를 들어, modifyProduction 메서드에서 호출되는
+   checkIfOptionCodeExists, saveProductionOption 등의 메서드가 있다면,
+   이들도 각각 단위 테스트를 작성해야 할 경우가 많음.
+   하지만, 모든 메서드에 대해 독립적인 테스트를 작성해야 하는지는 상황 고려가 필요.
+   1) 메서드가 외부 의존성이 있는 경우   
+      checkIfOptionCodeExists() 메서드는 데이터베이스를 조회하거나 외부 서비스 호출 가능.
+      이 경우, Mocking을 사용하여 외부 의존성을 대체하고 해당 메서드의 기능을 테스트.
+      예를 들어, checkIfOptionCodeExists()가 데이터베이스를 호출하는 메서드라면,
+      실제 데이터베이스를 테스트 환경에서 사용하기보다는 Mockito나 MockMvc를 사용해
+      Mocking하여 테스트를 진행.
+   2) 메서드가 비즈니스 로직을 수행하는 경우   
+      saveProductionOption()이 실제 DB에 데이터를 저장하는 로직이라면,
+      이 부분도 Mocking을 사용하여 데이터베이스와의 상호작용 없이 해당 메서드가 올바르게 동작하는지 테스트 가능.   
+      <br>
+
+3. 각 메서드의 단위 테스트 여부 판단 기준
+   1) 핵심 비즈니스 로직을 처리하는 메서드  
+      핵심 비즈니스 로직을 처리하는 메서드의 경우, 단위 테스트 필요.  
+      예를 들어, modifyProduction 메서드는 상품 수정 로직의 핵심이므로 테스트 대상이 되어야 함.
+   2) 단순한 변환 작업을 하는 메서드   
+      예를 들어, modifyProductionOptionMapper::toEntity와 같은 메서드는
+      단순히 DTO를 엔티티로 변환하는 작업이다.
+      이런 메서드는 통합 테스트로 확인하고, 단위 테스트는 필요없을 수 있음.
+      변환 로직이 복잡하다면 테스트가 필요할 수 있음.
+   3) 외부 의존성을 호출하는 메서드   
+      productionRepository.save() 같은 JPA 리포지토리 메서드는 실제 DB를 사용하는 부분이라,
+      Mocking이나 통합 테스트로 처리하는 것이 일반적.   
+      <br>
+
+4. 단위 테스트를 위한 모킹(Mock)   
+   Mockito와 같은 Mocking 프레임워크를 활용하면, 외부 의존성을 차단하고 단위 테스트를 작성 가능.
+
+
+### < Controller 테스트케이스 작성 - 도저히 안되서 Chat gpt를 통해 작성 >
+1. MockMvc를 이용한 테스트 목적
+   - 컨트롤러의 엔드포인트를 호출하여 HTTP 클라이언트의 요청을 모방하고 적절한 응답을 확인하기 위해 테스트 수행.
+2. @WebMvcTest(MemberController.class)
+   - MockMvc 객체를 생성해 컨트롤러와 상호작용함.
+   - 명시한 해당 컨트롤러만 격리시켜 단위테스트 수행가능.
+   - value : 테스트 할 controller 클래스 명시.
+3. @MockBean
+   - 테스트 환경에서 애플리케이션 컨텍스트(ApplicationContext)의 빈을 모킹하도록 설정.
+   - Spring Boot 3.4.0부터 deprecated된 @MockBean과 거의 동일.
+   - 빈으로 등록해주는 mock
+   - 자동으로 빈으로 등록되어 컨트롤러에 주입됨.
+
+4. 일반적으로 **@WebMvcTest**와 **MockMvc**를 사용하여 Controller를 테스트할 수 있습니다.    
+   이 테스트는 Controller의 HTTP 요청과 응답을 실제로 처리하는 방식으로 동작합니다.   
+   다음은 signUpSeller() 메서드의 성공적인 테스트 케이스입니다.   
+   이 예제에서는 @MockBean을 사용하여 의존성 주입되는 MemberService를 mock하고, MockMvc를 사용하여 실제 HTTP 요청을 시뮬레이션합니다.
+   - 코드 설명
+      1) MockMvc 설정   
+         MockMvcBuilders.standaloneSetup(memberController).build()로 MockMvc를 설정하여 Controller를 테스트할 수 있게 만듭니다.
+      2) Mock 객체 설정   
+         @Mock 어노테이션을 통해 MemberService를 mock하고, @InjectMocks를 사용하여 MemberController에 mock된 MemberService를 주입합니다.
+      3) MockMvc로 HTTP 요청 시뮬레이션
+         - mockMvc.perform(post("/member/signup/seller")...)로 HTTP POST 요청을 시뮬레이션합니다.
+         - andExpect(status().isOk())는 응답 상태 코드가 200 OK임을 검증.
+         - andExpect(jsonPath("$.name").value("John Doe"))는 JSON 응답 본문에서 name 값이 "John Doe"인지 확인합니다.
+   ~~~
+    package com.myecommerce.MyECommerce.controller;
+    
+    import com.fasterxml.jackson.databind.ObjectMapper;
+    import com.myecommerce.MyECommerce.dto.MemberDto;
+    import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
+    import com.myecommerce.MyECommerce.service.member.MemberService;
+    import com.myecommerce.MyECommerce.type.MemberAuthorityType;
+    import org.junit.jupiter.api.BeforeEach;
+    import org.junit.jupiter.api.Test;
+    import org.mockito.InjectMocks;
+    import org.mockito.Mock;
+    import org.mockito.Mockito;
+    import org.springframework.http.HttpStatus;
+    import org.springframework.http.MediaType;
+    import org.springframework.test.web.servlet.MockMvc;
+    import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+    import org.springframework.web.context.WebApplicationContext;
+    
+    import java.util.Collections;
+    
+    import static org.mockito.ArgumentMatchers.any;
+    import static org.mockito.Mockito.when;
+    import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+    import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+    
+    class MemberControllerTest {
+    
+        private MockMvc mockMvc;
+    
+        @Mock
+        private MemberService memberService;
+    
+        @InjectMocks
+        private MemberController memberController;
+    
+        private ObjectMapper objectMapper;
+    
+        @BeforeEach
+        void setUp() {
+            objectMapper = new ObjectMapper();
+            mockMvc = MockMvcBuilders.standaloneSetup(memberController).build();
+        }
+    
+        @Test
+        void signUpSeller_Success() throws Exception {
+            // given
+            MemberDto memberDto = new MemberDto();
+            memberDto.setName("John Doe");
+            memberDto.setTel1("010");
+            memberDto.setTel2("1234");
+            memberDto.setTel3("5678");
+            memberDto.setPassword("password123");
+    
+            // 권한 설정
+            MemberAuthority authority = new MemberAuthority();
+            authority.setAuthority(MemberAuthorityType.SELLER);
+            memberDto.setAuthorities(Collections.singletonList(authority));
+    
+            // when
+            when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
+    
+            // then
+            mockMvc.perform(post("/member/signup/seller")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(memberDto)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.name").value("John Doe"))
+                    .andExpect(jsonPath("$.tel1").value("010"))
+                    .andExpect(jsonPath("$.tel2").value("1234"))
+                    .andExpect(jsonPath("$.tel3").value("5678"))
+                    .andExpect(jsonPath("$.password").value("password123"))
+                    .andExpect(jsonPath("$.authorities[0].authority").value("SELLER"));
+        }
+    }
+   ~~~
+
+5. 스프링부트 3.4.0 버전 이상인 경우 @Mock 어노테이션 사용 불가.   
+   다른방식으로 테스트코드 작성 필요.
+   - @Mock 어노테이션 대신 Mockito.mock()을 사용하여 mock 객체를 생성해야 합니다. (Mockito.mock 사용)
+   - @Mock 어노테이션을 사용하지 않고, Mockito.mock()을 사용하여 MemberService의 mock 객체를 생성합니다.
+     ~~~
+      // mock 객체  생성
+      memberService = Mockito.mock(MemberService.class);
+     ~~~
+   - @InjectMocks
+      - @InjectMocks는 여전히 MemberController에 mock 객체를 주입하는 데 사용됩니다.
+        ~~~
+           // mock 객체를 직접 생성하여 주입
+           new MemberController(memberService);
+        ~~~
+   - Mockito로 Mock 객체 설정
+     ~~~
+      // memberService.saveMember 메서드 호출 시 mock된 MemberDto를 반환하도록 설정
+      when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
+     ~~~
+
+   ~~~
+    package com.myecommerce.MyECommerce.controller;
+    
+    import com.fasterxml.jackson.databind.ObjectMapper;
+    import com.myecommerce.MyECommerce.dto.MemberDto;
+    import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
+    import com.myecommerce.MyECommerce.service.member.MemberService;
+    import com.myecommerce.MyECommerce.type.MemberAuthorityType;
+    import org.junit.jupiter.api.BeforeEach;
+    import org.junit.jupiter.api.Test;
+    import org.mockito.InjectMocks;
+    import org.mockito.Mockito;
+    import org.springframework.http.HttpStatus;
+    import org.springframework.http.MediaType;
+    import org.springframework.test.web.servlet.MockMvc;
+    import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+    
+    import java.util.Collections;
+    
+    import static org.mockito.ArgumentMatchers.any;
+    import static org.mockito.Mockito.when;
+    import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+    import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+    
+    class MemberControllerTest {
+    
+        private MockMvc mockMvc;
+    
+        private MemberService memberService;  // @Mock 대신 필드로 사용
+    
+        @InjectMocks
+        private MemberController memberController;
+    
+        private ObjectMapper objectMapper;
+    
+        @BeforeEach
+        void setUp() {
+            // Mockito.mock을 사용하여 mock 객체 생성
+            memberService = Mockito.mock(MemberService.class);
+            
+            // InjectMocks로 Controller에 mock 객체 주입
+            memberController = new MemberController(memberService);
+            
+            objectMapper = new ObjectMapper();
+            mockMvc = MockMvcBuilders.standaloneSetup(memberController).build();
+        }
+    
+        @Test
+        void signUpSeller_Success() throws Exception {
+            // given
+            MemberDto memberDto = new MemberDto();
+            memberDto.setName("John Doe");
+            memberDto.setTel1("010");
+            memberDto.setTel2("1234");
+            memberDto.setTel3("5678");
+            memberDto.setPassword("password123");
+    
+            // 권한 설정
+            MemberAuthority authority = new MemberAuthority();
+            authority.setAuthority(MemberAuthorityType.SELLER);
+            memberDto.setAuthorities(Collections.singletonList(authority));
+    
+            // when
+            when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
+    
+            // then
+            mockMvc.perform(post("/member/signup/seller")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(memberDto)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.name").value("John Doe"))
+                    .andExpect(jsonPath("$.tel1").value("010"))
+                    .andExpect(jsonPath("$.tel2").value("1234"))
+                    .andExpect(jsonPath("$.tel3").value("5678"))
+                    .andExpect(jsonPath("$.password").value("password123"))
+                    .andExpect(jsonPath("$.authorities[0].authority").value("SELLER"));
+        }
+    }
+   ~~~
+
+6. 테스트코드를 작성시 @MockMvc 어노테이션을 적용하지 않는 이유
+   - @MockMvc는 테스트 클래스에 적용할 수 없고, 객체를 수동으로 생성해야하기 때문입니다.   
+     @MockMvc 어노테이션은 실제로 MockMvc 객체를 설정하는 것이 아니라, MockMvc 객체를 자동으로 초기화하기 위한 테스트 클래스의 기본적인 설정을 도와줍니다.    
+     그러나, 이 어노테이션은 Spring 3.4.0 이상에서는 사용되지 않으며, @MockMvc를 클래스에 붙여도 동작하지 않습니다.
+   - @MockMvc 어노테이션 역할
+      - 실제로 MockMvc 객체를 생성해주는 역할을 하지만, **@MockMvc**를 클래스 레벨에 직접 적용하는 것은 지원되지 않습니다.    
+        대신, MockMvc 객체는 테스트 클래스에서 직접 **MockMvcBuilders**를 사용하여 설정하고 초기화합니다.
+   - MockMvc를 초기화
+      - **MockMvcBuilders**를 사용해 MockMvc 객체를 수동으로 설정해야 합니다.
+      - 예를 들어, MockMvcBuilders.standaloneSetup(memberController).build();로 MockMvc 객체를 설정하여 Controller를 테스트할 수 있습니다.
+   - @WebMvcTest 사용 시 @MockMvc 자동 설정
+      - 만약 @WebMvcTest를 사용하면, @MockMvc가 자동으로 주입되지만, @WebMvcTest는 기본적으로 Spring Boot에서 웹 레이어를 테스트할 때 사용됩니다.
+      - @MockMvc는 @WebMvcTest 내에서만 자동으로 동작하는 것입니다.
+   - 권장
+      - @MockMvc는 클래스를 통해 자동 주입되지 않기 때문에 MockMvcBuilders를 사용하여 MockMvc를 수동으로 설정해야 합니다.   
+        **@MockMvc**는 @WebMvcTest에서 사용되지만, 일반적으로 @WebMvcTest 없이 사용할 때는 MockMvc를 수동으로 설정하는 방식이 필요합니다.   
+        따라서 MockMvc 객체를 수동으로 초기화하는 방식이 더 유연하고, 명시적으로 테스트가 필요한 컨트롤러만 설정할 수 있습니다.
+      - MockMvcBuilders.standaloneSetup(memberController).build() 방식이 더 권장됩니다.
+
+
+---
+## 4. 슬라이스 테스트
+### < Controller 슬라이스 테스트 >
+1. Controller 슬라이스 테스트   
+   Security, JWT, Service 구현 등에 관심이 없고 요청에 따른 컨트롤러 응답만 검증.
+   이 때, JWT 토큰이 없고 Security Filter가 먼저 실행되어 Controller까지 가지 못해 테스트가 깨진다.
+   따라서 해당 테스트에서 모든 요청을 통과 시키기 위해 Security 자체를 끄는 방법이 필요하다.  
+   <br>
+
+2. Controller 슬라이스 테스트 목적
+   - 요청 바인딩
+   - Validation
+   - HTTP Status
+   - Controller 로직   
+     JWT 파싱, 토큰 서명, 인증 서버 연동, 실제 권한 판별 로직 등은 검증하지 않는다.
+
+
+### < Controller 단위테스트에서 슬라이스 테스트로 변경 >
+- 참조 ProductionController.successRegisterProduction()
+
+1. 기존 Controller 테스트의 한계
+   기존 테스트는 Controller가 Service를 호출하는지만 확인하는 Mockito 기반의 순수 단위 테스트에 가깝다.   
+   이는 Controller 메서드를 직접 호출하는 수준에 머물러 있으며,
+   JSON 바인딩로 MockMVC의 최소 기능만 사용했다.
+   1) ***Controller는 비즈니스 로직이 없기 때문에 단위 테스트의 효용이 낮음.***
+   2) JSON 필드명 변경으로 인한 요청/응답 불일치,
+      Validation 어노테이션 누락,
+      @RequestBody 누락,
+      Security 설정 오류,
+      ArgumentResolver 설정 오류 등의 문제 검증 불가.
+      Controller의 역할은 Http 요청 수신, 바인딩, validation, service 호출, response 반환이다.
+      따라서 controller 핵심 책임 검증을 전혀 하지 못함.
+
+2. 수정한 Controller 테스트의 목적    
+   수정된 테스트는 Spring MVC + Security를 포함한 웹 계층 테스트이다.   
+   HTTP 요청/응답, JSON 바인딩, API 스펙 보호를 주요 목적으로 하며,
+   실제 HTTP 요청 처리 흐름을 거의 그대로 통과하고 있다.   
+   테스트는 Spring MVC Context, DispatcherServlet, Jackson 기반 JSON 바인딩,
+   Validation 처리, Spring Security 인증 흐름의 구성 요소들을 포함하고 있다.   
+   그러면서 비즈니스 로직을 담당하는 Service는 Mock 처리하여 웹 계층 테스트로서의 범위를 명확히 유지한다.
+
+3. 인증 처리 관점에서의 차이
+   기존 테스트코드는 인증 개념 자체가 존재하지 않고, Member 객체도 단순한 POJO에 불과하다.
+   이로 인해 실제 운영 환경과 괴리가 크다.
+   반면, 수정된 테스트코드는 with(user(member))를 통해
+   Spring Security Context에 사용자를 주입하고 member 객체에 권한 정보를 포함시켜
+   실제 운영 환경과 거의 동일한 인증 흐름을 재현한다.
+   이로 인해 해당 API는 인증된 SELLER만 호출 가능하다는 요구사항을 테스트 수준에서 보호할 수 있게 된다.
+
+- 테스트 변경 목적
+  Controller는 비즈니스 로직이 없으므로 순수 단위 테스트의 효용은 낮다.
+  따라서 비즈니스 검증이 아닌 HTTP 요청/응답, JSON 바인딩 및 API 스펙(계약) 보호를 목적으로 변경한다.
+
+
+### < Controller 단위테스트를 슬라이스 테스트로 변경 시 스프링 시큐리티 문제 >
+0. controller 단위테스트 -> 슬라이스 테스트로 변경
+   > 테스트 대상에 따른 Security 처리 활성 여부가 달라진다.  
+   Controller 슬라이스 테스트에서 Security 처리는 비활성화 하거나 Mocking 처리한다.  
+   Security 설정 검증 테스트에서 Security는 별도로 처리하고,
+   인증/인가 통합 테스트는 @SpringBootTest로 테스트한다.
+   >
+   > Controller 슬라이스 테스트에서는 Spring Security의 토큰 인증 자체를 검증 대상에서 제외하고,
+   필요 시 Mock 인증을 사용해 권한 분기만 테스트한다.
+   1. Security 필터 비활성화 (일반 요청 검증)  
+      가장 흔한 해결방법이다.
+      Controller 로직에만 집중 가능하고 Validation 테스트도 수행되므로 가장 보편적인 선택이다.
+       ~~~
+       @WebMvcTest(ProductionController.class)
+       @AutoConfigureMockMvc(addFilters = false)
+       class ProductionControllerTest {
+           // ...
+       }
+       ~~~
+   2. Mock 인증 사용자 주입 (권한 분기 검증)  
+      권한 분기 테스트가 가능하며, 인증 로직 자체는 제외된다.
+      따라서 토큰 검증을 수행하지 않고, 필터 체인만 통과 가능하다.
+       ~~~
+       @WithMockUser(authorities = "SELLER")
+       @Test
+       void 상품등록_성공() throws Exception {
+           // ...
+       }
+       ~~~
+   3. 토큰까지 포함해 테스트   
+      실제 JWT 생성, SecurityConfig를 로딩하고 @SpringBootTest를 사용한다.
+      느리고 유지보수가 어려우며, Controller 테스트 목적과 어긋난다.
+      이는 통합 테스트 영역이므로 따라서 잘 사용하지 않는 방법이다.  
+      <br>
+1. 문제발생
+   ~~~
+    Failed to load ApplicationContext for [WebMergedContextConfiguration@456aa471 testClass = com.myecommerce.MyECommerce.controller.ProductionControllerTest, locations = [], classes = [com.myecommerce.MyECommerce.MyECommerceApplication], contextInitializerClasses = [], activeProfiles = [], propertySourceDescriptors = [], propertySourceProperties = ["org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTestContextBootstrapper=true"], contextCustomizers = [org.springframework.boot.test.autoconfigure.OnFailureConditionReportContextCustomizerFactory$OnFailureConditionReportContextCustomizer@4ebea12c, org.springframework.boot.test.autoconfigure.OverrideAutoConfigurationContextCustomizerFactory$DisableAutoConfigurationContextCustomizer@235f4c10, org.springframework.boot.test.autoconfigure.actuate.observability.ObservabilityContextCustomizerFactory$DisableObservabilityContextCustomizer@1f, org.springframework.boot.test.autoconfigure.filter.TypeExcludeFiltersContextCustomizer@7f0b4da3, org.springframework.boot.test.autoconfigure.properties.PropertyMappingContextCustomizer@13b3bb87, org.springframework.boot.test.autoconfigure.web.servlet.WebDriverContextCustomizer@303e3593, [ImportsContextCustomizer@51f01535 key = [org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration, org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration, org.springframework.boot.autoconfigure.web.servlet.HttpEncodingAutoConfiguration, org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration, org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration, org.springframework.boot.autoconfigure.hateoas.HypermediaAutoConfiguration, org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration, org.springframework.boot.autoconfigure.data.web.SpringDataWebAutoConfiguration, org.springframework.boot.test.autoconfigure.web.reactive.WebTestClientAutoConfiguration, org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration, org.springframework.boot.test.autoconfigure.web.servlet.MockMvcAutoConfiguration, org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration, org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration, org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConfiguration, org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration, org.springframework.boot.test.autoconfigure.web.servlet.MockMvcSecurityConfiguration, org.springframework.boot.test.autoconfigure.web.servlet.MockMvcWebClientAutoConfiguration, org.springframework.boot.test.autoconfigure.web.servlet.MockMvcWebDriverAutoConfiguration, org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration, org.springframework.boot.autoconfigure.gson.GsonAutoConfiguration, org.springframework.boot.autoconfigure.jsonb.JsonbAutoConfiguration, org.springframework.boot.autoconfigure.freemarker.FreeMarkerAutoConfiguration, org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration, org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration, org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration, org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateAutoConfiguration, org.springframework.boot.autoconfigure.mustache.MustacheAutoConfiguration]], org.springframework.boot.test.context.filter.ExcludeFilterContextCustomizer@754777cd, org.springframework.boot.test.json.DuplicateJsonObjectContextCustomizerFactory$DuplicateJsonObjectContextCustomizer@4cc76301, org.springframework.boot.test.mock.mockito.MockitoContextCustomizer@0, org.springframework.boot.test.web.reactor.netty.DisableReactorResourceFactoryGlobalResourcesContextCustomizerFactory$DisableReactorResourceFactoryGlobalResourcesContextCustomizerCustomizer@22c86919, org.springframework.test.context.bean.override.BeanOverrideContextCustomizer@764a2c56, org.springframework.test.context.support.DynamicPropertiesContextCustomizer@0, org.springframework.boot.test.context.SpringBootTestAnnotation@983247bf], resourceBasePath = "src/main/webapp", contextLoader = org.springframework.boot.test.context.SpringBootContextLoader, parent = null]
+    java.lang.IllegalStateException: Failed to load ApplicationContext for [WebMergedContextConfiguration@456aa471 testClass = com.myecommerce.MyECommerce.controller.ProductionControllerTest, locations = [], classes = [com.myecommerce.MyECommerce.MyECommerceApplication], contextInitializerClasses = [], activeProfiles = [], propertySourceDescriptors = [], propertySourceProperties = ["org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTestContextBootstrapper=true"], contextCustomizers = [org.springframework.boot.test.autoconfigure.OnFailureConditionReportContextCustomizerFactory$OnFailureConditionReportContextCustomizer@4ebea12c, org.springframework.boot.test.autoconfigure.OverrideAutoConfigurationContextCustomizerFactory$DisableAutoConfigurationContextCustomizer@235f4c10, org.springframework.boot.test.autoconfigure.actuate.observability.ObservabilityContextCustomizerFactory$DisableObservabilityContextCustomizer@1f, org.springframework.boot.test.autoconfigure.filter.TypeExcludeFiltersContextCustomizer@7f0b4da3, org.springframework.boot.test.autoconfigure.properties.PropertyMappingContextCustomizer@13b3bb87, org.springframework.boot.test.autoconfigure.web.servlet.WebDriverContextCustomizer@303e3593, [ImportsContextCustomizer@51f01535 key = [org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration, org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration, org.springframework.boot.autoconfigure.web.servlet.HttpEncodingAutoConfiguration, org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration, org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration, org.springframework.boot.autoconfigure.hateoas.HypermediaAutoConfiguration, org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration, org.springframework.boot.autoconfigure.data.web.SpringDataWebAutoConfiguration, org.springframework.boot.test.autoconfigure.web.reactive.WebTestClientAutoConfiguration, org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration, org.springframework.boot.test.autoconfigure.web.servlet.MockMvcAutoConfiguration, org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration, org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration, org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConfiguration, org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration, org.springframework.boot.test.autoconfigure.web.servlet.MockMvcSecurityConfiguration, org.springframework.boot.test.autoconfigure.web.servlet.MockMvcWebClientAutoConfiguration, org.springframework.boot.test.autoconfigure.web.servlet.MockMvcWebDriverAutoConfiguration, org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration, org.springframework.boot.autoconfigure.gson.GsonAutoConfiguration, org.springframework.boot.autoconfigure.jsonb.JsonbAutoConfiguration, org.springframework.boot.autoconfigure.freemarker.FreeMarkerAutoConfiguration, org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration, org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration, org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration, org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateAutoConfiguration, org.springframework.boot.autoconfigure.mustache.MustacheAutoConfiguration]], org.springframework.boot.test.context.filter.ExcludeFilterContextCustomizer@754777cd, org.springframework.boot.test.json.DuplicateJsonObjectContextCustomizerFactory$DuplicateJsonObjectContextCustomizer@4cc76301, org.springframework.boot.test.mock.mockito.MockitoContextCustomizer@0, org.springframework.boot.test.web.reactor.netty.DisableReactorResourceFactoryGlobalResourcesContextCustomizerFactory$DisableReactorResourceFactoryGlobalResourcesContextCustomizerCustomizer@22c86919, org.springframework.test.context.bean.override.BeanOverrideContextCustomizer@764a2c56, org.springframework.test.context.support.DynamicPropertiesContextCustomizer@0, org.springframework.boot.test.context.SpringBootTestAnnotation@983247bf], resourceBasePath = "src/main/webapp", contextLoader = org.springframework.boot.test.context.SpringBootContextLoader, parent = null]   
+    // ... 생략   
+    Caused by: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'jwtAuthenticationFilter' defined in file [C:\workspace\MyECommerce\build\classes\java\main\com\myecommerce\MyECommerce\security\filter\JwtAuthenticationFilter.class]: Unsatisfied dependency expressed through constructor parameter 0: No qualifying bean of type 'com.myecommerce.MyECommerce.config.JwtAuthenticationProvider' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}   
+    // ... 생략   
+    Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'com.myecommerce.MyECommerce.config.JwtAuthenticationProvider' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}
+    at org.springframework.beans.factory.support.DefaultListableBeanFactory.raiseNoMatchingBeanFound(DefaultListableBeanFactory.java:2144)   
+    // ... 생략   
+    Error creating bean with name 'jwtAuthenticationFilter' defined in file [C:\workspace\MyECommerce\build\classes\java\main\com\myecommerce\MyECommerce\security\filter\JwtAuthenticationFilter.class]: Unsatisfied dependency expressed through constructor parameter 0: No qualifying bean of type 'com.myecommerce.MyECommerce.config.JwtAuthenticationProvider' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}
+    org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'jwtAuthenticationFilter' defined in file [C:\workspace\MyECommerce\build\classes\java\main\com\myecommerce\MyECommerce\security\filter\JwtAuthenticationFilter.class]: Unsatisfied dependency expressed through constructor parameter 0: No qualifying bean of type 'com.myecommerce.MyECommerce.config.JwtAuthenticationProvider' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}   
+    // ... 생략   
+    Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'com.myecommerce.MyECommerce.config.JwtAuthenticationProvider' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}   
+    at app//org.springframework.beans.factory.support.DefaultListableBeanFactory.raiseNoMatchingBeanFound(DefaultListableBeanFactory.java:2144)
+    at app//org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1594)
+    at app//org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1519)
+    at app//org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:913)
+    at app//org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:791)
+    ... 45 more
+   ~~~
+   <br>
+
+2. 문제발생원인
+   > 테스트 범위를 정확히 설정했는데 왜 프레임워크가 그 경계를 침범하는가?
+
+   controller 단위테스트를 @WebMvcTest로 변경했더니
+   스프링 시큐리티를 적용하고 있어서인지 토큰 인증문제로 인한 에러가 발생했다.  
+   대부분의 Controller 슬라이스 테스트에서는 토큰 인증 자체를 “검증 제외 대상”이다.  
+   @WebMvcTest를 사용하면 Controller만 로딩되고 Spring Security FilterChain은 기본적으로 활성화된다.  
+   MockMvc → Security Filter → Controller 순서로 실행(?)되므로,
+   토큰이 없거나 잘못되면 Controller까지 요청이 도달하지 않기에 테스트가 실패한다.  
+   Controller 슬라이스 테스트에서 JWT 파싱, 토큰 서명, 인증 서버 연동, 실제 권한 판별 로직 등은 검증하지 않는다.  
+   Security 자체는 다른 테스트의 책임이기 때문이다.   
+   <br>
+   @AutoConfigureMockMvc(addFilters = false)를 적용하면 filter를 적용하지 않는 것으로 생각했다.  
+   여기서 'addFilters = false'는 FilterChain을 실행하지 않는다는 의미이지,
+   Filter Bean을 생성하지 않는다는 뜻이 아니다.  
+   따라서 ***Filter Bean 생성 시점의 의존성 주입 오류는 그대로 발생한다.***  
+   에러의 핵심 부분은 아래와 같다.
+   ~~~
+   Error creating bean with name 'jwtAuthenticationFilter'
+   Unsatisfied dependency expressed through constructor parameter 0
+   No qualifying bean of type 'JwtAuthenticationProvider'
+   ~~~
+   ApplicationContext 생성 시
+   Filter Bean 우선 생성 후, MockMvc 요청 시 FilterChain을 적용한다.
+   Spring이 JwtAuthenticationFilter Bean을 생성하려고 시도한다.
+   이 때, 생성자에서 JwtAuthenticationProvider를 주입하려고 한다.
+   하지만 @WebMvcTest 환경에는 해당 Bean이 없다.
+   따라서 ApplicationContext 로딩(생성) 단계에서 실패하게 된다.
+   이는 Controller까지 요청이 가기 전에 오류가 발생하는 것을 의미한다.   
+   <br>
+   @WebMvcTest는 기본적으로 Controller 관련 Bean만 로딩한다.
+   따라서 SecurityConfig는 로딩될 수 있다.
+   하지만 Security 관련 Bean 의존성이 전부 제공되지는 않는다.  
+   <br>
+
+3. 문제해결방법   
+   @WebMvcTest 환경에서 Security 관련 Bean이 부분적으로만 로딩되기 때문에,
+   Bean 생성 실패를 막으려면 테스트 전용 Security 설정(TestConfig)을 별도로 두는 것이 가장 안정적이다.  
+   'addFilters=false' 설정은 Filter 실행만 막을 뿐,
+   Filter Bean 생성은 막지 않기 때문에 Security 설정이나 Filter 의존성은 별도로 처리해야하기 때문이다.  
+   <br>
+
+   1. Security 설정 자체를 테스트에서 제외   
+      가장 깔끔하고 실무에서 최다 사용된다.
+      TestSecurityConfig를 분리하는 방법으로 JWT Filter Bean 생성 자체가 되지 않도록 한다.
+      Security와 Controller 책임을 분리해 Controller 슬라이스 테스트 목적에 가장 부합하다.
+      ~~~
+      @WebMvcTest(ProductionController.class) 
+      @AutoConfigureMockMvc(addFilters = false)
+      @Import(TestSecurityConfig.class)
+      class ProductionControllerTest {
+          // ...
+      }
+      ~~~
+      - @Import(TestSecurityConfig.class)    
+        Security 설정만 대체되고 나머지 설정은 그대로 프로덕션 설정 사용.
+      ~~~
+      @TestConfiguration
+      class TestSecurityConfig {
+          @Bean
+          SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+              http
+                  .csrf().disable()
+                  .authorizeHttpRequests().anyRequest().permitAll();
+              return http.build();
+          }
+      }
+      ~~~
+      - 보통 Security 설정만 테스트용으로 생성한다.
+        Security는 모든 요청에 개입하고 테스트 목적과 무관한 실패를 만들기 때문이다.
+
+   2. jwtAuthenticationFilter 빈 생성하지 못하게 수정
+      SecurityConfig 프로덕션 코드에 JwtAuthenticationFilter Bean을 생성해
+      filterChain에 addFilterBefore() 메서드를 통해 등록했다.
+      이는 Spring이 뜰 때 JwtAuthenticationFilter Bean을 무조건 생성하라는 의미이다.
+      내가 작성한 TestSecurityConfig를 ControllerTest에 적용하는 것은, 테스트에서는 인증을 하지 않겠다는 의미이다.
+      그런데도 여전히 JWT 에러가 발생하는 이유는, @Import에 대한 이해가 부족하기 때문이다.
+      @Import는 대체가 아닌 추가의 개념이다. 따라서 프로덕션 SecurityConfig가 TestSecurityConfig로 대체되지 않는다.   
+      <br>
+      여기서 진짜 해결책은 ***프로덕션 SecurityConfig 자체를 테스트 컨텍스트에서 아예 로딩하지 않는 것***이다.
+      1. @WebMvcTest 어노테이션의 excludeFilters 속성을 사용.
+         ~~~
+         @WebMvcTest(
+             controllers = ProductionController.class,
+             excludeFilters = @ComponentScan.Filter(
+                 type = FilterType.ASSIGNABLE_TYPE,
+                 classes = SecurityConfig.class
+             )
+         )
+         @Import(TestSecurityConfig.class)
+         class ProductionControllerTest {
+             // ...
+         }
+         ~~~
+         - 프로덕션 SecurityConfig는 로딩하지 않기 때문에 JwtAuthenticationFilter Bean은 생성되지 않는다.
+         - TestSecurityConfig가 로딩되므로, 설정한대로 모든 인증을 허가한다.   
+           <br>
+      2. SecurityConfig 자체를 조건부 로딩으로 만들기.   
+         제일 깔끔하고 실무에서 많이 사용.
+         ~~~
+         @Profile("!test")
+         @Configuration
+         public class SecurityConfig { ... }
+         ~~~
+         ~~~
+         @ActiveProfiles("test")
+         ~~~
+   3. Controller 슬라이스 테스트에서 member 객체가 null인 이유.
+      내 프로젝트의 경우, MemberUserDetails가 불필요.
+      Member 자체가 UserDetails이기 때문이다.
+      즉, Member는 도메인 사용자이자 Security 사용자이다.
+
+      Controller 슬라이스 테스트에서 인증과정이 없기 때문에 SecurityContext가 비어있다.
+      따라서 principal이 없기 때문에 member 객체는 null을 가진다.
+      Security 설정에서 permitAll() 하는 것은 접근을 허용하는 것이지 인증 객체를 생성해 주는 것이 아니기 때문이다.
+      결과적으로 ***테스트에서 Member 주입이 별도로 필요***하다.
+
+
+---
+## 5. @WebMvcTest
+### < @WebMvcTest와 MockMvc >
+@WebMvcTest 적용 시 MockMvc를 @Autowired로 주입 가능하다.
+@WebMvcTest는 Spring MVC 테스트용 ApplicationContext를 구성하고,
+그 과정에서 MockMvc를 Bean으로 등록하기 떄문이다.
+
+1. @WebMvcTest   
+   Controller 테스트에 필요한 최소한의 MVC 환경 구성.   
+   @WebMvcTest 어노테이션 미적용 시,
+   단순 JUnit 테스트에서는 Spring Context가 없기 때문에 mockMvc 자동 주입 불가.
+
+2. @WebMvcTest 어노테이션 적용 시 Spring이 로딩하는 것
+   - DispatcherServlet
+   - HandlerMapping
+   - HandlerAdapter
+   - ArgumentResolver
+   - Validator
+   - HttpMessageConverter
+   - MockMvc   
+     반면, Service, Repository, DB, 전체 비즈니스 Bean은 로딩하지 않음.
+
+3. @WebMvcTest와 MockMvc    
+   @WebMvcTest는 MVC 테스트용 ApplicationContext를 구성하면서 MockMvc를 자동으로 Bean으로 등록한다.   
+   MockMvc는 Spring MVC 테스트 환경에서만 생성된다.
+
+
+### < @WebMvcTest에서 Security 설정 >
+1. @WebMvcTest의 excludeFilters 속성   
+   프로덕션 SecurityConfig에서 표준 필터만 사용하고 커스텀 필터가 없는 경우에는,
+   생성자에 복잡한 의존성이 없어 @WebMvcTest에서도 잘 뜨기 때문에 excludeFilters가 필요없다.
+   반면, 커스텀 필터가 존재할 때, 필터가 다른 Bean에 의존한다면 excludeFilters가 필요하다.
+
+
+### < @WebMvcTest와 ObjectMapper DI >
+Spring Context가 없는 순수 단위 테스트에서는 new ObjectMapper()를 이용해 ObjectMapper 객체를 직접 생성했다.
+반면, @WebMvcTest 적용 시에는 @Autowired를 이용해 Spring이 만든 ObjectMapper Bean을 주입해 사용해야 한다.
+JacksonAutoConfiguration에 의해 생성되기 때문이다.
+- ObjectMapper   
+  ObjectMapper는 Java 객체 ↔ JSON 을 변환해주는 Jackson 라이브러리의 핵심 클래스.   
+  Spring MVC에서 요청 Body(JSON) → DTO, 응답 DTO → JSON
+  이 모든 걸 실제로 수행하는 “실무의 중심 엔진”.
+
+
+---
+## 6. mocking
 ### < mocking >
 1. Mock을 사용해 테스트 하는 이유
    - 동일 테스트코드를 함께 실행해도 하나는 성공하고 하나는 실패하는 문제 해결가능.
@@ -300,8 +910,55 @@ JUnit 5에서 MockitoExtension을 사용 시, 테스트 클래스에 @ExtendWith
    예를 들어, 해당 메서드가 Optional.empty()를 반환하도록 설정하거나, 이미 존재하는 상품을 반환하도록 설정 가능.
 
 
+### < @MockBean vs @Mock >
+테스트코드에서 @Mock으로 만든 객체는 Controller에 자동 주입되지 않는다.
+@Mock은 Mockito 레벨의 객체로 Spring Context에 등록되지 않으며,
+Controller에 주입하려면 @MockBean을 사용해야 한다.
+
+1. @Mock
+   > 순수 mock 객체 생성 어노테이션.
+   > @Mock 단독으로 Service 단위 테스트에서 사용하거나
+   @Mock, @InjectMocks를 함께 사용해 Controller 단위 테스트 목적으로 사용.
+   > Controller 단위 테스트에서 사용하는 경우는 실무에서는 거의 사용하지 않음.
+   - Mockito가 만든 순수 mock 객체.
+   - Spring Context에 등록되지 않음.
+   - Controller는 Spring이 생성하면서 ApplicationContext에 등록된 Bean을 찾으므로,
+     Spring이 생성하는 Controller의 경우, @Mock 으로 생성된 객체를 알 수 없음.
+   - @WebMvcTest 적용 시 @Mock 사용하는 경우, NoSuchBeanDefinitionException 또는 실제 Bean 주입 시도.
+   ~~~
+   @ExtendWith(MockitoExtension.class)
+   class ProductionControllerTest {
+
+       @Mock
+       ProductionService productionService;
+
+       @InjectMocks
+       ProductionController productionController;
+   }
+   ~~~
+
+2. @MockBean
+   > Controller에 주입을 위한 어노테이션.
+   > Controller 슬라이스 테스트에서 @WebMvcTest, @MockBean을 함께 사용.
+   - Mockito mock 생성.
+   - Spring Context에 Bean으로 등록.
+   - 기존 Bean이 있으면 교체됨.
+   - Controller 생성 시 자동 주입됨.
+   ~~~
+   @WebMvcTest(ProductionController.class)
+   class ProductionControllerTest {
+
+      @Autowired 
+      MockMvc mockMvc;
+
+      @MockBean
+      ProductionService productionService;
+   }
+   ~~~
+
+
 ---
-## 4. 테스트코드 검증
+## 7. 테스트코드 검증
 ### < 테스트코드 검증 >
 1. 전달인자, 반환값에 대한 검증   
    검증할 때 변경되지 않는 값들에 대해서는 반드시 검증할 필요없음.
@@ -468,7 +1125,57 @@ JUnit 5에서 MockitoExtension을 사용 시, 테스트 클래스에 @ExtendWith
 
 
 ---
-## 7. Reflection - private 메서드 테스트코드 작성
+## 8. 테스트코드에서 필드주입
+> 프로덕션 코드에서는 설계 안정성을 위해 생성자 주입을 사용하지만,
+테스트 코드에서는 가독성과 작성 속도를 이유로
+@Autowired, @MockBean 기반 필드 주입을 실용적으로 허용한다.
+
+1. 프로덕션 코드에서 필드 주입 지양 이유
+   - 불변성 보장 불가
+   - 의존성 누락을 컴파일 타임에 못 잡음
+   - 테스트 어려움
+   - 숨겨진 의존성 증가   
+     결과적으로 생성자 주입 권장.
+
+2. 테스트 코드에서 필드 주입 널리 허용되는 이유   
+   프로덕션 코드와 테스트 코드의 목적은 다르다.
+   프로덕션 코드는 안정성, 구조적 설계, 재사용, 불변성을 목적으로 하는 변면,
+   테스트 코드는 가독성, 빠른 작성, 단발성, 편의성을 목적으로 한다.
+   테스트 코드에서 생성자 주입을 하는 경우, 테스트 가독성 저하, 설정 코드 증가 등으로 실익이 없다.
+   테스트 클래스는 Spring이 관리하는 Bean이 아니고 수명 주기가 짧다.
+   또한 상태를 외부에 노출하지 않고 재사용성, 확장성 고려가 거의 필요가 없다.
+   따라서 설계의 품질보다 편의성이 우선되기 때문에, 필드 주입이 널리 허용된다.
+   ~~~
+   // 필드 주입 예시
+   @WebMvcTest(ProductionController.class)
+   class ProductionControllerTest {
+
+       @Autowired
+       MockMvc mockMvc;
+
+       @MockBean
+       ProductionService productionService;
+   }
+   ~~~
+   ~~~
+   // 생성자 주입 예시
+   @WebMvcTest(ProductionController.class)
+   class ProductionControllerTest {
+
+       private final MockMvc mockMvc;
+       private final ProductionService productionService;
+
+       public ProductionControllerTest(MockMvc mockMvc,
+                                        ProductionService productionService) {
+           this.mockMvc = mockMvc;
+           this.productionService = productionService;
+       }
+   }
+   ~~~
+
+
+---
+## 9. Reflection - private 메서드 테스트코드 작성
 - 리플렉션을 사용 시 클래스의 메서드나 필드에 직접 접근할 수 없더라도 접근 제어자에 관계없이 해당 클래스의 메서드나 필드를 검사하거나 수정가능.
 - 자바의 java.lang.reflect 패키지에서 제공되는 클래스를 사용.
 - 프로그램 실행 중에 클래스, 메서드, 필드 등을 동적으로 다룰 수 있는 기능.
@@ -524,231 +1231,7 @@ JUnit 5에서 MockitoExtension을 사용 시, 테스트 클래스에 @ExtendWith
 
 
 ---
-## 8. Controller 테스트케이스 작성 - 도저히 안되서 Chat gpt를 통해 작성
-1. MockMvc를 이용한 테스트 목적
-   - 컨트롤러의 엔드포인트를 호출하여 HTTP 클라이언트의 요청을 모방하고 적절한 응답을 확인하기 위해 테스트 수행.
-2. @WebMvcTest(MemberController.class)
-   - MockMvc 객체를 생성해 컨트롤러와 상호작용함.
-   - 명시한 해당 컨트롤러만 격리시켜 단위테스트 수행가능.
-   - value : 테스트 할 controller 클래스 명시.
-3. @MockBean
-   - 테스트 환경에서 애플리케이션 컨텍스트(ApplicationContext)의 빈을 모킹하도록 설정.
-   - Spring Boot 3.4.0부터 deprecated된 @MockBean과 거의 동일.
-   - 빈으로 등록해주는 mock
-   - 자동으로 빈으로 등록되어 컨트롤러에 주입됨.
-
-4. 일반적으로 **@WebMvcTest**와 **MockMvc**를 사용하여 Controller를 테스트할 수 있습니다.    
-   이 테스트는 Controller의 HTTP 요청과 응답을 실제로 처리하는 방식으로 동작합니다.   
-   다음은 signUpSeller() 메서드의 성공적인 테스트 케이스입니다.   
-   이 예제에서는 @MockBean을 사용하여 의존성 주입되는 MemberService를 mock하고, MockMvc를 사용하여 실제 HTTP 요청을 시뮬레이션합니다.
-   - 코드 설명
-     1) MockMvc 설정   
-        MockMvcBuilders.standaloneSetup(memberController).build()로 MockMvc를 설정하여 Controller를 테스트할 수 있게 만듭니다.
-     2) Mock 객체 설정   
-        @Mock 어노테이션을 통해 MemberService를 mock하고, @InjectMocks를 사용하여 MemberController에 mock된 MemberService를 주입합니다.
-     3) MockMvc로 HTTP 요청 시뮬레이션
-        - mockMvc.perform(post("/member/signup/seller")...)로 HTTP POST 요청을 시뮬레이션합니다.
-        - andExpect(status().isOk())는 응답 상태 코드가 200 OK임을 검증.
-        - andExpect(jsonPath("$.name").value("John Doe"))는 JSON 응답 본문에서 name 값이 "John Doe"인지 확인합니다.
-   ~~~
-    package com.myecommerce.MyECommerce.controller;
-    
-    import com.fasterxml.jackson.databind.ObjectMapper;
-    import com.myecommerce.MyECommerce.dto.MemberDto;
-    import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
-    import com.myecommerce.MyECommerce.service.member.MemberService;
-    import com.myecommerce.MyECommerce.type.MemberAuthorityType;
-    import org.junit.jupiter.api.BeforeEach;
-    import org.junit.jupiter.api.Test;
-    import org.mockito.InjectMocks;
-    import org.mockito.Mock;
-    import org.mockito.Mockito;
-    import org.springframework.http.HttpStatus;
-    import org.springframework.http.MediaType;
-    import org.springframework.test.web.servlet.MockMvc;
-    import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-    import org.springframework.web.context.WebApplicationContext;
-    
-    import java.util.Collections;
-    
-    import static org.mockito.ArgumentMatchers.any;
-    import static org.mockito.Mockito.when;
-    import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-    import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-    
-    class MemberControllerTest {
-    
-        private MockMvc mockMvc;
-    
-        @Mock
-        private MemberService memberService;
-    
-        @InjectMocks
-        private MemberController memberController;
-    
-        private ObjectMapper objectMapper;
-    
-        @BeforeEach
-        void setUp() {
-            objectMapper = new ObjectMapper();
-            mockMvc = MockMvcBuilders.standaloneSetup(memberController).build();
-        }
-    
-        @Test
-        void signUpSeller_Success() throws Exception {
-            // given
-            MemberDto memberDto = new MemberDto();
-            memberDto.setName("John Doe");
-            memberDto.setTel1("010");
-            memberDto.setTel2("1234");
-            memberDto.setTel3("5678");
-            memberDto.setPassword("password123");
-    
-            // 권한 설정
-            MemberAuthority authority = new MemberAuthority();
-            authority.setAuthority(MemberAuthorityType.SELLER);
-            memberDto.setAuthorities(Collections.singletonList(authority));
-    
-            // when
-            when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
-    
-            // then
-            mockMvc.perform(post("/member/signup/seller")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(memberDto)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.name").value("John Doe"))
-                    .andExpect(jsonPath("$.tel1").value("010"))
-                    .andExpect(jsonPath("$.tel2").value("1234"))
-                    .andExpect(jsonPath("$.tel3").value("5678"))
-                    .andExpect(jsonPath("$.password").value("password123"))
-                    .andExpect(jsonPath("$.authorities[0].authority").value("SELLER"));
-        }
-    }
-   ~~~
-
-5. 스프링부트 3.4.0 버전 이상인 경우 @Mock 어노테이션 사용 불가.   
-   다른방식으로 테스트코드 작성 필요.
-   - @Mock 어노테이션 대신 Mockito.mock()을 사용하여 mock 객체를 생성해야 합니다. (Mockito.mock 사용)
-   - @Mock 어노테이션을 사용하지 않고, Mockito.mock()을 사용하여 MemberService의 mock 객체를 생성합니다.
-     ~~~
-      // mock 객체  생성
-      memberService = Mockito.mock(MemberService.class);
-     ~~~
-   - @InjectMocks
-     - @InjectMocks는 여전히 MemberController에 mock 객체를 주입하는 데 사용됩니다.
-       ~~~
-          // mock 객체를 직접 생성하여 주입
-          new MemberController(memberService);
-       ~~~
-   - Mockito로 Mock 객체 설정
-     ~~~
-      // memberService.saveMember 메서드 호출 시 mock된 MemberDto를 반환하도록 설정
-      when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
-     ~~~
-
-   ~~~
-    package com.myecommerce.MyECommerce.controller;
-    
-    import com.fasterxml.jackson.databind.ObjectMapper;
-    import com.myecommerce.MyECommerce.dto.MemberDto;
-    import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
-    import com.myecommerce.MyECommerce.service.member.MemberService;
-    import com.myecommerce.MyECommerce.type.MemberAuthorityType;
-    import org.junit.jupiter.api.BeforeEach;
-    import org.junit.jupiter.api.Test;
-    import org.mockito.InjectMocks;
-    import org.mockito.Mockito;
-    import org.springframework.http.HttpStatus;
-    import org.springframework.http.MediaType;
-    import org.springframework.test.web.servlet.MockMvc;
-    import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-    
-    import java.util.Collections;
-    
-    import static org.mockito.ArgumentMatchers.any;
-    import static org.mockito.Mockito.when;
-    import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-    import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-    
-    class MemberControllerTest {
-    
-        private MockMvc mockMvc;
-    
-        private MemberService memberService;  // @Mock 대신 필드로 사용
-    
-        @InjectMocks
-        private MemberController memberController;
-    
-        private ObjectMapper objectMapper;
-    
-        @BeforeEach
-        void setUp() {
-            // Mockito.mock을 사용하여 mock 객체 생성
-            memberService = Mockito.mock(MemberService.class);
-            
-            // InjectMocks로 Controller에 mock 객체 주입
-            memberController = new MemberController(memberService);
-            
-            objectMapper = new ObjectMapper();
-            mockMvc = MockMvcBuilders.standaloneSetup(memberController).build();
-        }
-    
-        @Test
-        void signUpSeller_Success() throws Exception {
-            // given
-            MemberDto memberDto = new MemberDto();
-            memberDto.setName("John Doe");
-            memberDto.setTel1("010");
-            memberDto.setTel2("1234");
-            memberDto.setTel3("5678");
-            memberDto.setPassword("password123");
-    
-            // 권한 설정
-            MemberAuthority authority = new MemberAuthority();
-            authority.setAuthority(MemberAuthorityType.SELLER);
-            memberDto.setAuthorities(Collections.singletonList(authority));
-    
-            // when
-            when(memberService.saveMember(any(MemberDto.class))).thenReturn(memberDto);
-    
-            // then
-            mockMvc.perform(post("/member/signup/seller")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(memberDto)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.name").value("John Doe"))
-                    .andExpect(jsonPath("$.tel1").value("010"))
-                    .andExpect(jsonPath("$.tel2").value("1234"))
-                    .andExpect(jsonPath("$.tel3").value("5678"))
-                    .andExpect(jsonPath("$.password").value("password123"))
-                    .andExpect(jsonPath("$.authorities[0].authority").value("SELLER"));
-        }
-    }
-   ~~~
-
-6. 테스트코드를 작성시 @MockMvc 어노테이션을 적용하지 않는 이유
-   - @MockMvc는 테스트 클래스에 적용할 수 없고, 객체를 수동으로 생성해야하기 때문입니다.   
-     @MockMvc 어노테이션은 실제로 MockMvc 객체를 설정하는 것이 아니라, MockMvc 객체를 자동으로 초기화하기 위한 테스트 클래스의 기본적인 설정을 도와줍니다.    
-     그러나, 이 어노테이션은 Spring 3.4.0 이상에서는 사용되지 않으며, @MockMvc를 클래스에 붙여도 동작하지 않습니다.
-   - @MockMvc 어노테이션 역할
-     - 실제로 MockMvc 객체를 생성해주는 역할을 하지만, **@MockMvc**를 클래스 레벨에 직접 적용하는 것은 지원되지 않습니다.    
-       대신, MockMvc 객체는 테스트 클래스에서 직접 **MockMvcBuilders**를 사용하여 설정하고 초기화합니다.
-   - MockMvc를 초기화
-     - **MockMvcBuilders**를 사용해 MockMvc 객체를 수동으로 설정해야 합니다.
-     - 예를 들어, MockMvcBuilders.standaloneSetup(memberController).build();로 MockMvc 객체를 설정하여 Controller를 테스트할 수 있습니다.
-   - @WebMvcTest 사용 시 @MockMvc 자동 설정
-     - 만약 @WebMvcTest를 사용하면, @MockMvc가 자동으로 주입되지만, @WebMvcTest는 기본적으로 Spring Boot에서 웹 레이어를 테스트할 때 사용됩니다.
-     - @MockMvc는 @WebMvcTest 내에서만 자동으로 동작하는 것입니다.
-   - 권장
-     - @MockMvc는 클래스를 통해 자동 주입되지 않기 때문에 MockMvcBuilders를 사용하여 MockMvc를 수동으로 설정해야 합니다.   
-       **@MockMvc**는 @WebMvcTest에서 사용되지만, 일반적으로 @WebMvcTest 없이 사용할 때는 MockMvc를 수동으로 설정하는 방식이 필요합니다.   
-       따라서 MockMvc 객체를 수동으로 초기화하는 방식이 더 유연하고, 명시적으로 테스트가 필요한 컨트롤러만 설정할 수 있습니다.
-     - MockMvcBuilders.standaloneSetup(memberController).build() 방식이 더 권장됩니다.
-
-
----
-## 9. JPA의 Dirty Checking을 사용 시 테스트코드 작성
+## 10. JPA의 Dirty Checking을 사용 시 테스트코드 작성
 - JPA의 Dirty Checking을 사용할 때는 명시적으로 repository.save()를 호출하지 않아도 JPA가 트랜잭션이 끝날 때 자동으로 변경된 엔티티를 저장합니다.    
   하지만 이러한 명시적 호출이 아닌 동작도 테스트에서 모킹해야 할지 여부는 조금 다릅니다.
 
@@ -835,4 +1318,55 @@ JUnit 5에서 MockitoExtension을 사용 시, 테스트 클래스에 @ExtendWith
       - 이 경우, @Query나 EntityManager를 사용하여 INSERT/UPDATE를 명시적으로 수행하고
         SQL 로그를 확인하거나 TestEntityManager를 사용하여 쿼리 실행 여부를 검증합니다.
 
-          
+
+---
+## 11. 프로덕션, 테스트 config 파일
+1. Spring의 설정 로딩 방식
+   1. 기본 설정 로딩.
+   2. @Import된 설정 추가 로딩.
+   3. 같은 타입 Bean 존재 시, 후순위가 덮어씀.
+
+2. 프로덕션 Config   
+   실제 인증/인가, Redis, JWT, DB 같은 외부 의존성을 생성한다.
+   따라서 복잡하고 무겁다.
+   ~~~
+   @Configuration
+   public class SecurityConfig {
+       @Bean
+       SecurityFilterChain securityFilterChain(HttpSecurity http) { ... }
+
+       @Bean
+       JwtAuthenticationFilter jwtAuthenticationFilter(...) { ... }
+   }
+   ~~~ 
+
+3. TestConfig    
+   테스트에서만 쓰는 설정 클래스.   
+   TestConfig는 테스트 환경에서만 사용되는 전용 설정 클래스로,
+   테스트에 필요 없는 보안 인프라를 “대체하거나 제거”해서
+   ApplicationContext가 정상적으로 뜨게 만드는 장치.      
+   프로덕션 Config를 그대로 쓰기 어렵거나 쓰면 안 되는 경우 이를 대체·단순화하기 위해 둔다.  
+   <br>
+   테스트 전용으로 단순화된 설정이다.
+   외부 의존성을 제거해 테스트 목적에만 집중 가능하다.
+   ~~~
+   @TestConfiguration
+   public class TestSecurityConfig {
+       @Bean
+       SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
+            http
+                .csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+ 
+            return http.build();
+       }
+   }
+   ~~~
+   - @TestConfiguration : 테스트 전용 설정
+   - SecurityFilterChain : Security의 핵심
+   - permitAll() : 인증/인가 전부 통과
+   - JWT 관련 설정 없으므로, JWT 필터 자체가 생성되지 않음.
+   - TestSecurityConfig를 통해 인증/인가를 모두 허용하는 SecurityFilterChain을 정의해
+     JWT 보안 절차를 완전히 우회하고, Controller 책임만 검증할 수 있도록 함.   
+   <br>
+

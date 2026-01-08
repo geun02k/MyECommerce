@@ -11,6 +11,7 @@ import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.security.filter.JwtAuthenticationFilter;
 import com.myecommerce.MyECommerce.service.production.ProductionService;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -101,7 +103,7 @@ class ProductionControllerTest {
     }
 
     /* ----------------------
-        Tests
+        상품등록 Tests
        ---------------------- */
 
     @Test
@@ -200,6 +202,23 @@ class ProductionControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
         verify(productionService, never()).registerProduction(any(), any());
+    }
+
+    /* ----------------------
+        상품상세조회 Tests
+       ---------------------- */
+
+    @Test
+    @DisplayName("상품상세조회실패_음수 pathVariable 요청 시 400 에러 반환")
+    @Disabled("단순 방어적 검증으로 테스트에서 제외 (pathVariable 유효성 검증 여부 확인용)")
+    public void searchProductDetail_whenNegativeId_thenBadRequest() throws Exception {
+        // given
+        Long invalidProductId = -1L;
+        // when
+        // then
+        mockMvc.perform(get("/production/{id}", invalidProductId))
+                .andExpect(status().isBadRequest());
+        verify(productionService, never()).searchDetailProduction(invalidProductId);
     }
 
 }

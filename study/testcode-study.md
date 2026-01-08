@@ -43,6 +43,10 @@
 12. Spring Security와 테스트코드
     - permitAll() 경로 테스트에서 member.roles가 null이면 에러 발생 이유
     - 권한 검증 테스트가 누락되는 문제 해결
+13. 유효성 검증 테스트
+    - 애플리케이션의 계약/정책 테스트 전략
+    - 웹 계층 테스트의 책임 범위 - API 계약과 Validation 책임 구분
+    - 커스텀 Validation 테스트 - Enum 유효성 검증 테스트
 14. 테스트코드 리팩토링
     - 상품등록성공 Controller 테스트코드 리팩토링 
 
@@ -1553,6 +1557,163 @@ Controller에 주입하려면 @MockBean을 사용해야 한다.
 
 5. 권장사항   
    permitAll의 경우에는 보안 상 위험하고 예측이 어려우므로 permitAll이 아닌 경우는 authenticated 처리하도록 하자.
+
+
+---
+## 13. 유효성 검증 테스트
+### < 애플리케이션의 계약/정책 테스트 전략 >
+1. 애플리케이션의 계약/정책 테스트
+   이는 Spring 기본 동작을 검증하는 테스트가 아니라,
+   Spring 위에 정의한 개발자가 선택/정의한 계약과 정책을 검증하는 테스트이므로 테스트의 가치가 높다.
+   1) 에러 코드 정책   
+      예외를 직접 처리하는 경우   
+      잘못된 값이 입력되었을 때 400 상태 코드를 출력하는지가 아니라
+      우리 에러 응답 정책이 유지되느냐를 확인한다.
+   2) 에러 응답 포맷   
+      에러 응답 구조가 API 계약인 경우
+      Front가 해당 에러 응답 구조를 의존하는 경우, 테스트로 반드시 보호해야 함.
+   3) 권한별 메시지 및 접근 제어 규칙   
+      보안/라우팅 정책과 결합된 경우
+      - 인증된 사용자만 접근 가능.
+      - 권한에 따라 다른 메시지 출력.
+   4) Validation 그룹 / 커스텀 Validator
+      커스텀 Validator의 경우, 비즈니스 규칙으로 테스트 가치가 있음.
+
+2. 테스트 전략
+   1) WebMvcTest에서 Web 계층 테스트를 최소화
+      ***정상 시나리오(테스트케이스), 요구사항/정책으로 정의한 비즈니스 규칙만 테스트***한다.
+      validation 실패 대표 케이스는 2~4개 정도가 적당하므로, 모든 필드에 대해 검증할 필요 없다.
+      DTO의 경우 유효성 검증이 걸려있고, 실제 동작한다는 사실만 증명하면 충분하다.   
+      또한, 타입 변환 실패까지 다 테스트하지 않는다.
+      - 올바른 요청 (HTTP status 200 반환)
+      - 올바른 인증 정보 (접근 가능 여부)
+      - 올바른 JSON (정상 바인딩)
+      - 요구사항에 맞는 응답 구조
+      - DTO Validation (개발자 실수 잡기)
+      - 커스텀 Validator (비즈니스 규칙)
+   2) 통합 테스트에서 한 번만 검증   
+      예를 들면, 프레임워크가 올바르게 설정되어있다는 신뢰 확보를 위해 통합테스트에서 검증 할 수 있다.
+      대표적으로 문자열->long->400, 음수->400 을 대표 케이스 1,2개만 확인한다.
+      이를 통해 Spring MVC + Validation이 정상 동작하고 있다는 사례만 확인한다.
+   3) Exception 정책 테스트는 별도 진행   
+      잘못되 입력값에 대해 우리가 정의한 에러 응답이 반환되는지 확인.
+      이는 대표적인 케이스를 통해 보호. (Controller마다 테스트 작성할 필요 없음.)
+
+3. 적용 사례
+   - 참고 : ProductionControllerTest.class 에서 상품등록 관련 테스트코드
+   1) 상품등록 controller 테스트에서 검증한 부분
+      - 정상 시나리오    
+        “SELLER 권한을 가진 사용자가 상품과 옵션을 JSON으로 요청하면
+        ProductionService의 결과를 그대로 200 OK JSON 응답으로 반환한다.”   
+        - 요청 JSON → DTO로 잘 매핑되는지   
+        - 인증된 사용자가 접근 가능한지 (@PreAuthorize)   
+        - 서비스 호출 결과를 HTTP 응답(JSON)으로 잘 변환하는지   
+      - DTO Validation
+        - 문자열 제약 검증 (상품코드 형식 오류)
+        - 커스텀 검증 (유효하지 않은 Enum 값 오류)
+        - 중첩 검증 (옵션 유효성 미검증)
+   2) 상품등록 controller 테스트에서 아래의 의도적으로 제거한 부분
+      이들은 다른 테스트에서 다루는 게 옳음.
+      - SELLER가 아닐 때 403
+      - 인증되지 않았을 때 401
+      - @Valid 실패 시 400
+      - 옵션 없을 때 에러
+
+
+### < 웹 계층 테스트의 책임 범위 - API 계약과 Validation 책임 구분 >
+WebMvcTest에서 무엇을 테스트하고 무엇을 테스트하지 않을 것인가?
+
+1. WebMvcTest은 제약사항 테스트 수행.    
+   WebMvcTest에서 Spring이 기본으로 보장하는 타입 바인딩 실패는 보통 테스트하지 않음.   
+   개발자가 명시적으로 추가한 제약사항은 테스트 대상.
+
+2. Controller의 API 문서로서 역할.   
+   WebMvcTest의 목적은 컨트롤러의 요청 처리 계약(API contract) 검증이다.   
+   개발자의 선언 실수를 전부 잡아내는 테스트는 아니다.
+
+3. ***DTO Validation 테스트 필수.***   
+   DTO Validation은 개발자가 직접 정의한 규칙으로, 비즈니스 요구사항의 일부이다.   
+   해당 내용이 빠지면 명백한 버그를 발생시키므로 프론트와의 게약이 깨지게 된다.   
+   따라서 API 계약 그 자체이므로 테스트로 보호해야 한다.
+   단, 필드 하나하나의 validation 로직을 전부 테스트할 필요는 없다.
+   각 제약 조건의 대표적인 케이스만 작성할 수 있도록 한다.
+   1) validation 실패 테스트 검증
+      - 컨트롤러 진입 차단 : 오류발생 검증
+      - 비즈니스 로직 보호 : service 호출되지 않음을 검증
+
+4. PathVariable 타입체크 테스트 제외.   
+   이는 Spring MVC가 강제하는 계약이다.
+   따라서 누락하거나 타입이 일치하지 않으면 아예 컨트롤러에 진입이 불가하다.
+   @PathVariable 어노테이션이 적용된 필드의 타입 체크는 불필요하다.
+
+5. ***유효성검증 어노테이션이 붙은 PathVariable은 선택적 테스트.***
+   이는 Spring 기본 책임이 아닌 개발자가 추가한 제약.   
+   단순한 방어적 검증이면 테스트 제외하고, 비즈니스 규칙이라면 테스트를 수행한다.
+   1) 단순 방어적 검증   
+      예를 들어 ID는 항상 양수니까 그냥 적용한 어노테이션이라면 이는 설계상 당연한 규칙이다.   
+      따라서 테스트의 가치가 낮아 보통 테스트에서 제외한다.
+   2) API 계약으로 중요한 경우   
+      '음수 ID 요청시 반드시 400을 반드시 반환해야 한다'는 명시적 요구사항이 주어진다면,
+      이는 테스트 대상으로 WebMvcTest에서 검증하는 것이 좋다.
+
+
+### < 커스텀 Validation 테스트 - Enum 유효성 검증 테스트 >
+1. 기존 예외 발생 코드
+   JSON 문자열 방식으로 유효하지 않은 Enum값 전달.   
+   String으로 JSON 전달 시 유효하지 않은 Enum 값을 전달했다.
+   ~~~
+   @Test
+   @DisplayName("상품등록실패_유효하지않은 Enum 값 오류")
+   public void failRegisterProduction_invalidEnum() throws Exception {
+       // given
+       String invalidRequestJson = """
+             {
+              "code": "validCode",
+              "name": "정상 상품명",
+              "category": "INVALID_ENUM_VALUE",
+             }
+             """;
+       Member member = sellerMember();
+
+       // when
+       // then
+       mockMvc.perform(post("/production")
+                 .with(user(member))
+                 .contentType(MediaType.APPLICATION_JSON)
+                 .content(invalidRequestJson))
+             .andExpect(status().isBadRequest());
+       verify(productionService, never()).registerProduction(any(), any());
+   }
+   ~~~      
+
+2. 발생에러
+   ~~~
+   org.springframework.http.converter.HttpMessageNotReadableException: JSON parse error: Cannot deserialize value of type `com.myecommerce.MyECommerce.type.ProductionCategoryType` from String "INVALID_ENUM_VALUE": not one of the values accepted for Enum class: [BABY_PRODUCTION, ETC, ELECTRONICS, WOMEN_CLOTHING, OUTDOOR, MANS_CLOTHING, FASHION_GOODS, BEAUTY]
+   ~~~
+
+3. 문제점  
+   HttpMessageNotReadableException 오류가 발생했다.  
+   해당 예외는 Jackson 역직렬화 단계에서 요청이 실패했을 때 발생하는 예외이다.
+   즉, validation check 전에 JSON -> DTO로 변환하는 단계에서 실패했다는 이야기다.
+   HTTP 요청 수신 후 Jackson이 JSON을 DTO로 역직렬화 해 객체 생성 후 DTO 검증을 수행한다.
+   즉, DTO 검증 전에 객체 생성 과정에서 enum 값 매핑에서 실패해서 해당 예외가 발생했다.
+   이는 커스텀 validation 테스트가 아닌, 컨트롤러 바인딩 테스트 실패 케이스가 된다.
+
+4. 해결방법   
+   Enum 타입 값으로 null을 전달하게 되면
+   @EnumValid 검증이 아닌 @NotNull 검증처럼 보일까봐 json으로 유효하지 않은 Enum값을 전달했다.
+   하지만 목적이 Controller + Validation 테스트이므로, 검증 전에 오류가 발생하는 위의 방법은 적절하지 않다.   
+   해결 방법으로 검증 의도에 따라 2가지의 선택 사항이 있다.
+   1) enum 값으로 null 사용   
+      @EnumValid 검증을 보장.
+      테스트의 목적이 Controller + Validation이면 null 값을 전달하는 것이 적합.
+      ~~~
+      ~~~
+   2) enum 문자열 오류로 테스트 (기존 테스트)   
+      API 완성도를 중시하는 경우 권장.
+      API가 잘못된 enum 문자열에 대해 어떤 응답을 하는지에 목적이라면 의미있음.
+      단, 발생하는 오류에 대해 400으로 변환하는 ExceptionHandler 작성이 필요하다.
+      - Controller 단위 테스트의 필수 항목 아님.
 
 
 ---

@@ -31,6 +31,8 @@ import static com.myecommerce.MyECommerce.type.ProductionCategoryType.WOMEN_CLOT
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -129,6 +131,75 @@ class ProductionControllerTest {
                 .andExpect(jsonPath("$.code").value(request.getCode()))
                 .andExpect(jsonPath("$.category").value(WOMEN_CLOTHING.toString()))
                 .andExpect(jsonPath("$.saleStatus").value(ON_SALE.toString()));
+    }
+
+    @Test
+    @DisplayName("상품등록실패_상품코드 형식오류")
+    public void failRegisterProduction_invalidCode() throws Exception {
+        // given
+        // 요청 상품 DTO
+        RequestProductionDto invalidRequest = RequestProductionDto.builder()
+                .code("!!INVALID!!") // @Pattern 위반
+                .name("정상 상품명")
+                .category(WOMEN_CLOTHING)
+                .build();
+
+        // when
+        // then
+        // 1. 400 에러 발생 호출 검증
+        mockMvc.perform(post("/production")
+                        .with(user(seller()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest());
+        // 2. service 미호출 검증
+        verify(productionService, never()).registerProduction(any(), any());
+    }
+
+    @Test
+    @DisplayName("상품등록실패_유효하지않은 Enum 값 오류")
+    public void failRegisterProduction_invalidEnum() throws Exception {
+        // given
+        // 요청 상품 DTO
+        RequestProductionDto invalidRequest = RequestProductionDto.builder()
+                .code("validCode")
+                .name("정상 상품명")
+                .category(null)
+                .build();
+
+        // when
+        // then
+        mockMvc.perform(post("/production")
+                        .with(user(seller()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                       .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest());
+        verify(productionService, never()).registerProduction(any(), any());
+    }
+
+    @Test
+    @DisplayName("상품등록실패_옵션 유효성 미검증")
+    public void failRegisterProduction_invalidOption() throws Exception {
+        // given
+        RequestProductionOptionDto invalidOption =
+                RequestProductionOptionDto.builder()
+                        .optionCode("") // @Size 위반
+                        .build();
+        RequestProductionDto request = RequestProductionDto.builder()
+                .code("validCode")
+                .name("정상 상품명")
+                .category(WOMEN_CLOTHING)
+                .options(List.of(invalidOption))
+                .build();
+
+        // when
+        // then
+        mockMvc.perform(post("/production")
+                        .with(user(seller()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        verify(productionService, never()).registerProduction(any(), any());
     }
 
 }

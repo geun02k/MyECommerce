@@ -68,13 +68,11 @@ class ProductionControllerTest {
         String productionCode = "RM-JK-D11S51";
         String productionName = "제 품 명";
         ProductionCategoryType category = WOMEN_CLOTHING;
-        String description = "설명";
 
         String optionCode = "S-BL";
         String optionName = "스몰사이즈 블루컬러";
         BigDecimal price = BigDecimal.valueOf(67900);
         int quantity = 30;
-        int seq = 1;
 
         Long memberId = 1L;
 
@@ -91,7 +89,6 @@ class ProductionControllerTest {
                         .code(productionCode)
                         .name(productionName)
                         .category(category)
-                        .description(description)
                         .options(Collections.singletonList(requestOptionDto))
                         .build();
         // 요청 회원 DTO
@@ -108,9 +105,7 @@ class ProductionControllerTest {
                 .id(1L)
                 .seller(member.getId())
                 .code(productionCode)
-                .name(productionName)
                 .category(category)
-                .description(description)
                 .saleStatus(ON_SALE)
                 .build();
 
@@ -128,9 +123,7 @@ class ProductionControllerTest {
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.seller").value(member.getId()))
                 .andExpect(jsonPath("$.code").value(requestProductionDto.getCode()))
-                .andExpect(jsonPath("$.name").value(requestProductionDto.getName()))
                 .andExpect(jsonPath("$.category").value(WOMEN_CLOTHING.toString()))
-                .andExpect(jsonPath("$.description").value(requestProductionDto.getDescription()))
                 .andExpect(jsonPath("$.saleStatus").value(ON_SALE.toString()));
     }
 

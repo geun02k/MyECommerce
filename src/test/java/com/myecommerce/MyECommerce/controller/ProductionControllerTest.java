@@ -61,53 +61,59 @@ class ProductionControllerTest {
     @MockitoBean
     private ProductionService productionService;
 
-    @Test
-    @DisplayName("상품등록 성공")
-    void successRegisterProduction() throws Exception {
-        // given
-        String productionCode = "RM-JK-D11S51";
-        String productionName = "제 품 명";
-        ProductionCategoryType category = WOMEN_CLOTHING;
+    /* ------------------
+        Test Fixtures
+       ------------------ */
 
-        String optionCode = "S-BL";
-        String optionName = "스몰사이즈 블루컬러";
-        BigDecimal price = BigDecimal.valueOf(67900);
-        int quantity = 30;
-
-        Long memberId = 1L;
-
-        // 요청 상품옵션 DTO 목록
-        RequestProductionOptionDto requestOptionDto = RequestProductionOptionDto.builder()
-                .optionCode(optionCode)
-                .optionName(optionName)
-                .price(price)
-                .quantity(quantity)
-                .build();
-        // 요청 상품 DTO
-        RequestProductionDto requestProductionDto =
-                RequestProductionDto.builder()
-                        .code(productionCode)
-                        .name(productionName)
-                        .category(category)
-                        .options(Collections.singletonList(requestOptionDto))
-                        .build();
-        // 요청 회원 DTO
-        Member member = Member.builder()
-                .id(memberId)
+    private Member seller() {
+        return Member.builder()
+                .id(1L)
                 .roles(List.of(MemberAuthority.builder()
                         .id(1L)
                         .authority(MemberAuthorityType.SELLER)
                         .build()))
                 .build();
+    }
 
-        // 응답 상품 DTO
-        ResponseProductionDto response = ResponseProductionDto.builder()
+    private RequestProductionDto validRequestProduction() {
+        return RequestProductionDto.builder()
+                .code("productionCode")
+                .name("상 품 명")
+                .category(WOMEN_CLOTHING)
+                .options(Collections.singletonList(
+                        RequestProductionOptionDto.builder()
+                                .optionCode("optionCode")
+                                .optionName("상품 옵션명")
+                                .price(BigDecimal.valueOf(67900))
+                                .quantity(30)
+                                .build()))
+                .build();
+    }
+
+    private ResponseProductionDto serviceResponseProduction() {
+        return ResponseProductionDto.builder()
                 .id(1L)
-                .seller(member.getId())
-                .code(productionCode)
-                .category(category)
+                .seller(1L)
+                .code("productionCode")
+                .category(WOMEN_CLOTHING)
                 .saleStatus(ON_SALE)
                 .build();
+    }
+
+    /* ----------------------
+        Tests
+       ---------------------- */
+
+    @Test
+    @DisplayName("상품등록 성공")
+    void successRegisterProduction() throws Exception {
+        // given
+        // 요청 상품 DTO
+        RequestProductionDto requestProductionDto = validRequestProduction();
+        // 요청 회원 DTO
+        Member member = seller();
+        // 응답 상품 DTO
+        ResponseProductionDto response = serviceResponseProduction();
 
         given(productionService.registerProduction(
                 any(RequestProductionDto.class), any(Member.class)))

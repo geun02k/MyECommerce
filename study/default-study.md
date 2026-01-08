@@ -14,6 +14,7 @@
 3. 유효성 검증
    - 검증관련처리
    - PathVariable에 대한 @NotNull 검증 제외 판단
+   - PathVariable 검증
    - 유효성검사 정규식
    - 비밀번호 유효성검사 정규식
 4. git 사용하기
@@ -181,7 +182,7 @@
    - @Validated, @Valid 어노테이션 
      - 사용 시 대부분 스프링이 대신 검증해주므로 Validator 직접 생성할 필요 없음.
      - @Validated
-       - Spring에 해당 어노테이션이 달린 클래스의 메서드로 전달되는 매개변수를 검증하도록 지시하는 데 사용할 수 있는 **클래스 수준의 어노테이션.**
+       - Spring에 해당 어노테이션이 달린 클래스의 메서드로 전달되는 ***매개변수를 검증하도록 지시***하는 데 사용할 수 있는 **클래스 수준의 어노테이션.**
      - @Valid
        - **메서드 매개변수와 필드**에 주석을 달아서 Spring에 메서드 매개변수나 필드의 유효성을 검사.
      - Spring MVC 컨트롤러에 대한 입력 검증가능.
@@ -491,6 +492,40 @@
    추가적으로 상품 ID는 양수라는 도메인 제약을 가지므로,
    @NotNull을 이용한 단순 존재 여부 검증 보다는 값의 범위 및 형식 검증이 더 의미있고 적절한 선택이다.
    ex) @Positive : 값이 0보다 큰지 검증.
+
+
+### < PathVariable 검증 >
+1. 문제점   
+   PathVariable 필드 유효성 검증이 수행되는지 확인하고 싶어서 pathVariable 유효성 검증 테스트코드를 작성해보았다.
+   이 떄, PathVariable 필드에 유효성 검증 어노테이션을 적용해 
+   컨트롤러 진입 전에 검증 실패를 기대했으나 유효성 검증이되지 않음.
+
+2. 문제의 원인   
+   Method Parameter Validation은 기본으로 활성화되지 않는다.
+   @PathVariable Validation이 동작을 위해서는 Controller에 @Validated 어노테이션을 필수 적용해야 함.
+   1) @Validated   
+      빈에 대해 메서드 파라미터 검증을 활성화하는 어노테이션.
+      컨트롤러 클래스 레벨에 적용해야 정상 동작.
+      빈 자체가 Validation 대상이 되어야하므로, 메서드나 필드에 적용하면 안된다.
+
+3. 문제해결방법   
+   ~~~
+   @RestController
+   @RequestMapping("/production")
+   @RequiredArgsConstructor
+   @Validated
+   public class ProductionController {
+       /**
+       * 상품상세 조회 get /production/{id}
+       **/
+       @GetMapping("/{id}")
+       public ResponseEntity<ResponseSearchDetailProductionDto> searchDetailProduction(
+                            @PathVariable @Positive Long id) {
+           return ResponseEntity.ok(
+                   productionService.searchDetailProduction(id));
+       }
+   }
+   ~~~
 
 
 ### < 유효성검사 정규식 >

@@ -40,6 +40,9 @@
 9. Reflection - private 메서드 테스트코드 작성
 10. JPA의 Dirty Checking을 사용 시 테스트코드 작성
 11. 프로덕션, 테스트 config 파일
+12. Spring Security와 테스트코드
+    - permitAll() 경로 테스트에서 member.roles가 null이면 에러 발생 이유
+    - 권한 검증 테스트가 누락되는 문제 해결
 
 --- 
 ## 1. 테스트코드
@@ -1369,4 +1372,183 @@ Controller에 주입하려면 @MockBean을 사용해야 한다.
    - TestSecurityConfig를 통해 인증/인가를 모두 허용하는 SecurityFilterChain을 정의해
      JWT 보안 절차를 완전히 우회하고, Controller 책임만 검증할 수 있도록 함.   
    <br>
+
+
+---
+## 12. Spring Security와 테스트코드
+### < permitAll() 경로 테스트에서 member.roles가 null이면 에러 발생 이유 >
+1. 에러 발생   
+   Validation 실패는 Security와 무관하다.
+   따라서 Member의 role은 필요 없는 정보라고 생각했다.
+   전달하면 “인증이 필요한 테스트”처럼 보이기 때문에 테스트 의도를 흐린다고 느꼈기 때문이다.
+   그래서 role에 null을 전달했는데 에러가 발생했다.
+
+2. 모든 접근 허가 경로와 권한 검증
+   1) 의문점 - permitAll()에 대한 오해  
+      member 객체의 roles=null일 때 에러가 발생했다.   
+      permitAll() 설정한 접근 경로에 접근 시, 권한 검증을 수행하지 않는다고 생각했다.
+      하지만 오류가 발생했다.
+   2) 오해 정정   
+      permitAll()은 인가(Authorization)만 건너뛰고, 인증(Authentication) 객체 생성 과정은 여전히 수행된다.
+      즉, 권한 검증을 생략할 뿐, UserDetails->Authentication 생성 과정은 그대로 수행된다.
+      그렇기 때문에 roles = null이면 getAuthorities()에서 NPE가 발생한다.   
+      요청이 들어오면 Spring Security는 먼저 인증 객체를 생성한다.
+      permitAll()을 적용했다 하더라도 이는 항상 실행된다.
+
+3. 내 테스트코드 실행과정
+   1) Spring Security 실제 인증 흐름
+      - 인증객체생성 > UserDetails 로딩 > getAuthorities 호출 > 권한 비교   
+        permitAll() 적용 시, 위 과정에서 권한 비교 부분만 생략됨.
+        Spring Security는 기본적으로 익명 사용자 또는 인증 사용자 둘 중 하나의 Authentication은 항상 SecurityContext에 넣는다.
+        하지만 테스트에서 with(user(member))를 쓰는 순간, 익명 사용자가 아닌 인증 사용자를 추가하게 된다.
+      ~~~
+      .with(user(member))
+      ~~~   
+      이 요청은 '이미 인증된 사용자'를 의미한다.
+      - Spring Security 내부 동작 과정
+         1) member를 UserDetails로 취급.
+         2) getAuthorities() 호출.
+         3) roles.stream() 실행.
+            이 때, roles = null이 된다.
+        ~~~
+        public class Member extends BaseEntity implements UserDetails {
+            // ...
+      
+            // 유저:권한 (1:N)
+            @OneToMany(cascade = CascadeType.ALL, mappedBy = "member")
+            @JsonManagedReference
+            private List<MemberAuthority> roles; // 사용자가 여러 권한을 가질 수 있음.
+
+            @Override
+            public Collection<? extends GrantedAuthority> getAuthorities() {
+                // authorities 정보를 SimpleGrantedAuthority로 매핑
+                // -> 스프링 시큐리티에서 지원하는 role 관련기능을 쓰기 위함.
+                return this.roles.stream()
+                                 .map((MemberAuthority authority) ->
+                                          new SimpleGrantedAuthority(authority.getAuthority().toString()))
+                                 .collect(Collectors.toList());
+        }
+        ~~~
+
+4. 해결 방법
+   1) Member Entity를 안전하게 만들기.   
+      getAuthorities()를 null-safe 처리한다.   
+      이는 permitAll() 여부와 무관하게 안정성 확보를 위해 실무에서 필수적으로 추가되는 로직.
+      ~~~
+      @Override
+      public Collection<? extends GrantedAuthority> getAuthorities() {
+          if (roles == null) {
+              return List.of();
+          }
+
+          return roles.stream()
+                   .map(authority ->
+                           new SimpleGrantedAuthority(authority.getAuthority().toString()))
+                  .toList();
+      }
+      ~~~
+   2) user() 미사용   
+      인증 자체가 필요없는 permitAll() 경로라면, user()를 굳이 쓰지 않는 것이 더 자연스럽다.
+
+
+### < 권한 검증 테스트가 누락되는 문제 해결 >
+1. 문제점   
+   권한에 대한 검증이 잘 수행되고 있는지 궁금해서 허용 권한인 SELLER 대산 CUSTOMER 권한을 전달했는데 테스트가 통과되었다.
+   기존 정상 시나리오 테스트에서 권한을 설정하고 전달하고 있지만, 검증이 수행되지 않는 문제 발생한 것이다.
+
+2. 내 코드의 상황   
+   1) 권한 설정   
+      내 코드는 SecurityConfig에서 permitAll()을 이용해 해당 경로에 대해 모든 권한이 접근 가능하도록 설정하고 있다.   
+      단, Controller에서 @PreAuthorize를 이용해 'SELLER' 권한만 해당 경로에 접근 가능하도록 제한하고 있다.
+   2) 권한을 가진 사용자 전달
+      테스트에서는 with(user(member))를 통해 권한 체크를 수행하도록 하고 있다.
+
+3. 문제발생원인
+   Spring Security에는 인가가 동작하는 2단계가 있다.
+   1) WebSecurity - Filter 단계의 인가   
+      URL/HTTP Method 기준으로 Filter Chain 단계에서 permitAll, authenticated, hasRole 등을 이용해 Controller 진입 전에 인가.
+   2) Method Security - AOP 기반 인가   
+      Controller/Service 메서드 기준으로 Controller 진입 후 AOP 프록시 기반이므로, 명시적인 활성화 필수.
+   - Spring Security 인가 동작 과정      
+     요청 -> Security Filter Chain -> permitAll() 통과 -> Controller 진입 -> @PreAuthorize AOP 적용되어 실행 -> 메서드 정상 실행
+   
+   현재 테스트 환경 상황에는 TestSecuritConfig가 존재하고 SecurityFilterChain이 정상 등록되어있다.
+   하지만 현재 호출하는 컨트롤러가 @PreAuthorize를 적용해 AOP 기반 인가를 사용하고 있음에도 @EnableMethodSecurity 어노테이션 적용이 되어있지 않다.
+   따라서 기존 테스트에서는 SecurityContext에 Authentication 객체를 전달하고, 
+   permitAll 설정에 따라 해당 경로에 대해 모든 접근 권한을 허가하지만,
+   Method Security 설정에 따라 접근 권한을 제한해야한다.
+   하지만 Method Security가 적용되어도 활성화 되어있지 않아 권한 검증이 수행되지 않았다.    
+   Method Security는 Filter 이후에 동작하므로 Filter가 permitAll 해도 Controller 메서드 호출 직전에
+   MethodSecurityInterceptor가 다시 권한 검사를 수행해야 한다.
+   결과적으로 정상 시나리오에 작성한 것과 달리 
+   실제로는 권한이 컨트롤러까지 전달되었으나 AuthenticationPrincipal 주입만 확인하고 아래의 두 검증은 실제 수행하지 않는다.
+   - SELLER만 접근 가능.
+   - 인증된 사용자만 접근.
+
+4. 해결방법
+   테스트 Security 설정에 Method Security 활성화
+   Method Security가 테스트 컨텍스트에서 활성화되지 않았다.
+   없으면 @PreAuthorize 절대 검증되지 않는다.
+   - @PreAuthorize 적용해 인가. 
+   ~~~
+    /**
+     * 상품, 상품옵션목록 등록 post /production
+     **/
+    @PostMapping
+    @PreAuthorize("hasAuthority('SELLER')")
+    public ResponseEntity<ResponseProductionDto> registerProduction(
+            @RequestBody @Valid RequestProductionDto production,
+            @AuthenticationPrincipal Member member) {
+
+        return ResponseEntity.ok(
+                productionService.registerProduction(production, member));
+    }
+   ~~~
+   - @EnableMethodSecurity 적용해 Method Security 활성화.
+   ~~~
+   @TestConfiguration
+   @EnableMethodSecurity
+   public class TestSecurityConfig {
+       /** 인증관련설정: 자원별 접근권한 설정 */
+       @Bean
+       public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+           http
+                // CSRF 보호를 비활성화
+                // : HTTP POST로 직접 엔드포인트 호출 시 기본적으로는 CSRF 보호를 비활성화 필요.
+                .csrf(AbstractHttpConfigurer::disable)
+
+                // 접근경로허가
+                .authorizeHttpRequests((authorizeRequests) ->
+                        authorizeRequests
+                                // 회원가입, 로그인 경로에 대해 모든인원 접근허용
+                                .requestMatchers("/member/signup/**",
+                                        "/member/signin/**",
+                                        "/production").permitAll()
+                                .requestMatchers(HttpMethod.GET,  "/production/*").permitAll()
+                                // 그 외 경로에 대해 인증필요
+                                .anyRequest().authenticated());
+
+          return http.build();
+       }
+   }
+   ~~~
+   - 테스트 시 권한을 가진 사용자 전달
+   ~~~
+    @Test
+    @DisplayName("상품등록 성공")
+    void successRegisterProduction() throws Exception {
+        // given 생략
+   
+        // when / then
+        mockMvc.perform(post("/production")
+                        .with(user(member))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestProductionDto)))
+                .andExpect(status().isOk());
+    }
+   ~~~
+
+
+5. 권장사항   
+   permitAll의 경우에는 보안 상 위험하고 예측이 어려우므로 permitAll이 아닌 경우는 authenticated 처리하도록 하자.
 

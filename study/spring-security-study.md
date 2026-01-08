@@ -503,7 +503,7 @@ SecurityFilterChain Bean이 곧 보안 설정임.
 ---
 ## 6. 권한과 역할
 1. 권한 (Authority)
-    - 사용자가 시스템 내에서 **"구체적으로 할 수 있는 작업"**으로 세부 권한을 나타냄.    
+    - 사용자가 시스템 내에서 ***"구체적으로 할 수 있는 작업"***으로 세부 권한을 나타냄.    
       ex) READ_PRIVILEGES, WRITE_PRIVILEGES, DELETE_PRIVILEGES
 
 2. 역할 (Role)
@@ -517,6 +517,14 @@ SecurityFilterChain Bean이 곧 보안 설정임.
 
 ---
 ## 7. 인증과 권한
+1. 인증(Authentication)   
+   누구인가?    
+   로그인 여부 검사.
+2. 인가(Authorization)   
+   무엇을 할 수 있는가?    
+   역할(Role), 권한(Authority) 검사.
+
+
 ### < 인증과 권한에 대한 HTTP 상태코드 >
 1. 401 Unauthorized(인증되지않음)
    - 요청을 처리하기 위해 사용자가 인증을 받아야함을 의미.

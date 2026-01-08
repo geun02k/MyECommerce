@@ -11,8 +11,6 @@ import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.security.filter.JwtAuthenticationFilter;
 import com.myecommerce.MyECommerce.service.production.ProductionService;
-import com.myecommerce.MyECommerce.type.MemberAuthorityType;
-import com.myecommerce.MyECommerce.type.ProductionCategoryType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,12 +26,12 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 
+import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
 import static com.myecommerce.MyECommerce.type.ProductionCategoryType.WOMEN_CLOTHING;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -70,7 +68,7 @@ class ProductionControllerTest {
                 .id(1L)
                 .roles(List.of(MemberAuthority.builder()
                         .id(1L)
-                        .authority(MemberAuthorityType.SELLER)
+                        .authority(SELLER)
                         .build()))
                 .build();
     }
@@ -108,10 +106,10 @@ class ProductionControllerTest {
     @DisplayName("상품등록 성공")
     void successRegisterProduction() throws Exception {
         // given
-        // 요청 상품 DTO
-        RequestProductionDto requestProductionDto = validRequestProduction();
         // 요청 회원 DTO
         Member member = seller();
+        // 요청 상품 DTO
+        RequestProductionDto request = validRequestProduction();
         // 응답 상품 DTO
         ResponseProductionDto response = serviceResponseProduction();
 
@@ -124,11 +122,11 @@ class ProductionControllerTest {
         mockMvc.perform(post("/production")
                         .with(user(member))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestProductionDto)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.seller").value(member.getId()))
-                .andExpect(jsonPath("$.code").value(requestProductionDto.getCode()))
+                .andExpect(jsonPath("$.code").value(request.getCode()))
                 .andExpect(jsonPath("$.category").value(WOMEN_CLOTHING.toString()))
                 .andExpect(jsonPath("$.saleStatus").value(ON_SALE.toString()));
     }

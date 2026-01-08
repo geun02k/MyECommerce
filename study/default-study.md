@@ -15,6 +15,7 @@
    - 검증관련처리
    - PathVariable에 대한 @NotNull 검증 제외 판단
    - PathVariable 검증
+   - DTO 검증 실패 vs PathVariable/RequestParam 검증 실패
    - 유효성검사 정규식
    - 비밀번호 유효성검사 정규식
 4. git 사용하기
@@ -526,6 +527,30 @@
        }
    }
    ~~~
+
+
+### < DTO 검증 실패 vs PathVariable/RequestParam 검증 실패 >
+두 검증은 검증 시점, 계층, 대상, 에러 구조가 다르기 때문에 Spring이 의도적으로 다른 예외를 사용한다.   
+따라서 필드에 동일한 @Positive 어노테이션을 사용해도 발생하는 예외타입도 다르다.
+
+| 구분                  | DTO 검증                                                        | PathVariable / RequestParam 검증                                     |
+|:--------------------|:--------------------------------------------------------------|:-------------------------------------------------------------------|
+| 검증 주체               | Spring MVC + Bean Validation                                  | Bena Validation                                                    |
+| 검증 시점               | 컨트롤러 메서드 진입 직전                                                | ArgumentResolver 단계                                                |
+| 실패 예외               | MethodArgumentNotValidException <br> (Spring 메서드 인자 검증 전용 예외) | ConstraintViolationException <br> (Bean Validation 메서드 파라미터 제약 위반) |
+| 바인딩 대상              | 객체 전체                                                         | 단일 값                                                               |
+| BindingResult 존재 여부 | o                                                             | x                                                                  |
+| 에러 개수               | 여러 개 가능                                                       | 보통 1개                                                              |
+
+1. Spring MVC DefaultHandlerExceptionResolver가 400 처리하는 예외    
+   Spring MVC에는 기본적으로 DefaultHandlerExceptionResolver가 존재한다.   
+   이 클래스에서 아래의 예외들은 아무 설정이 없어도 내부적으로 400으로 처리한다.
+   - MethodArgumentTypeMismatchException : PathVariable / RequestParam 타입 불일치
+   - MissingServletRequestParameterException : 필수 RequestParam 누락
+   - HttpMessageNotReadableException : JSON 파싱 실패
+   - BindException : Form/Query 바인딩 실패
+   - MethodArgumentNotValidXecption : @Valid @RequestBody 검증 실패
+   - ConstraintViolationException : @Valid + PathVariable/Param 검증 실패
 
 
 ### < 유효성검사 정규식 >

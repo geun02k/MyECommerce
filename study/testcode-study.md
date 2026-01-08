@@ -47,6 +47,7 @@
     - 애플리케이션의 계약/정책 테스트 전략
     - 웹 계층 테스트의 책임 범위 - API 계약과 Validation 책임 구분
     - 커스텀 Validation 테스트 - Enum 유효성 검증 테스트
+    - PathVariable 검증 실패가 500이 되는 이유와 400으로 처리하는 방법
 14. 테스트코드 리팩토링
     - 상품등록성공 Controller 테스트코드 리팩토링 
 
@@ -1714,6 +1715,87 @@ WebMvcTest에서 무엇을 테스트하고 무엇을 테스트하지 않을 것�
       API가 잘못된 enum 문자열에 대해 어떤 응답을 하는지에 목적이라면 의미있음.
       단, 발생하는 오류에 대해 400으로 변환하는 ExceptionHandler 작성이 필요하다.
       - Controller 단위 테스트의 필수 항목 아님.
+
+   
+### < PathVariable 검증 실패가 500이 되는 이유와 400으로 처리하는 방법 >
+1. DTO 검증 실패
+   ~~~
+   @RequestBody @Valid DTO
+   ~~~
+   1) 발생 예외 : MethodArgumentNotValidException
+   2) Spring MVC 기본 동작   
+      자동으로 400 Bad Request 반환.
+
+2. PathVariable / RequestParam 검증 실패
+   ~~~
+   @PathVariable @Positive Long id
+   ~~~
+   1) 발생 예외 : ConstraintViolationException
+   2) 발생 시점 : Controller 메서드 호출 중 (Method Validation)
+   3) Spring MVC 기본 동작   
+      Spring MVC가 예외를 자동으로 400으로 바꿔주지 않음.   
+      그래서 결과가 Unhandled Exception -> 500 Internal Server Error 발생.
+
+3. PathVariable / RequestParam 검증 실패 시 400 예외 미발생 해결 방법
+   - 해결방법 : 예외를 400으로 매핑해준다.
+   1) ExceptionHandler 생성
+      - @ExceptionHandler   
+        응답 형태와 메시지를 통제하고 싶을 때 사용.
+
+      @RestControllerAdvice 어노테이션을 사용해 ConstraintViolationException 예외에 대한 ExceptionHandler를 작성한다.
+      그러면 @Positive, @NotNull 등 유효성 검증 실패 시 ConstraintViolationException 예외가 발생하면 400 Bad Request를 반환한다.
+      이로써 DTO 검증과 동일하게 '클라이언트의 입력 오류 = 400' 의미를 유지할 수 있다.
+      이는 실제 운영 환경에서도 필요한 처리이다.
+      ~~~
+      @RestControllerAdvice
+      public class GlobalExceptionHandler {
+          @ExceptionHandler(ConstraintViolationException.class)
+          @ResponseStatus(HttpStatus.BAD_REQUEST)
+          public Map<String, String> handleConstraintViolation(
+                  ConstraintViolationException e) {
+
+              return Map.of( 
+                      "message", e.getMessage()
+              );
+          }
+      }
+      ~~~
+
+   2) (테스트 적용 시) @WebMvcTest에 Advice 포함   
+      @WebMvcTest는 Controller와 필요한 Bean만 로딩하기 떄문에
+      ControllerAdvice를 명시적으로 포함해야 한다.
+      ~~~
+      @WebMvcTest(controllers = ProductionController.class)
+      @Import(GlobalExceptionHandler.class)
+      class ProductionControllerTest {
+          // ...
+      }
+      ~~~
+      또는
+      ~~~
+      @WebMvcTest(
+          controllers = ProductionController.class,
+          includeFilters = @ComponentScan.Filter(
+              type = FilterType.ASSIGNABLE_TYPE,
+              classes = GlobalExceptionHandler.class
+          )
+      )
+      ~~~
+
+3. 내 테스트의 문제점   
+   아래의 테스트는 웹 계층 테스트로 Spring MVC와 Controller만 로딩하고 나머지 애플리케이션 자동 설정은 최대한 배제된다.
+   따라서 기본 ExceptionResolver 체인이 “운영 환경과 동일하게” 구성되지 않을 수 있다.
+   이 때 Spring MVC가 아닌 테스트 컨텍스트에 해당 예외를 HTTP 상태코드 400으로 처리할 주체가 없어
+   예외가 처리되지 않고 그대로 던져지게 된다.
+
+4. 문제 해결방법
+   테스트를 의도대로 통과시키는 방법은 아래와 같다.
+   1) 명시적으로 해당 Exception에 대해 400 매핑 추가하는 ExceptionHandler 작성.
+   2) 작성한 ExceptionHandler.class를 import를 통해 테스트에 포함.
+   > 그런데 위와 같은 Exception 정책은 결국 반복된다.   
+   > Controller마다 동일한 테스트 케이스를 중복으로 계속 생성하지 않고, 별도의 테스트로 분리해 관리하는 것이 좋다.   
+   > 애플리케이션 전역의 정책이기 때문에 Exception 전용 테스트 파일을 생성해
+     ExceptionHandler 단위로 테스트를 생성하도록 한다.
 
 
 ---

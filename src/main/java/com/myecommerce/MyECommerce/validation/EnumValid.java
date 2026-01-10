@@ -12,7 +12,7 @@ import java.lang.annotation.*;
 public @interface EnumValid {
     // 아래의 메서드는 어노테이션의 옵션으로 사용됨.
 
-    String message() default "유효하지 않은 도메인입니다.";
+    String message() default "{validation.enum.invalid}";
 
     Class<?>[] groups() default {};
 

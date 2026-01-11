@@ -46,8 +46,9 @@
 14. Controller 메서드 파라미터
     - Controller에서 @RequestParam을 DTO로 받는 이유 
     - 스프링 MVC 파라미터 바인딩 (컨트롤러에서 파라미터값 받는 방법) 
-15. properties 파일 한글 깨짐 문제 해결
-
+15. 메시지 관리
+    - properties 파일 한글 깨짐 문제 해결
+    - 메시지 관리 방식 개선
 
 ---
 ## 1. Spring
@@ -1396,17 +1397,147 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
 
 
 ---
-## 15. properties 파일 한글 깨짐 문제 해결
+## 15. 메시지 관리
+### < properties 파일 한글 깨짐 문제 해결 >
 1. IDE File Encoding   
-   파일을 어떻게 저장할지 결정하는 것으로, 개발자가 파일을 디스크에 저장할 떄의 규칙 지정.   
+   파일을 어떻게 저장할지 결정하는 설정.   
+   개발자가 파일을 디스크에 저장할 떄 사용할 문자 인코딩 규칙을 지정.   
    해당 설정이 잘못되면 파일 자체가 꺠진 상태로 저장됨.
     - 설정방법   
       FIle > Settings > Editor > Code Style > File Encodings에서 Default encoding for properties Files를 UTF-8로 설정.
 2. spring.messages.encoding   
-   Spring이 파일을 어떻게 읽을지 결정하는 것으로, 런타임에서 MessageSource가 properties를 해석하는 방식 지정.
+   Spring이 파일을 어떻게 읽을지 결정하는 설정.
+   애플리케이션 런타임에서 MessageSource가 .properties 파일을 해석할 때 사용할 문자 인코딩 지정.   
+   IDE에서 정상적으로 저장된 파일이다로, 해당 설정이 없으면 실행 시 한글이 깨질 수 있음.   
    ~~~
    // applicatioin.properties 파일에 설정 추가
    
    spring.messages.encoding=UTF-8
    ~~~
+
+
+### < 메시지 관리 방식 개선 >
+> 비즈니스 에러는 의미와 계약이므로 Enum,
+> Validation 에러는 표현과 UX이므로 properties가 최적.
+
+1. 메시지 하드코딩의 문제점과 메시지 관리 방식 개선   
+   하드코딩된 메시지는 표현(UI)과 로직을 강하게 결합시켜
+   변경 비용이 크고, 일관성 유지와 확장이 어렵다.   
+   메시지를 Enum(비즈니스 에러) 과 Validation 메시지(properties) 로 분리하면
+   에러를 문자열이 아닌 정책(Policy) 단위로 관리할 수 있고,
+   메시지 변경 및 국제화(i18n)에도 유연하게 대응할 수 있다.   
+
+2. 메시지 하드코딩 비권장 이유
+   1) 메시지 변경 시 코드 수정 필요   
+      - 문구 수정에도 코드 변경 및 배포 필요
+      - 비즈니스 로직과 표현 책임이 섞임
+   2) 메시지 일관성 관리 어려움
+      - 같은 에러에 대해 서로 다른 문구 사용 가능성 증가
+      - UX 및 CS 대응 시 혼란 발생
+   3) 에러 추적 및 정책 파악 어려움
+      - 전체 에러 목록을 한눈에 파악하기 어려움
+      - 에러가 “정책”이 아니라 “산재된 문자열”로 존재
+   4) 다국어(i18n) 대응 불가
+      - 언어 추가 시 코드 수정 필수
+      - 확장 비용이 매우 큼
+
+3. Enum / Validation 메시지 분리의 의미   
+   Enum / Validation 메시지 분리는 단순 리팩토링이 아니라
+   규칙 · 표준 · 계약을 코드로 표현하는 설계 결정이다.    
+   메시지를 문자열이 아닌 정책(Policy) 으로 다루게 된다.   
+
+4. 서버 에러 코드 · 메시지 관리 방식
+   - 서버 에러 코드, 메시지를 properties로 분리할지 판단 기준
+     - Enum 메시지가 사용자에게 그대로 노출되는 문구라면 → 분리 고려.
+     - 에러 코드의 의미 설명(계약) 이라면 → Enum 유지.
+   1) messages.properties로 메시지 관리 특징
+      - 메시지 중앙 집중 관리
+      - 다국어 지원
+      - 코드에서 메시지 키가 흩어질 수 있음
+      ~~~
+      // messages.properties
+      error.product.already-exists=이미 등록된 상품입니다.
+      ~~~
+      ~~~
+      messageSource.getMessage("error.product.already-exists", null, locale);
+      ~~~
+   2) Enum 기반 에러 코드 관리 특징
+      - Enum 기반 에러 코드 관리 방식   
+        의미와 계약(API 스펙)을 중심으로 에러를 관리하는 방식
+      - 에러 정책 중앙 집중 관리 가능
+      - 상태 코드와 에러 의미의 강한 결합   
+        잘못된 상태 코드 반환 가능성 감소 및 일관된 API 응답 보장.
+      - 타입 안정성   
+        문자열이 아닌 Enum 타입을 사용해 오타 및 잘못된 에러 코드 사용을 컴파일 타임에 방지.   
+      - API 스펙 관리에 유리
+        클라이언트와의 게약인 에러 코드를 코드 값 변경 없이 의미 유지 가능.
+      - 비즈니스 의미 명확   
+        단순 메시지가 아닌 도메인 에러로 표현해, 로그, 모니터링, 장애 분석 시 의미 파악에 용이. 
+      - 메시지 변경 시 코드 수정 및 배포 필요
+      - 다국어 대응이 어려움
+      ~~~
+      public enum ErrorCode {
+          PRODUCT_ALREADY_EXISTS("P001", "이미 등록된 상품입니다."); 
+      }
+      ~~~
+   3) Enum + MessageSource 혼합 특징   
+      - 에러 정책과 표현 분리   
+        에러 코드는 Enum으로, 메시지는 properties로 관리.
+      - 메시지 변경 및 다국어 모두 대응 가능.
+      ~~~
+      public enum ErrorCode {
+          PRODUCT_ALREADY_EXISTS("P001", "error.product.already-exists");
+      }
+      ~~~
+      ~~~
+      messageSource.getMessage(errorCode.getMessageKey(), null, locale);
+      ~~~   
+
+5. Validation 예외 메시지 관리
+   1) Validation 메시지   
+      아래의 특성으로 인해 properties 관리가 최적.
+      - 사용자 노출 UI 메시지
+      - 필드 단위
+      - 케이스 수 많음
+      - 문구 변경 빈번
+      - 다국어 대응 가능성 높음
+   2) ValidationMessages.properties 사용 시 이점
+      - 표현 책임 분리 (SRP)
+      - DTO / Validator: 규칙
+      - properties: 표현
+      - 메시지 변경 시 코드 수정 없이 대응 가능
+      - 다국어 확장 용이
+      - 메시지 일관성 확보
+   3) Validation 예외를 Enum으로 관리해야 하는 예외적 경우
+      - B2B API에서 Validation 실패도 에러 코드로 내려야 하는 경우
+      - 클라이언트가 에러 코드 기반 로직을 수행하는 경우
+   4) Validation 메시지 키 작성 규칙
+      1. 도메인 키 방식 권장
+         - 검색성과 예측 가능성 높음
+         - 팀 협업 시 규칙 명확
+         - 필드별 메시지 커스터마이징 가능
+         - 다국어 대응 용이
+      2. FQCN 방식 비권장
+         - 어떤 도메인/필드 메시지인지 알 수 없음
+         - UX 메시지로 부적합
+         - 하나의 메시지 변경 시 모든 필드에 영향 끼침
+
+6. 메시지 파일 역할
+   1) messages.properties
+      - 비즈니스 에러
+      - 시스템 메시지
+      - 공통 메시지
+   2) ValidationMessages.properties
+      - Bean Validation 기본 메시지 파일
+      - messages.properties와 충돌 방지를 위해 Validation 전용 prefix 사용 권장.
+
+7. 기타 주의사항
+   - {min}, {max} placeholder 활용해 하드코딩 제거
+   - = 뒤 공백은 실제 메시지에 포함되므로 주의
+
+8. 최종 결정 사항
+   1) 서버 비즈니스 에러
+      - 의미+계약(API스펙)의 일부이므로 Enum 유지.
+   2) Validation 에러
+      - 문구 변경시 코드를 수정하지 않도록 하기 위해 ValidationMessages.properties로 분리.
 

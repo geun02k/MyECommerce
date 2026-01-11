@@ -15,13 +15,14 @@ import java.util.List;
 @AllArgsConstructor
 public class RequestModifyProductionDto {
 
-    @NotNull
-    @Min(1)
+    @NotNull(message = "{validation.product.id.not.null}")
+    @Min(value = 1, message = "{validation.product.id.min}")
     private Long id;
 
     private String description;
 
-    @EnumValid(enumClass = ProductionSaleStatusType.class)
+    @EnumValid(enumClass = ProductionSaleStatusType.class,
+            message = "{validation.product.sale.status.enum.invalid}")
     private ProductionSaleStatusType saleStatus;
 
     @Valid

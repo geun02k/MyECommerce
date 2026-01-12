@@ -10,8 +10,9 @@
    - Spring Security 내부동작구조
    - Spring Security 설정정보
    - Spring Security 의존성 추가 시 api호출불가 에러해결
-2. Filter
+2. Filter와 FilterChain
    - 중요 필터
+   - SecurityFilterChain
 3. 비밀번호 암호화
 4. JWT (Json Web Token)
    - JWT와 토큰구성
@@ -25,6 +26,11 @@
    - JWT 인증 필터에서 Custom Exception 발생 시 AuthenticationException 발생하는 이유
 8. DB 생성자, 수정자 ID 자동입력
 9. 스프링 시큐리티를 이용해 로그인 사용자정보 가져오기
+10. 사용자
+    - Member
+    - UserDetails
+    - MemberUserDetails
+    - @AuthenticationPrincipal Member member
 
 
 ---
@@ -199,7 +205,23 @@
 
 
 ---
-## 2. Filter
+## 2. Filter와 FilterChain
+0. Config   
+   Spring에서 Config란, Bean 정의를 담은 클래스 전체를 의미.  
+   <br>
+
+1. Filter   
+   하나의 검사 단계.     
+   Servlet 관점에서, 요청을 가로채 처리하고 필요 시 다음 필터로 넘기거나 중간에서 차단 가능.  
+   <br>
+
+2. FilterChain   
+   검사 단계들의 실행 순서 묶음.  
+   언제, 어떤 순서로 검사할지 결정.  
+   Servlet Filter 들의 연결된 체인.  
+   요청마다 이 체인을 통과하면서 검사 수행.
+
+
 ### < 중요 필터 >
 1. SecurityContextPersistenceFilter     
    SecurityContextRepository에서 SecurityContext를 가져오거나 생성. (세션공간)
@@ -219,6 +241,13 @@
    필터 체인 내에서 발생되는 인증, 인가 예외 처리.
 9. FilterSecurityInterceptor  
    권한 부여, 권한 관련 결정을 AccessDscisionManager에게 위임해 권한부여 결정 및 접근 제어 처리.
+
+
+### < SecurityFilterChain >
+Spring Security가 HTTP 요청을 처리할 때 적용할 보안 규칙들의 집합으로
+인증 필터, 인가 필터, CSRF 필터, JWT 필터 등 포함.   
+SecurityFilterChain Bean이 곧 보안 설정임.  
+어떤 필터들을 어떤 순서로 어떤 URL에 적용할지 결정.
 
 
 ---
@@ -474,7 +503,7 @@
 ---
 ## 6. 권한과 역할
 1. 권한 (Authority)
-    - 사용자가 시스템 내에서 **"구체적으로 할 수 있는 작업"**으로 세부 권한을 나타냄.    
+    - 사용자가 시스템 내에서 ***"구체적으로 할 수 있는 작업"***으로 세부 권한을 나타냄.    
       ex) READ_PRIVILEGES, WRITE_PRIVILEGES, DELETE_PRIVILEGES
 
 2. 역할 (Role)
@@ -488,6 +517,14 @@
 
 ---
 ## 7. 인증과 권한
+1. 인증(Authentication)   
+   누구인가?    
+   로그인 여부 검사.
+2. 인가(Authorization)   
+   무엇을 할 수 있는가?    
+   역할(Role), 권한(Authority) 검사.
+
+
 ### < 인증과 권한에 대한 HTTP 상태코드 >
 1. 401 Unauthorized(인증되지않음)
    - 요청을 처리하기 위해 사용자가 인증을 받아야함을 의미.
@@ -585,4 +622,51 @@ Spring Security에서 로그인한 사용자의 정보를 받아오기 위해서
 
 - 참고 블로그   
   https://charliezip.tistory.com/25
+
+
+---
+## 10. 사용자
+Spring Security에서 사용자는 ***도메인 사용자, Security 사용자*** 2종류다.
+
+### < Member, 도메인 사용자 >
+비즈니스 관점에서의 도메인 사용자.
+DB에 저장되어 주문, 상품등록, 권한 판단의 대상.
+즉, 우리 서비스의 사용자를 의미.
+
+### < UserDetails, Spring Security 사용자 >
+보안 관점에서의 Security 사용자.
+Spring Security가 이해할 수 있는 사용자로, 인증/권한 체크용으로 사용됨.
+SecurityContext 안에 포함되어 Spring Security가 사용하는 사용자로, 
+Spring Security는 Member는 알지 못한다.
+
+### < MemberUserDetails >
+Member, UserDatails 중간의 어댑터.
+도메인 사용자인 Member를 감싸 Spring Security 사용자인 UserDetails 인터페이스를 구현해 MemberUserDetails 생성. 
+~~~
+public class MemberUserDetails implements UserDetails {
+
+    private final Member member;
+
+    public MemberUserDetails(Member member) {
+        this.member = member;
+    }
+
+    public Member getMember() {
+        return member;
+    }
+
+    // getAuthorities(), getPassword(), getUsername() ...
+}
+~~~
+
+### < @AuthenticationPrincipal Member member >
+@AuthenticationPrincipal 어노테이션을 사용해, Spring Security가 가진 UserDetails를 Member 객체로 변환.
+
+### < 통합된 도메인 사용자, Security 사용자와 Controller 슬라이스 테스트 >
+내 프로젝트의 경우, MemberUserDetails가 불필요.
+Member 자체가 UserDetails이기 때문이다.
+즉, Member는 도메인 사용자이자 Security 사용자이다.
+
+Controller 슬라이스 테스트에서 인증과정이 없기 때문에 SecurityContext가 비어있다.
+따라서 principal이 없기 때문에 member 객체는 null을 가진다.
 

@@ -55,7 +55,7 @@ public class MemberController {
      * 회원 로그인 post /member/signin
      **/
     @PostMapping("/signin")
-    public ResponseEntity<String> signIn(@RequestBody RequestMemberDto memberDto) {
+    public ResponseEntity<String> signIn(@Valid @RequestBody RequestMemberDto memberDto) {
         // 사용자검증 후 JWT 토큰 반환
         return ResponseEntity.ok(memberService.signIn(memberDto));
     }

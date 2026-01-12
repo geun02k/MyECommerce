@@ -15,13 +15,16 @@ import org.springframework.data.domain.Pageable;
 @AllArgsConstructor
 public class RequestSearchProductionDto {
 
-    @EnumValid(enumClass = ProductionOrderByStdType.class)
+    @EnumValid(enumClass = ProductionOrderByStdType.class,
+            message = "{validation.product.order.by.std.enum.invalid}")
     private ProductionOrderByStdType orderByStd;
 
-    @EnumValid(enumClass = ProductionCategoryType.class)
+    @EnumValid(enumClass = ProductionCategoryType.class,
+            message = "{validation.product.category.enum.invalid}")
     private ProductionCategoryType category;
 
-    @Pattern(regexp = "^[^\\s]+$", message = "검색어를 입력하세요.") // 공백 이외 최소 한글자이상 입력
+    @Pattern(regexp = "^[^\\s]+$",
+            message = "{validation.product.keyword.pattern}") // 공백 외 최소 한 글자 이상 입력
     private String keyword;
 
     // Pageable 객체관련 필드

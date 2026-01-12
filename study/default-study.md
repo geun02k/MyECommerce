@@ -182,7 +182,7 @@
          throw new ConstraintViolationException(violations);
      } 
      ~~~
-   - @Validated, @Valid 어노테이션 
+   - @Validated, @Valid 어노테이션 - 검증트리거
      - 사용 시 대부분 스프링이 대신 검증해주므로 Validator 직접 생성할 필요 없음.
      - @Validated
        - Spring에 해당 어노테이션이 달린 클래스의 메서드로 전달되는 ***매개변수를 검증하도록 지시***하는 데 사용할 수 있는 **클래스 수준의 어노테이션.**

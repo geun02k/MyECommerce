@@ -469,18 +469,37 @@ Service 코드에서 메서드로 추출된 내용에 대한 단위 테스트 �
 ---
 ## 4. 슬라이스 테스트
 ### < Controller 슬라이스 테스트 >
-1. Controller 슬라이스 테스트   
-   Security, JWT, Service 구현 등에 관심이 없고 요청에 따른 컨트롤러 응답만 검증.
-   이 때, JWT 토큰이 없고 Security Filter가 먼저 실행되어 Controller까지 가지 못해 테스트가 깨진다.
-   따라서 해당 테스트에서 모든 요청을 통과 시키기 위해 Security 자체를 끄는 방법이 필요하다.  
+1. Controller의 역할
+   Controller의 역할은 Http 요청 수신, 바인딩, validation, service 호출, response 반환이다.   
    <br>
 
-2. Controller 슬라이스 테스트 목적
-   - 요청 바인딩
-   - Validation
-   - HTTP Status
-   - Controller 로직   
-     JWT 파싱, 토큰 서명, 인증 서버 연동, 실제 권한 판별 로직 등은 검증하지 않는다.
+2. Controller 슬라이스 테스트   
+   Controller 슬라이스 테스트는 Controller 역할을 기반하기 때문에
+   ***HTTP 요청이 들어왔을 때 바인딩 / 검증 / 인증·인가 / 예외 변환 / 올바른 HTTP 응답으로 변환을 테스트***한다.
+   그리고 중요한 점은, ***테스트에서는 중복 제거보다 가독성이 우선***이라는 것이다.
+   1) Controller 슬라이스 테스트와 Security
+      Security, JWT, Service 구현 등에 관심이 없고 요청에 따른 컨트롤러 응답만 검증한다.
+      이 때, JWT 토큰이 없고 Security Filter가 먼저 실행되어 Controller까지 가지 못해 테스트가 깨진다.
+      따라서 해당 테스트에서 모든 요청을 통과 시키기 위해 Security 자체를 끄는 방법이 필요하다.  
+   <br>
+
+3. Controller 슬라이스 테스트 목적
+   1) 요청 데이터 바인딩
+   2) 인증/인가
+   3) Validation 검증   
+      Validation 검증의 경우는, 모든 제약조건 조합, 모든 필드별 케이스를 작성하는 것이 아니라 검증이 동작한다는 사실만 확인하는 것이다.
+      DTO 세부 검증을 수행하고 싶다면 DTO 단위 테스트를 별도 수행해야 한다.
+   4) 예외 변환
+   5) 올바른 HTTP 응답 (Status 등)   
+      응답 검증은 모킹된 서비스 결과를 통해 간접 검증하는 구조가 정상이다.   
+   6) Controller 로직   
+   <br>
+   
+4. Controller 슬라이스 테스트 검증 제외 
+   1) JWT 파싱, 토큰 서명, 인증 서버 연동, 실제 권한 판별 로직 등은 검증하지 않는다.
+   2) ArgumentCaptor, refEq, equals를 이용한 Service 전달인자의 검증 또한 웹 계층 테스트의 책임 범위를 넘어선다.
+   3) 비즈니스 로직 검증, 서비스 내부 동작 검증, DTO->Entity 변환 검증은 수행하지 않는다.
+   <br>
 
 
 ### < Controller 단위테스트에서 슬라이스 테스트로 변경 >
@@ -1848,6 +1867,36 @@ WebMvcTest에서 무엇을 테스트하고 무엇을 테스트하지 않을 것�
    4) 테스트 데이터 생성 책임 분리.   
       가장 중요하게 생각한 리팩토링 포인트이다.
       데이터를 생성하는데 시선이 분산되어 테스트코드가 지저분한 느낌이다.
+   5) Service 전달인자 검증 최소화   
+      any() 사용해도 괜찮음. 굳이 DTO equals 필요 없음.
+      Controller 테스트에서는 전달인자가 그대로 Service로 넘어가는지만 간접적으로 확인하면 충분
+      ~~~
+       given(productionService.registerProduction(
+              any(RequestProductionDto.class), any(Member.class)))
+              .willReturn(response);
+      ~~~
+   6) 의도한 객체에 대한 반환값 보장 (JSON Path 검증)   
+      기존에는 any()를 통해 “무엇이 전달돼도 성공”하는 스텁.
+      Controller 테스트에서 최소한 “요청 JSON → DTO 변환이
+      의도한 객체로 이루어졌는지”를 한 번은 보장해주는 게 좋다.
+      이를 위해 JSON Path 검증을 통해 간접 검증을 수행한다.
+      응답 DTO 필드가 올바르게 매핑됐는지 확인해 Controller → Service → Response 변환까지 테스트 가능.
+      ~~~
+              mockMvc.perform(post("/production")
+                        .with(user(member))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.seller").value(member.getId()))
+                .andExpect(jsonPath("$.code").value(request.getCode()))
+                .andExpect(jsonPath("$.category").value(WOMEN_CLOTHING.toString()))
+                .andExpect(jsonPath("$.saleStatus").value(ON_SALE.toString()));
+
+      ~~~
+   7) ArgumentCaptor 제거   
+       DTO 단순 전달만 하는 Controller라면 불필요.   
+       유지보수 코드가 간결해지고 테스트가 가벼움.  
 
 6. 테스트 픽스쳐(Test Fixture)   
    테스트가 반복적으로 의존하는 준비된 상태(데이터, 객체, 환경)
@@ -1870,6 +1919,8 @@ WebMvcTest에서 무엇을 테스트하고 무엇을 테스트하지 않을 것�
    따라서 ***테스트코드 작성 시에는 response 값을 하드코딩 하는 것이 테스트의 검증 목적에 적합***하다.
    단, Request와 Response 값이 같은 경우, 반복적이거나 불필요하게 보일 수 있고 동일 값 여부를 직관적으로 확인하기는 어렵다.
    따라서 단순히 CRUD 흐름을 테스트하는 경우에는 Request 기반의 값을 재사용 가능하다.
+   1) 테스트 유지보수 우선 → request 기반 response 작성
+   2) 테스트 의도 명확성 우선 → response 값 하드코딩
 
 
 ### < ValidationMessages.properties 검증 테스트 설계 >

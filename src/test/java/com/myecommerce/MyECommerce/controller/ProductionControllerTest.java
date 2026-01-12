@@ -148,12 +148,14 @@ class ProductionControllerTest {
 
         // when
         // then
-        // 1. 400 에러 발생 호출 검증
+        // 1. 400 에러 발생 & 호출 메시지 검증
         mockMvc.perform(post("/production")
                         .with(user(seller()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorMessage")
+                        .value("유효하지않은 값입니다.\n상품코드는 영문자, 숫자만 사용 가능합니다.\n특수문자는 -만 허용하며 첫 글자로 사용 불가합니다."));
         // 2. service 미호출 검증
         verify(productionService, never()).registerProduction(any(), any());
     }

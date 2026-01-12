@@ -48,6 +48,7 @@
     - 웹 계층 테스트의 책임 범위 - API 계약과 Validation 책임 구분
     - 커스텀 Validation 테스트 - Enum 유효성 검증 테스트
     - PathVariable 검증 실패가 500이 되는 이유와 400으로 처리하는 방법
+    - ValidationMessages.properties 검증 테스트 설계
 14. 테스트코드 리팩토링
     - 상품등록성공 Controller 테스트코드 리팩토링 
 
@@ -1869,4 +1870,70 @@ WebMvcTest에서 무엇을 테스트하고 무엇을 테스트하지 않을 것�
    따라서 ***테스트코드 작성 시에는 response 값을 하드코딩 하는 것이 테스트의 검증 목적에 적합***하다.
    단, Request와 Response 값이 같은 경우, 반복적이거나 불필요하게 보일 수 있고 동일 값 여부를 직관적으로 확인하기는 어렵다.
    따라서 단순히 CRUD 흐름을 테스트하는 경우에는 Request 기반의 값을 재사용 가능하다.
+
+
+### < ValidationMessages.properties 검증 테스트 설계 >
+Validation 메시지를 키로 관리하는 설계를 제대로 했는지 검증하는 방법.
+테스트의 목적은 Validation 결과로 “최종 메시지 문구가 기대값인지”를 확인하는 것이다.
+메시지 키를 직접 관리하는 경우, 필요한 테스트이다.
+
+1. 테스트의 목적   
+   Validation 메시지 키가 정상 로딩되는지 검증하는 것이 목적이다.
+   - {validation...}로 작성된 키가 실제 메시지로 치환되는가
+   - properties 설정이 깨지지 않았는가
+   - 인코딩/MessageSource 설정 이상이 없는가
+
+2. 적절한 테스트 환경   
+   설정 + 프레임워크 통합 테스트이므로 Spring Boot 환경에서 하는 것이 옳다.
+   ~~~
+   @SpringBootTest
+   public class MessageSourceTest {
+       @Autowired
+       MessageSource messageSource;
+
+       @Test
+       @DisplayName("messages.properties파일에 대해 메시지 key로 value에 접근 성공")
+       public void message_key_is_resolved() {
+           // given
+           // when
+           String message = messageSource.getMessage(
+                      "키값",
+                      new Object[]{1, 100},
+                      Locale.KOREA
+           );
+
+           // then
+           Assertions.assertTrue(message.contains("상품코드는 최소 "));
+       }
+   } 
+   ~~~
+
+3. 테스트 코드 작성 후 발생에러
+   ~~~
+   No message found under code 'validation.product.code.size' for locale 'ko_KR'.
+   org.springframework.context.NoSuchMessageException: No message found under code 'validation.product.code.size' for locale 'ko_KR'.
+   ~~~
+
+4. 발생원인   
+   MessageSource가 해당 properties 파일을 찾지 못해 발생한 에러이다.
+   Spring 기본 탐색 파일은 messages.properties이니 당연하다.   
+   나는 Bean Validation 메시지 탐색 시 스펙상 기본 메시지 파일인
+   ValidationMessages.properties에서 메시지 탐색이 우선이라는 생각을 했다
+   하지만 이는 Validator가 직접 메시지를 해석할 때 해당하는 이야기이다.   
+   테스트코드에서는 MessageSource를 통해 메시지를 호출했으므로 해당하지 않는 이야기다.
+
+5. 해결방법
+   역할분리가 필요하다.
+   Bean Validation 동작 테스트는 ControllerTest에서 수행하도록 한다.   
+   따라서 해당 키에 대한 value를 잘 찾는지에 대해서는 validation check를 수행하는 controller 테스트에서 함께 수행한다.
+   이는 response에서 message로 전달된 값을 확인해 검증 가능하다.
+   ~~~
+        mockMvc.perform(post("/production")
+                        .with(user(seller()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorMessage") // 에러메시지 검증
+                        .value("유효하지않은 값입니다.\n상품코드는 영문자, 숫자만 사용 가능합니다.\n특수문자는 -만 허용하며 첫 글자로 사용 불가합니다."));
+   ~~~
 

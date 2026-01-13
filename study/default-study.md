@@ -36,6 +36,8 @@
    - 인터페이스와 추상화 클래스의 차이
    - service, service impl 분리하지 않는 이유
 8. 예외처리
+   - 예외 처리 표준화: Custom RuntimeException 기반 설계
+   - 예외 처리 구조 개선: ErrorCode 식별자화 및 메시지 책임 분리
 9. JWT 이용한 로그아웃
 10. 로그 레벨 결정
 11. 상수 선언
@@ -832,7 +834,9 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
 
 ---
 ## 8. 예외처리
-### < 예외처리 >
+### < 예외 처리 표준화: Custom RuntimeException 기반 설계 >
+Custom RuntimeException 기반 예외 처리 구조를 설명한다.
+
 1. Custom Exception을 생성해 예외처리하는 이유
    - throw new NullPointerException("error message") 와 같이 에러를 처리하면   
      통일성이 전혀 없고 또 정확한 에러 원인과 이유도 알 수 없다.
@@ -868,6 +872,250 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
       return new ResponseEntity<>(errorResponse,
                 Objects.requireNonNull(HttpStatus.resolve(e.getStatusCode())));
     ~~~
+
+
+### < 예외 처리 구조 개선: ErrorCode 식별자화 및 메시지 책임 분리 >
+messages.properties 도입을 고려하게 되면서, 기존 설계의 문제점을 개선하게 되었다.
+
+1. 기존 예외처리 결정 배경   
+   잘하려다 생긴 전형적인 과도 설계이다.   
+   각 계층(?)에 대한 책임을 분명하게 부여하지 못했다.
+   결론적으로 예외가 똑똑해지려다 책임이 섞인 상태이다.
+    1) Exception 표준화를 목적으로 함
+       모든 예외가 HTTP 상태코드, 에러코드(Enum), 사용자에게 내려줄 메시지를 가지므로
+       이를 같은 방식으로 갖도록 강제하려 했다.
+       그래서 BaseAbstractException에 추상 메서드를 생성해 해당 내용을 반드시 구현하도록 강제했다.
+    2) ExceptionHandler는 예외 내부 구현을 몰라도 됨.   
+       Handler는 타입 확인, 예외별 분기, 메시지 조합 로직을 전혀 몰라도 되도록 구현하고 싶었다.
+       예외가 스스로 응답 정보를 알고 있어야 한다고 생각했다.
+    3) ErrorCode는 Enum 중심으로 시스템 정리를 목적으로 함.   
+       CommonErrorCode 인터페이스를 구현해 에러의 단위가 enum이라는 명확한 기준을 세웠다.
+
+2. 상황 - 상황 변화로 인한 한계
+   (messages.properties 도입 시 기존 예외 구조의 한계)    
+   현재 시스템은 하드코딩된 에러 메시지를 제거하고,
+   messages.properties 기반으로 메시지를 관리하도록 구조를 변경하고 있다.
+   이 과정에서 메시지를 동적으로 구성해야 하는 요구가 발생했고,
+   기존 예외 구조가 이를 수용하지 못하는 한계에 직면했다.
+    1) 기존 구조   
+       기존 CartErrorCode는 에러 메시지를 직접 문자열로 보유하고 있으며,
+       이 과정에서 CartService.CART_MAX_SIZE와 같은 자바 코드 기반의 동적 값을 메시지 생성 시점에 참조하고 있다.
+    2) 발생한 구조적 문제 - messages.properties 도입으로 인한 제약    
+       messages.properties는 순수 리소스 파일로, 자바 코드를 직접 사용할 수 없다.   
+       Spring은 MessageSource를 통해 메시지 키 + 전달 인자(Object[]) 방식으로만 메시지를 조립한다.   
+       띠라서 에러 메시지를 런타임 시점에 동적으로 생성하려면
+       메시지의 구성 요소(placeholder에 들어갈 값)를 예외 발생 시점에 함께 전달해야 하는 구조가 필요해졌다.
+    3) 구조적 요구사항의 변화   
+       변경되어야 하는 구조로 인해 아래와 같은 요구사항이 생겼다.
+       즉, CartErrorCode는 더 이상 메시지를 직접 생성허지 않고 메시지 식별자(message key)만 제공해야 한다.
+       메시지 조립에 필요한 전달 인자는 에러가 발생한 도메인 계층에서 예외와 함께 전달되어야 한다.   
+       공통 예외 처리 계층에서는 전달받은 정보들을 기반으로 최종 메시지를 최종 조립해야 한다.
+
+3. ***원인 - 기존 설게의 본질적 문제***
+    1) ErrorCode는 메시지의 소유자가 아닌 식별자(identifier)   
+       메시지는 표현 계층(UI/응답)의 관심사이며,
+       ErrorCode는 시스템 내부에서 에러를 식별하고 분류하기 위한 값 객체이다.   
+       즉, ***ErrorCode는 식별자***이지 메시지 생성기가 아니다.
+       그러나 기존 구조에서는 역할 경계가 무너지면서 ErrorCode가 본래 의도보다 과도한 책임을 가지게 되었다.
+        - 기존 구조에서 ErrorCode가 가지는 책임
+            1. 서비스 상수 참조   
+               현재 CartErrorCode에서, ErrorCode가 Service 상수를 참조하면서 인프라를 침범했다.
+            2. 메시지 하드코딩    
+               다국어, 메시지 교체 불가
+            3. 테스트 취약   
+               메시지 변경이 코드 변경으로 이어져 테스트 범위가 불필요하게 확장됨.
+               (단순 문구 수정에도 enum 재컴파일 및 배포 필요)
+            4. 책임 혼합
+               ErrorCode가 식별의 책임을 지니는데 메시지 생성 책임까지 지님.
+       ~~~
+       LIMIT_CART_MAX_SIZE(
+            400,
+            "장바구니에는 최대 " + CartService.CART_MAX_SIZE + "건만 추가 가능합니다."
+       )
+       ~~~
+    2) BaseAbstractException을 중심으로 한 메시지 책임 혼란   
+       BaseAbstractException이 너무 많은 걸 강제하고 있다.
+       ErrorCode에도, Exception에도 메시지가 있으며 Handler에서 이미 있는 메시지를 다시 조합한다.
+       이로 인해 메시지의 최종 책임 주체가 모호해졌다.   
+       각 계층이 메시지에 부분적으로 관여하면서 명확한 소유권이 사라진 구조를 가지고 있다.
+    3) messages.properties 기반 메시지 조립 구조와 근본적 충돌    
+       현재 구조에서는 enum 생성 시점에 메시지가 이미 완성되어있다.   
+       이 구조에서는 plcaeholder 개념이 들어갈 여지가 없고,
+       Locale/MessageSource 사용 위치 또한 명확하지 않다.   
+       즉, 기존 예외 구조는 정적 메시지 생성에는 적합했지만,
+       messages.properties 기반의 동적 메시지 조립 구조와는 근본적으로 맞지 않는 설게였다.
+
+4. 수정 방향 검토 및 대안 비교   
+   messages.properties 기반의 동적 메시지 조립 구조를 도입하기 위해
+   다음과 같은 수정 방향을 검토했다.
+    1) CartException에만 messageArgs 필드를 추가하고 전용 Handler 분리   
+       CartException만을 위한 메시지 처리 로직을 별도로 구성하는 방법이다.
+       예외 처리 구조가 도메인별로 분기되어 예외가 늘어날수록 Handler 폭증 우려가 있다.
+       따라서 공통 예외 처리 전략이 붕괴된다.
+       확장성은 낮고 유지보수 비용은 증가하는 방법이다.   
+       추가적으로, 메시지 파라미터를 특정 도메인안의 예외에 한정된 특성으로 취급한다는 점에서 구조적으로 적절하지 않다.
+       messageArgs는 특정 도메인 예외의 구현 세부사항이 아니라, 에러 메시지가 표현되기 위해 필요한 공통 속성이다.
+       에러 메시지는 종종 수량, 한계값, 상태, 정책값 등 동적 정보를 포함하기 때문에 모든 도메인에서 발생할 수 있다.
+       따라서 특정 도메인의 특성이 아닌, 에러 표현의 일반 속성으로 취급되어야 하므로
+       BaseAbstractException 수준에서 다루는 것이 구조적으로 타당하다.
+    2) BaseAbstractException에 선택적 messageArgs 제공 메서드 추가   
+       전달인자가 필요한 경우에만 오버라이딩하도록 설계.
+       예외마다 메시지 인자 사용 여부가 다르므로 Handler는 분기 로직을 알아야한다.
+       또한 메시지 조립 책임이 불명확해진다.
+       표면적으로는 유연해보이지만, 내부 일관성이 깨지게 된다.
+    3) BaseAbstractException에 추상 메서드 추가   
+       모든 커스텀 Exception이 메시지 관련 메서드를 구현하도록 강제.
+       메시지가 필요 없는 예외까지 불필요한 구현을 강제하게 된다.
+       따라서 메시지 전략 변경 시 모든 예외 수정이 필요하다.
+       과도한 강제로 인해 변경 비용이 높아질 수 있다.
+    4) 기존 Exception + ErrorCode 구조 전면 개편 (최종 선택)
+       ErroCode는 식별자 역할에 집중하고,
+       Exception은 상황과 메시지 인자를 전달하고,
+       Handler는 메시지 조립과 응답을 책임지도록 변경한다.
+       역할이 명확하고 확징 시 구조가 흔들리지 않을 것이다.
+
+5. 역할 재정의 - 개선된 예외 구조의 책임 분리
+   기존 구조의 한계를 해결하기 위해 예외 처리 구조 전반에 대한 역할 재정의가 필요하다.
+   이 변경은 단순히 메시지 관리 방식을 바꾸는 것이 아니라,
+   ErrorCode, Exception, Handler 간 책임을 명확히 분리하기 위한 구조적 개선이다.
+   이 과정에서 CommonExceptionHandler가 예외에 포함된 전달 인자를 사용해 메시지를 조립할 수 있도록,
+   BaseAbstractException은 ErrorCode와 messageArgs를 공통으로 보유하는 구조로 수정되었다.
+   ***이 변경은 단순한 메시지 관리 방식 변경이 아니라,
+   ErrorCode · Exception · Handler 간 책임을 명확히 분리하기 위한 구조적 개선이다.***
+    1) CartErrorCode
+        - 에러의 의미를 식별하는 식별자
+        - HTTP 상태 코드 + 메시지 키만을 보유
+    2) CartException
+        - 어떤 에러가 발생했는지(ErrorCode)
+        - 메시지 조립에 필요한 전달 인자(messageArgs)를 함께 보유
+    3) CommonExceptionHandler
+        - BaseAbstractException을 기준으로 예외를 일괄 처리
+        - MessageSource를 사용해 메시지를 최종 조립
+        - HTTP 상태와 에러 정보를 포함한 응답을 생성
+
+6. 개선 방향 - messages.properties 도입의 설계적 의미
+   현재 구조는 이미 초기 설계 시 책임이 명확하지 않고 동일한 정보가 여러 군데 분산되어있기 때문에
+   메시지 관리 문제를 넘어선 구조의 문제가 있는 경우다.
+   이 때 messages.properties 도입의 목적은 국제화 등이 아닌
+   ***ErrorCode · Exception · Handler 간 책임을 명확히 분리하기 위한 구조적 개선***이다.
+   <br>
+   설계를 위한 설계가 되지 않도록 하기 위해 고민했다.
+   Validation 에러 메시지를 하드코딩에서 파일로 별도 분리하면서 서버 에러의 메시지도 관리 방식도 함께 검토하게 되었다.   
+   Validation 메시지는 수정 빈도와 일관성 측면에서 파일 분리는 명확한 이점이 있었다.
+   반면, 서버 에러 메시지의 경우는 Enum으로 관리하는 방식도 베스트는 아니지만 최악은 아니라고 생각해 현상 유지 계획이었다.
+   그럼에도 불구하고 이번 설계 변경은 ***책임 분리를 위한 설계 안정성 측면에서 의미가 있다.***
+    1) 메시지를 도메인 로직에서 분리   
+       책임이 명확하지 않고 동일한 정보가 여러 군데 분산되어 있는 구조를 정리할 수 있다.
+       기본 구조의 본질적인 문제는 ErrorCode가 메시지 자체를 보유하고,
+       Exception이 메시지 또는 메시지 조합 정보를 보유하고,
+       Handler가 이미 있는 메시지를 다시 조합해 응답한다는 것이다.
+       이는 메시지 책임이 여러 계층에 분산되어 메시지가 시스템 내부 로직을 오염시키게 된다.
+       messages.properties 구조를 이용해
+       ErrorCode는 에러 식별, Exception은 어떤 에러가 발생했고 어떤 값을 전달할지 상황전달 역할을 하고,
+       Handler는 표현을 위해 메시지를 생성하고, properties는 UI 문구 자체를 관리하므로서
+       각 계층의 관심사를 분리할 수 있도록 한다.
+    2) ErrorCode를 불변 식별자로 단순화      
+       messages.properties를 쓰지 않으면 ErrorCode는 필연적으로 문자열 포맷터 역할을 하게 된다.
+       그러면 ErrorCdoe는 정책, 표현 방식을 알고, 서비스 상수를 참조하면서 변경에 민감하게 된다.
+       하지만 메시지 외부로 분리하면 ErrorCode는 불변 식별자 역할에 집중할 수 있다.
+    3) 변경에 대한 최소한의 여지 확보   
+       현실에서는 여러 변경 사항이 발생하게 된다.
+       messages.properties 구조는 코드 변경 없이 수용할 여지를 남긴다.
+       이는 설계 관점에서 중요하다.
+
+   구조가 단순하고 책임이 명확하다면 messages.properties를 사용할 필요는 없다.
+   하지만 현재 구조는 이미 BaseAbstractException, CommonExceptionHandler, ErrorCode 추상화, 도메인별 Exception 분리 등
+   구조가 설계되어 있기 떄문에 messages.properties는 메시지 관리 목적을 넘어 책임 분리를 위한 선택이다.
+
+7. 개선된 예외 구조
+    1) 핵심 원칙   
+       ***예외는 상태를 전달하고, 표현은 Handler에서 결정한다.***   
+       ErrorCode는 식별자, Exception은 상황 전달, Handler는 메시지로 MessageSource를 결정하는 구조를 가지도록 한다.
+        - ErrorCode는 식별자 + HTTP 상태까지만 책임진다.
+        - 메시지는 Exception 또는 Handler 레벨에서 결정한다.
+            - Exception은 어떤 에러인지, 메시지 파라미터만 가진다.
+            - Handler는 메시지 해석과 응답 생성을 담당한다.
+        - messages는 UI 표현 문구만 담당한다.
+    2) CommonErrorCode 단순화   
+       메시지 호출을 위한 key를 갖는다.(메시지 문자열 자체를 갖지 않음)
+       ~~~
+       public interface CommonErrorCode {
+           HttpStatus getStatus();
+           String getCode(); // 메시지 키
+       }
+       ~~~
+       ~~~
+       public enum CartErrorCode implements CommonErrorCode {
+       LIMIT_CART_MAX_SIZE(HttpStatus.BAD_REQUEST, "cart.limit.exceeded");
+       
+           private final HttpStatus status;
+           private final String code;
+       }
+       ~~~
+    3) BaseAbstractException은 ErrorCode, messages 전달인자만 갖는다.   
+       getter를 강제하지 않고, 필드기반으로 단순, 명확하게 가져간다.
+        - Object...   
+          법적으로는 Object[] 배열이고, 사용성을 좋게 만든 자바의 가변 인자(varargs) 문법.   
+          컴파일 타임에 그냥 배열로 변환.
+        - 추상 클래스가 아니지만 abstract를 유지하는 이유
+            1. 직접 던지지 말라는 설계 의도 표현 수단으로 사용   
+               BaseAbstractException은 직접 사용되는 예외가 아니라
+               도메인 예외들이 반드시 상속해야 하는 기반 계약(contract) 이다.
+               띠라서 abstract로 선언해 직접 예외를 던지는 경우를 막는다.
+            2. 도메인 경계 강제
+               로그를 통하면 어느 도메인에서 예외가 발생했는지 즉시 알 수 있음.
+            3. 추후 "공통 동작"을 추가할 확장의 여지를 남김
+        - abstract 없애도 되는 경우   
+          추상 클래스가 과한 경우에는 제거해 단순화하는 것이 좋다.
+          예를 들어 소규모 프로젝트인데 에러코드 10개 미만이고 도메인 구분 필요없는 경우가 있다.
+       ~~~
+       public abstract class BaseAbstractException extends RuntimeException {
+           private final CommonErrorCode errorCode;
+           private final Object[] messageArgs;
+ 
+           protected BaseAbstractException(CommonErrorCode errorCode, Object... messageArgs) {
+               this.errorCode = errorCode;
+               this.messageArgs = messageArgs;
+           }
+ 
+           public CommonErrorCode getErrorCode() {
+               return errorCode;
+           }
+ 
+           public Object[] getMessageArgs() {
+               return messageArgs;
+           }
+       }
+       ~~~ 
+    4) 커스텀 Exception
+       ~~~
+       public class CartException extends BaseAbstractException {
+           public CartException(CartErrorCode errorCode, Object... args) {
+               super(errorCode, args)
+ 
+           }
+     
+           public CartException(CartErrorCode errorCode) {
+               super(errorCode, null);
+           }
+       }
+       ~~~
+    5) ExceptionHandler
+       ~~~
+       @ExceptionHandler(BaseAbstractException.class)
+       public ResponseEntity<CommonErrorResponse> handle(BaseAbstractException e) {
+     
+           String message = messageSource.getMessage(
+               e.getErrorCode().getCode(),
+               e.getMessageArgs(),
+               LocaleContextHolder.getLocale()
+           );
+     
+           return ResponseEntity
+               .status(e.getErrorCode().getStatus())
+               .body(new CommonErrorResponse(e.getErrorCode(), message));
+       }       
+       ~~~
 
 
 ---

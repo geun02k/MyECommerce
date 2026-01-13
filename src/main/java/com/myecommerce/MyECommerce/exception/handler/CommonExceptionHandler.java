@@ -32,15 +32,15 @@ public class CommonExceptionHandler {
         // 응답 객체 생성
         CommonErrorResponse errorResponse = CommonErrorResponse.builder()
                 .errorCode(e.getErrorCode())
-                .errorMessage(e.getErrorMessage())
+                .errorMessage(e.getErrorCode().getErrorMessage())
                 .build();
 
-        log.warn(e.getErrorMessage(), e);
+        log.warn(e.getErrorCode().getErrorMessage(), e);
 
         // 응답 객체 반환
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
         return new ResponseEntity<>(errorResponse,
-                Objects.requireNonNull(HttpStatus.resolve(e.getStatusCode())));
+                Objects.requireNonNull(HttpStatus.resolve(e.getErrorCode().getStatusCode())));
     }
 
     /** DTO 유효성검사 예외처리 **/
@@ -56,7 +56,7 @@ public class CommonExceptionHandler {
 
         // 응답 객체 생성
         CommonErrorResponse errorResponse = CommonErrorResponse.builder()
-                .errorCode(errorCode)
+                .errorCode(errorCode) // DefaultErrorCode.INVALID_VALUE
                 .errorMessage(errorCode.getErrorMessage() + defaultErrorMessage)
                 .build();
 

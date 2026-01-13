@@ -37,6 +37,7 @@
    - service, service impl 분리하지 않는 이유
 8. 예외처리
    - 예외 처리 표준화: Custom RuntimeException 기반 설계
+   - BaseAbstractException 설계 선택: 계약 중심에서 데이터 중심으로
    - 예외 처리 구조 개선: ErrorCode 식별자화 및 메시지 책임 분리
 9. JWT 이용한 로그아웃
 10. 로그 레벨 결정
@@ -874,6 +875,79 @@ Custom RuntimeException 기반 예외 처리 구조를 설명한다.
     ~~~
 
 
+### < BaseAbstractException 설계 선택: 계약 중심에서 데이터 중심으로 >
+1. 추상메서드만 두는 경우 -> 계약 중심 설계   
+   ***계약만 강제하는 방식.***   
+   Exception 종류가 아주 적고
+   공통 필드가 거의 늘지 않을 것이 확실하고
+   팀이 작거나 개인 프로젝트이고
+   “중복”보다 “명시적 계약”이 더 중요한 경우에는
+   계약만 강제하는 구조가 더 깔끔하고 좋을 방법일 수 있다.
+   ~~~
+   public abstract class BaseAbstractException extends RuntimeException {
+       public abstract CommonErrorCode getErrorCode();
+   }
+   ~~~
+    1) 계약만 제공   
+       순수하게 계약만 제공하므로 모든 커스텀 Exception에서 getErrorCode() 구현을 강제.  
+       BaseAbstractException은 필드나 생성자 없이 순수 계약 역할만 수행.
+    2) 중복코드발생   
+       대부분 커스텀 Exception에서 동일한 errorCode를 만들고, getter를 구현 필요.
+    3) 공통필드관리 시 매번 구현 필요   
+       Handler에서 일괄 처리하려면 개발자 규칙에 의존해야 함.
+       결국 모든 커스텀 Exception이 동일한 필드·구조를 암묵적으로 유지해야 한다.
+       그러나 BaseAbstractException은 계약(getErrorCode)만 강제할 뿐,
+       공통 필드의 존재나 구조 일관성은 컴파일 타임에 보장하지 못한다.   
+       강제는 계약 하나뿐이고, 실제 구조 일관성은 개발자 규칙에 의존하는 구조가 되는 것이다.
+
+2. 필드+생성자+getter 모두 포함하는 경우 -> 데이터 중심 베이스 클래스   
+   커스텀 Exception이 많고, 공통 필드를 일관되게 관리하고 싶을 때 선택하는
+   실용적인 패턴으로 ***데이터 중심 베이스 클래스***이다.   
+   아주 소규모 프로젝트에서는 과할 수 있음.
+   ~~~
+   public abstract class BaseAbstractException extends RuntimeException {
+      private final CommonErrorCode errorCode;
+      private final Object[] messageArgs;
+
+      protected BaseAbstractException(CommonErrorCode errorCode, Object... messageArgs) {
+          this.errorCode = errorCode;
+          this.messageArgs = messageArgs;
+      }
+
+      public CommonErrorCode getErrorCode() { return errorCode; }
+      public Object[] getMessageArgs() { return messageArgs; }
+   }
+   ~~~
+    1) 중복 제거   
+       모든 커스텀 Exception에서 동일한 getter 구현 불필요.
+       super()만 호출하면 됨.
+    2) 공통 필드 제공
+       공통 필드를 베이스 클래스에서 직접 관리.   
+       하위 Exception은 super() 호출만으로 구현 가능.  
+       따라서 Handler가 메시지 조립을 위해 공통 필드에 일관되게 접근 가능.
+    3) 추상 클래스가 단순 계약 제공을 넘어,
+       공통 상태(errorCode, messageArgs)를 직접 관리하는 역할 수행.
+
+3. 데이터 중심 베이스 클래스가 더 보편적으로 사용되는 이유
+    1) 예외는 행위보다 상태 전달이 목적   
+       예외 객체는 로직을 수행하는 주체가 아니므로, 발생한 에러와 필요한 값을 담으면 된다.
+    2) 변경 사항이 한 곳   
+       베이스 클래스의 대부분의 경우 하위 Exception 수정 없이 변경을 흡수 가능.
+        - 필드 추가 시 베이스 클래스만 수정
+        - 메시지 전략 변경 시 ExceptionHandler만 수정
+    3) Handler가 중심 구조
+       표현 로직인 메시지, 상태코드 정책이 Handler에 모이게 된다.
+
+4. BaseAbstractException 구조 변경 결정
+   현재 프로젝트는 BaseAbstractException이 이미 존재하고 CommonExceptionHandler가 중심에 있다.   
+   ErrorCode 추상화가 되어있고 도메인별 Exception이 계속 늘어날 가능성이 존재한다.
+   messageArgs, 메시지 전략 변경 같은 경우가 실제로 발생했다.
+   이 상황에서 계약만 강제하는 방식의 문제는 변경이 생길 때, 항상 “모든 Exception”이 영향을 받는다는 것이다.
+   또한 기본 구조는 계약은 명확하나, 실질적으로 모든 커스텀 Exception이 동일한 필드와 구현을 반복하고 있었다.
+   이에 따라 BaseAbstractException을 계약 중심 추상 클래스에서 데이터 중심 베이스 클래스로 변경한다.
+   이는 설계 단순화가 아닌 중복제거와 변경 대응성 강화를 위한 구조적 개선이다.
+
+
 ### < 예외 처리 구조 개선: ErrorCode 식별자화 및 메시지 책임 분리 >
 messages.properties 도입을 고려하게 되면서, 기존 설계의 문제점을 개선하게 되었다.
 
@@ -1057,8 +1131,12 @@ messages.properties 도입을 고려하게 되면서, 기존 설계의 문제점
         - Object...   
           법적으로는 Object[] 배열이고, 사용성을 좋게 만든 자바의 가변 인자(varargs) 문법.   
           컴파일 타임에 그냥 배열로 변환.
+        - 추상 클래스를 유지한다는 말은 경계를 유지한다는 뜻이다.
+          경계를 유지한다는 말은, BaseAbstractException이 직접 사용되는 예외가 아니라
+          도메인 예외들이 반드시 거쳐야 하는 기준선으로 유지한다는 뜻이다.
+          따라서 책임의 분리가 선명해진다.
         - 추상 클래스가 아니지만 abstract를 유지하는 이유
-            1. 직접 던지지 말라는 설계 의도 표현 수단으로 사용   
+            1. 예외를 직접 던지지 말라는 설계 의도 표현 수단으로 사용   
                BaseAbstractException은 직접 사용되는 예외가 아니라
                도메인 예외들이 반드시 상속해야 하는 기반 계약(contract) 이다.
                띠라서 abstract로 선언해 직접 예외를 던지는 경우를 막는다.

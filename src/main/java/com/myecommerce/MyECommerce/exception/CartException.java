@@ -8,4 +8,8 @@ public class CartException extends BaseAbstractException {
         super(errorCode);
     }
 
+    public CartException(CartErrorCode errorCode, Object... messageArgs) {
+        super(errorCode, messageArgs);
+    }
+
 }

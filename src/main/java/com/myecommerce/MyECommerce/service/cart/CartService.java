@@ -74,7 +74,7 @@ public class CartService {
                 .reduce(0, Integer::sum);
 
         if (cartItemCount >= CART_MAX_SIZE) {
-            throw new CartException(LIMIT_CART_MAX_SIZE);
+            throw new CartException(LIMIT_CART_MAX_SIZE, CART_MAX_SIZE);
         }
     }
 

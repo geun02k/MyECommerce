@@ -38,6 +38,7 @@
 8. 예외처리
    - 예외 처리 표준화: Custom RuntimeException 기반 설계
    - BaseAbstractException 설계 선택: 계약 중심에서 데이터 중심으로
+   - BaseAbstractException 설계 개선: Lombok 생성자 제거와 불변 구조 확립
    - 예외 처리 구조 개선: ErrorCode 식별자화 및 메시지 책임 분리
 9. JWT 이용한 로그아웃
 10. 로그 레벨 결정
@@ -52,6 +53,7 @@
 15. 메시지 관리
     - properties 파일 한글 깨짐 문제 해결
     - 메시지 관리 방식 개선
+    - 서버 에러 메시지 하드코딩 제거: placeholder 기반 메시지 분리 전략
 
 ---
 ## 1. Spring
@@ -946,6 +948,68 @@ Custom RuntimeException 기반 예외 처리 구조를 설명한다.
    또한 기본 구조는 계약은 명확하나, 실질적으로 모든 커스텀 Exception이 동일한 필드와 구현을 반복하고 있었다.
    이에 따라 BaseAbstractException을 계약 중심 추상 클래스에서 데이터 중심 베이스 클래스로 변경한다.
    이는 설계 단순화가 아닌 중복제거와 변경 대응성 강화를 위한 구조적 개선이다.
+
+
+### < BaseAbstractException 설계 개선: Lombok 생성자 제거와 불변 구조 확립 >
+1. 문제점
+   1) 의도 불분명   
+      Lombok의 @AllArgsConstructor + @RequiredArgsConstructor 조합은 의도대로 
+      final 필드인 CommonErrorCode만 받는 생성자와 모든 필드를 받는 생성자를 자동 생성한다.   
+      컴파일 오류는 없지만 어떤 생성자가 의도된 진입점인지, messageArgs가 필수인지 선택인지 코드에서 명확히 드러나지 않는다.
+      베이스 클래스는 구조 변경에 영향을 자주 받는 지점으로, Lombok 조합보다는 명시적인 생성자 정의 방식이 안전하다.
+   2) 예외 객체의 가변성
+      messageArgs를 final로 선언하지 않으므로서 예외 객체를 가변 상태로 만들게 된다.   
+      하지만 예외는 생성 시점에 상태가 결정되고, 던져진 이후에는 변하지 않는 객체여야 한다.   
+      불변 객체는 디버깅, 로깅, 멀티스레드 안정성이 높다.
+   3) RuntimeException 메시지 사용 의도 불명확   
+      RuntimeExcception을 상속하지만 명시적으로 super()를 통해 호출하지 않는다. (자동 호출)
+      따라서 RuntimeException 메시지를 사용하지 않는 구조임이 명확하게 드러나지 않는다. 
+      이렇게 메시지를 Exception에 담지 않는 구조라면 의도를 더 명확히 드러내는 생성자 정의가 필요하다.
+   ~~~
+    @Getter
+    @AllArgsConstructor
+    @RequiredArgsConstructor
+    public abstract class BaseAbstractException extends RuntimeException {
+        // 에러코드 반환(HTTP 상태코드, 에러메시지)
+        private final CommonErrorCode errorCode;
+        // 에러 메시지 전달인자
+        private Object[] messageArgs;
+    }
+   ~~~
+
+2. 해결방법
+   1) 생성자로 의도 분명히   
+      messageArgs는 선택적, errorCode는 필수임을 생성자 시그니처만 봐도 확인 가능하도록 직접 정의.
+   2) 예외 객체 불변화
+      모든 필드를 final로 선언해 예외 객체 불변 처리.
+   3) Null-safe    
+      messageArgs는 “없음”을 null이 아니라 빈 배열로 표현 권장.
+      Handler는 null 체크 방어 로직 없이 MessageSource는 빈 배열을 자연스럽게 처리 가능.   
+      null 전달 시, 사용하는 Handler에서 null 체크 방어로직 필요함.
+   4) 생성자 접근제어자 제한
+      BaseAbstractException은 직접 throw하는 대상이 아니다.
+      따라서 도메인 예외를 통해서만 생성되어야 하므로, protected 생성자를 사용한다.
+      이로 인해 베이스 클래스는 계약과 공통 상태를 관리한다는 의도를 명확히할 수 있다.
+   ~~~
+    @Getter
+    public abstract class BaseAbstractException extends RuntimeException {
+        private static final Object[] EMPTY_ARGS = new Object[0];
+    
+        // 에러코드 반환(HTTP 상태코드, 에러메시지)
+        private final CommonErrorCode errorCode;
+        // 에러 메시지 전달인자
+        private final Object[] messageArgs;
+    
+        protected BaseAbstractException(CommonErrorCode errorCode) {
+            this(errorCode, EMPTY_ARGS);
+        }
+    
+        protected BaseAbstractException(CommonErrorCode errorCode, Object... messageArgs) {
+            this.errorCode = errorCode;
+            this.messageArgs = messageArgs == null ? EMPTY_ARGS : messageArgs;
+        }
+    }
+   ~~~
 
 
 ### < 예외 처리 구조 개선: ErrorCode 식별자화 및 메시지 책임 분리 >
@@ -1866,4 +1930,85 @@ messages.properties 도입을 고려하게 되면서, 기존 설계의 문제점
       - 의미+계약(API스펙)의 일부이므로 Enum 유지.
    2) Validation 에러
       - 문구 변경시 코드를 수정하지 않도록 하기 위해 ValidationMessages.properties로 분리.
+
+
+### < 서버 에러 메시지 하드코딩 제거: placeholder 기반 메시지 분리 전략 >
+1. 해결해야 할 문제
+    1) 하드코딩 된 메시지 분리   
+       자바코드를 포함하는 하드코딩 된 에러 메시지를 properties 파일로 이동시키려고 한다.   
+       이 때, properties 파일 안에서 자바코드를 직접 사용할 수 없다.
+    2) 현재 코드 방식의 문제점
+        - 메시지와 로직의 강결합.   
+          메시지가 CartService에 의존.   
+          ErrorCode가 도메인 정책 값의 소유자처럼 동작하고 있다.
+          CartService 수정 시 ErrorCode까지 저장.
+        - 국제화 불가.
+        - 정책 변경 시 코드 수정 필요.   
+          메시지 문구 수정 시 배포 필요.
+   ~~~
+   @Getter
+   @AllArgsConstructor
+   public enum CartErrorCode implements CommonErrorCode {
+       // 장바구니 validation check
+       LIMIT_CART_MAX_SIZE(HttpStatus.BAD_REQUEST.value(), "장바구니에는 최대 " + CartService.CART_MAX_SIZE + "건만 추가 가능합니다.")
+       ;
+
+       private final int statusCode;
+       private final String errorMessage;
+   }
+   ~~~
+
+2. properties 파일의 역할과 한계    
+   properties 파일은 순수 리소스 파일로, 문자열만 저장 가능하다.
+   따라서 properties 파일이 자바 코드를 포함할 수 없다.
+   이 때 스프링은 MessageSource를 통해 '문자열+인자(Object[])'만 치환한다.
+
+3. 해결방법
+   위와 같은 방식 대신, 'placeholder + 런타임 인자 전달' 방식으로 동일한 효과를 낼 수 있다.
+    1) properties + placeholder 사용   
+       properties에 메시지를 하드코딩해 사용하면 자바코드와 properties 파일 모두 값을 수정해야한다.
+       따라서 정책 값이 메시지와 코드에 중복 정의되어 둘 다 관리가 필요하므로 정합성 붕괴와 실수 확률이 증가한다.   
+       따라서 properties 파일에서 메시지를 관리하되, placeholder를 이용해 인자를 전달해 사용한다.
+       전달인자는 런타임에 placeholder에 전달된다.
+       ~~~
+       error.cart.limit.max=장바구니에는 최대 {0}건만 추가 가능합니다.
+       ~~~
+    2) Enum에 하드코딩 메시지를 키로 변경
+       ~~~
+       @Getter
+       @AllArgsConstructor
+       public enum CartErrorCode implements CommonErrorCode {
+ 
+           LIMIT_CART_MAX_SIZE(
+               HttpStatus.BAD_REQUEST.value(),
+               "error.cart.limit.max"
+           );
+ 
+           private final int statusCode;
+           private final String messageKey;
+       }
+       ~~~
+    3) 예외 발생 시 값 주입   
+       예외 발생 시 값 주입해 해당 예외가 발생하면 에러 메시지를 출력한다.
+       ~~~
+       throw new CartException(
+           CartErrorCode.LIMIT_CART_MAX_SIZE,
+           new Object[]{ CartService.CART_MAX_SIZE }
+       );
+       ~~~
+
+4. 더 나은 확장 (선택)
+   메시지와 정책 값 모두 외부 설정으로 분리하면 환경별 정책 변경이 코드 수정 없이 가능하다.   
+   - 운영 환경별 설정 가능
+   - 메시지 구조는 그대로 유지
+   ~~~
+   //application.properties
+   cart:
+      max-size: 30 
+   ~~~
+   ~~~
+   // CartService
+   @Value("${cart.max-size}")
+   private int cartMaxSize;
+   ~~~
 

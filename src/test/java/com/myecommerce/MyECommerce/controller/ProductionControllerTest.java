@@ -9,9 +9,9 @@ import com.myecommerce.MyECommerce.dto.production.RequestProductionOptionDto;
 import com.myecommerce.MyECommerce.dto.production.ResponseProductionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
+import com.myecommerce.MyECommerce.exception.ProductionException;
 import com.myecommerce.MyECommerce.security.filter.JwtAuthenticationFilter;
 import com.myecommerce.MyECommerce.service.production.ProductionService;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.ALREADY_REGISTERED_CODE;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
 import static com.myecommerce.MyECommerce.type.ProductionCategoryType.WOMEN_CLOTHING;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
@@ -182,12 +183,15 @@ class ProductionControllerTest {
     }
 
     @Test
-    @DisplayName("상품등록실패_옵션 유효성 미검증")
+    @DisplayName("상품등록실패_옵션 유효성 미검증으로 DTO Validation 예외 발생 시 에러 응답 반환")
     public void failRegisterProduction_invalidOption() throws Exception {
         // given
         RequestProductionOptionDto invalidOption =
                 RequestProductionOptionDto.builder()
-                        .optionCode("") // @Size 위반
+                        .optionCode("optionCode")
+                        .optionName("optionName")
+                        .price(BigDecimal.valueOf(1000))
+                        .quantity(0) // @Min 위반
                         .build();
         RequestProductionDto request = RequestProductionDto.builder()
                 .code("validCode")
@@ -202,8 +206,35 @@ class ProductionControllerTest {
                         .with(user(seller()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("INVALID_VALUE"))
+                .andExpect(jsonPath("$.errorMessage")
+                        .value("유효하지 않은 값입니다.\n해당 옵션의 판매가능 수량은 1 이상이어야 합니다."));
+
         verify(productionService, never()).registerProduction(any(), any());
+    }
+
+    @Test
+    @DisplayName("상품등록실패_상품코드중복 비즈니스 예외 발생 시 에러 응답 반환")
+    public void failRegisterProduction_whenAlreadyRegisteredProduction() throws Exception {
+        // given
+        RequestProductionDto request = validRequestProduction();
+
+        given(productionService.registerProduction(any(), any(Member.class)))
+                .willThrow(new ProductionException(ALREADY_REGISTERED_CODE));
+
+        // when
+        // then
+        mockMvc.perform(post("/production")
+                        .with(user(seller()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("ALREADY_REGISTERED_CODE"))
+                .andExpect(jsonPath("$.errorMessage")
+                        .value("이미 등록된 상품코드입니다."));
     }
 
     /* ----------------------
@@ -211,15 +242,18 @@ class ProductionControllerTest {
        ---------------------- */
 
     @Test
-    @DisplayName("상품상세조회실패_음수 pathVariable 요청 시 400 에러 반환")
-    @Disabled("단순 방어적 검증으로 테스트에서 제외 (pathVariable 유효성 검증 여부 확인용)")
+    @DisplayName("상품상세조회실패_음수 pathVariable Validation 예외 발생 시 에러 응답 반환")
     public void searchProductDetail_whenNegativeId_thenBadRequest() throws Exception {
         // given
         Long invalidProductId = -1L;
         // when
         // then
         mockMvc.perform(get("/production/{id}", invalidProductId))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("INVALID_VALUE"))
+                .andExpect(jsonPath("$.errorMessage")
+                        .value("상품 ID는 양수입니다."));
         verify(productionService, never()).searchDetailProduction(invalidProductId);
     }
 

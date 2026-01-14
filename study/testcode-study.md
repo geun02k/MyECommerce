@@ -51,6 +51,9 @@
     - ValidationMessages.properties 검증 테스트 설계
 14. 테스트코드 리팩토링
     - 상품등록성공 Controller 테스트코드 리팩토링 
+15. Exception 테스트코드
+    - Validation, 비즈니스 예외 메시지 테스트
+
 
 --- 
 ## 1. 테스트코드
@@ -1988,3 +1991,46 @@ Validation 메시지를 키로 관리하는 설계를 제대로 했는지 검증
                         .value("유효하지않은 값입니다.\n상품코드는 영문자, 숫자만 사용 가능합니다.\n특수문자는 -만 허용하며 첫 글자로 사용 불가합니다."));
    ~~~
 
+
+## 15. Exception 테스트코드
+### < Validation, 비즈니스 예외 메시지 테스트 >
+1. Validation 메시지    
+   대부분 컨트롤러 테스트에서 MockMvc로 검증.
+   Validation 에러는 대표 케이스 몇 개만 작성해 테스트.
+
+2. 비즈니스 예외 메시지    
+   프로젝트, 조직 정책에 따라 다름
+   1) 단순히 메시지를 Key로 가져오는 경우   
+      메시지가 올바르게 내려가는지만 확인하면 되므로 통합(MockMvc) 테스트만으로 충분하다.
+   2) 메시지 생성 로직이 조합되거나 포맷팅, Locale 처리, 커스텀 파라미터 포함하는 경우   
+      통합(MockMvc) 테스트 외에도 ExceptionHandler 단위 테스트를 별도로 작성해 검증하는 경우가 많음.
+   3) 비즈니스 에러는 대표 케이스 1개만 작성해 테스트 수행   
+      모든 비즈니스 에러는 같은 ExceptionHandler, 같은 응답 포맷, 같은 MessageSource 로직을 수행하므로,
+      한 번만 검증해도 구조 전체가 검증되기 떄문이다. 
+
+3. 테스트 작성 방법
+   1) 기존 컨트롤러 테스트에 포함 (선택한 방법)    
+      컨트롤러 테스트에서 비즈니스 예외를 발생시키고, 응답 JSON 메시지 검증 추가해 테스트 수행.   
+      테스트 케이스가 컨트롤러부터 핸들러까지의 흐름을 그대로 검증.   
+      단, ExceptionHandler 단위 로직만 독립적으로 테스트하지 않음.
+
+   2) ExceptionHandler 단위 테스트   
+      @WebMvcTest 없이 핸들러 직접 호출.   
+      핸들러 단독 검증 가능하고, MockMvc 없이 빠르게 테스트 가능.   
+      단, 컨트롤러 흐름까지 검증하지 않음.   
+      ~~~
+      @Test
+      void businessExceptionHandler_returnsMessageFromMessageSource() {
+      // given
+      BusinessException ex = new BusinessException("error.product.status.invalid");
+     
+          // when
+          ResponseEntity<CommonErrorResponse> response =
+                  commonExceptionHandler.commonHandler(ex);
+       
+          // then
+          assertEquals("상품 상태가 올바르지 않습니다.", response.getBody().getErrorMessage());
+          assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+      }      
+      ~~~
+   

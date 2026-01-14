@@ -60,7 +60,7 @@ public class ProductionController {
      **/
     @GetMapping("/{id}")
     public ResponseEntity<ResponseSearchDetailProductionDto> searchDetailProduction(
-            @PathVariable @Positive Long id) {
+            @PathVariable @Positive(message = "{validation.product.id.positive}") Long id) {
         return ResponseEntity.ok(
                 productionService.searchDetailProduction(id));
     }

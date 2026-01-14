@@ -54,6 +54,7 @@
     - properties 파일 한글 깨짐 문제 해결
     - 메시지 관리 방식 개선
     - 서버 에러 메시지 하드코딩 제거: placeholder 기반 메시지 분리 전략
+    - 메시지 조회 Locale 문제 해결방법
 
 ---
 ## 1. Spring
@@ -2010,5 +2011,32 @@ messages.properties 도입을 고려하게 되면서, 기존 설계의 문제점
    // CartService
    @Value("${cart.max-size}")
    private int cartMaxSize;
+   ~~~
+
+
+### < 메시지 조회 Locale 문제 해결방법 >
+1. 발생에러   
+   Bean Validation에서 발생한 메시지를 MessageSource로 가져올 때 Locale이 엉뚱하게 잡히는 문제.
+   ~~~
+   No message found under code 'validation.product.id.positive' for locale 'en'
+   ~~~
+2. 해결방법    
+   글로벌 서비스가 아니라면, 메시지 조회 시 Locale을 고정해 해결 가능하다.   
+   LocaleContextHolder.setLocale(Locale.KOREAN)를 전역 상수를 만들어 MessageSource 조회 시 매번 Locale을 지정한다.
+   ExceptionHandler 전역상수로 고정해 메시지 생성 시마다 호출하는 경우, 테스트 환경에서도 Locale이 바뀌는 문제를 신경쓰지 않아도 된다. 
+   별도로 테스트에서 Locale 설정이 필요 없게된다.
+   ~~~
+    public class CommonExceptionHandler {
+    
+        private static final Locale DEFAULT_LOCALE = Locale.KOREAN;  // 전역 상수
+    
+        @Autowired
+        private MessageSource messageSource;
+    
+        private String createMessage(String key, Object... args) {
+            return messageSource.getMessage(key, args, DEFAULT_LOCALE);
+        }
+        // ...
+    }
    ~~~
 

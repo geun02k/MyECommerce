@@ -1,6 +1,7 @@
 package com.myecommerce.MyECommerce.exception.handler;
 
 import com.myecommerce.MyECommerce.exception.BaseAbstractException;
+
 import com.myecommerce.MyECommerce.exception.errorcode.DefaultErrorCode;
 import com.myecommerce.MyECommerce.exception.errorcode.SpringSecurityErrorCode;
 import com.myecommerce.MyECommerce.exception.model.CommonErrorResponse;
@@ -9,7 +10,6 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+import java.util.Locale;
 import java.util.Objects;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.DefaultErrorCode.INTERNAL_SERVER_ERROR;
@@ -32,6 +33,7 @@ import static com.myecommerce.MyECommerce.exception.errorcode.SpringSecurityErro
 public class CommonExceptionHandler {
 
     private final MessageSource messageSource;
+    private static final Locale DEFAULT_LOCALE = Locale.KOREAN;
 
     /** 사용자정의예외 예외처리 **/
     @ExceptionHandler(BaseAbstractException.class)
@@ -64,8 +66,14 @@ public class CommonExceptionHandler {
         // 에러 메시지 생성
         String errorCodeMessage = createMessage(errorCode.getErrorMessage());
         // 디폴트 에러 메시지 (에러메시지 여러개일 수 있음, BindingResult에서 가져옴)
+        // 이건 에러를 하나만 가져오나?
         String defaultErrorMessage = e.getBindingResult().getFieldError().getDefaultMessage() == null ?
                 "" : "\n" + e.getBindingResult().getFieldError().getDefaultMessage() ;
+//        // 이건 발생한 전체에러 가져오는듯
+//        String defaultErrorMessage = Optional.ofNullable(e.getBindingResult().getFieldError())
+//                .map(fieldError -> "\n" + messageSource.getMessage(
+//                        fieldError, LocaleContextHolder.getLocale()))
+//                .orElse("");
 
         // 응답 객체 생성
         CommonErrorResponse errorResponse = CommonErrorResponse.builder()
@@ -184,7 +192,7 @@ public class CommonExceptionHandler {
         return messageSource.getMessage(
                 messageKey,
                 messageArgs,
-                LocaleContextHolder.getLocale()
+                DEFAULT_LOCALE
         );
     }
 

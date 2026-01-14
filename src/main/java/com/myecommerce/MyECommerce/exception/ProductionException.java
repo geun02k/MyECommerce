@@ -8,4 +8,7 @@ public class ProductionException extends BaseAbstractException {
         super(errorCode);
     }
 
+    public ProductionException(ProductionErrorCode errorCode, Object... messageArgs) {
+        super(errorCode, messageArgs);
+    }
 }

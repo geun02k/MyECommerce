@@ -8,4 +8,8 @@ public class MemberException extends BaseAbstractException {
         super(errorCode);
     }
 
+    public MemberException(MemberErrorCode errorCode, Object... messageArgs) {
+        super(errorCode, messageArgs);
+    }
+
 }

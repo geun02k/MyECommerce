@@ -55,6 +55,7 @@
     - 메시지 관리 방식 개선
     - 서버 에러 메시지 하드코딩 제거: placeholder 기반 메시지 분리 전략
     - 메시지 조회 Locale 문제 해결방법
+    - MessageSource placeholder 규칙으로 인한 메시지 파싱 오류와 해결
 
 ---
 ## 1. Spring
@@ -2038,5 +2039,27 @@ messages.properties 도입을 고려하게 되면서, 기존 설계의 문제점
         }
         // ...
     }
+   ~~~
+
+
+### < MessageSource placeholder 규칙으로 인한 메시지 파싱 오류와 해결 >
+~~~
+// messages.properties
+error.cart.limit.max.size=장바구니에는 최대 {value}건만 추가 가능합니다.
+~~~
+1. 발생에러   
+   ~~~
+    can't parse argument number: value
+    java.lang.IllegalArgumentException: can't parse argument number: value
+    // ... 생략
+    Caused by: java.lang.NumberFormatException: For input string: "value"
+   ~~~
+2. 에러발생원인   
+   MessageSource는 이름 기반 바인딩을 지원하지 않는다.
+   순서 기반 placeholder만 사용 가능하다.
+3. 해결방법
+   ~~~
+    // messages.properties
+    error.cart.limit.max.size=장바구니에는 최대 {0}건만 추가 가능합니다.
    ~~~
 

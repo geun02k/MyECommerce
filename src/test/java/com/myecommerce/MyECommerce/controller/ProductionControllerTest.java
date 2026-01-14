@@ -155,8 +155,8 @@ class ProductionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorMessage")
-                        .value("유효하지 않은 값입니다.\n상품코드는 영문자, 숫자만 사용 가능합니다.\n특수문자는 -만 허용하며 첫 글자로 사용 불가합니다."));
+                .andExpect(jsonPath("$.errorCode")
+                        .value("INVALID_VALUE"));
         // 2. service 미호출 검증
         verify(productionService, never()).registerProduction(any(), any());
     }
@@ -178,7 +178,9 @@ class ProductionControllerTest {
                         .with(user(seller()))
                         .contentType(MediaType.APPLICATION_JSON)
                        .content(objectMapper.writeValueAsString(invalidRequest)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("INVALID_VALUE"));
         verify(productionService, never()).registerProduction(any(), any());
     }
 

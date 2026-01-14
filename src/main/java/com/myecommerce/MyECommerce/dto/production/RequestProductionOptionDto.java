@@ -27,7 +27,7 @@ public class RequestProductionOptionDto {
             message = "{validation.product.option.price.decimal.min}")
     private BigDecimal price;
 
-    @Min(value = 1, message = "validation.product.option.quantity.min")
+    @Min(value = 1, message = "{validation.product.option.quantity.min}")
     private int quantity;
 
 }

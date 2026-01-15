@@ -2,6 +2,7 @@ package com.myecommerce.MyECommerce.service.member;
 
 import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
 import com.myecommerce.MyECommerce.dto.member.RequestMemberDto;
+import com.myecommerce.MyECommerce.dto.member.RequestSignInMemberDto;
 import com.myecommerce.MyECommerce.dto.member.ResponseMemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
@@ -167,10 +168,8 @@ class MemberServiceTest {
         Character delYn = 'N';
 
         // 조회할 회원 DTO 객체 생성
-        RequestMemberDto member = RequestMemberDto.builder()
-                .userId(userId)
-                .password(password)
-                .build();
+        RequestSignInMemberDto member =
+                new RequestSignInMemberDto(userId, password);
         // 조회된 회원권한 Entity 객체 생성
         List<MemberAuthority> expectRoleList =
                 Collections.singletonList(MemberAuthority.builder()

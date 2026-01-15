@@ -2,6 +2,7 @@ package com.myecommerce.MyECommerce.service.member;
 
 import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
 import com.myecommerce.MyECommerce.dto.member.RequestMemberDto;
+import com.myecommerce.MyECommerce.dto.member.RequestSignInMemberDto;
 import com.myecommerce.MyECommerce.dto.member.ResponseMemberDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
@@ -68,7 +69,7 @@ public class MemberService {
     }
 
     /** 로그인 **/
-    public String signIn(RequestMemberDto memberDto) {
+    public String signIn(RequestSignInMemberDto memberDto) {
         // 1. 사용자ID 검증 (사용자 조회)
         Member member = memberRepository.findByUserIdAndDelYn(memberDto.getUserId(), 'N')
                 .orElseThrow(() -> new MemberException(USER_NOT_FOUND));

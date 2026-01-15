@@ -1,6 +1,7 @@
 package com.myecommerce.MyECommerce.controller;
 
 import com.myecommerce.MyECommerce.dto.member.RequestMemberDto;
+import com.myecommerce.MyECommerce.dto.member.RequestSignInMemberDto;
 import com.myecommerce.MyECommerce.dto.member.ResponseMemberDto;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.service.member.MemberService;
@@ -55,7 +56,7 @@ public class MemberController {
      * 회원 로그인 post /member/signin
      **/
     @PostMapping("/signin")
-    public ResponseEntity<String> signIn(@Valid @RequestBody RequestMemberDto memberDto) {
+    public ResponseEntity<String> signIn(@Valid @RequestBody RequestSignInMemberDto memberDto) {
         // 사용자검증 후 JWT 토큰 반환
         return ResponseEntity.ok(memberService.signIn(memberDto));
     }

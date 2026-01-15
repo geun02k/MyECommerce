@@ -2,6 +2,7 @@ package com.myecommerce.MyECommerce.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myecommerce.MyECommerce.dto.member.RequestMemberDto;
+import com.myecommerce.MyECommerce.dto.member.RequestSignInMemberDto;
 import com.myecommerce.MyECommerce.dto.member.ResponseMemberDto;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.service.member.MemberService;
@@ -129,16 +130,12 @@ class MemberControllerTest {
     @DisplayName("로그인성공")
     void successSignIn() throws Exception {
         // given
-        String userId = "sky";
-        String password = "12345678";
         // 조회할 회원 DTO 객체
-        RequestMemberDto member= RequestMemberDto.builder()
-                .userId(userId)
-                .password(password)
-                .build();
+        RequestSignInMemberDto member=
+                new RequestSignInMemberDto("sky,", "12345678");
 
         // when
-        given(memberService.signIn(any(RequestMemberDto.class)))
+        given(memberService.signIn(any(RequestSignInMemberDto.class)))
                 .willReturn("token");
 
         // then

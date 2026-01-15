@@ -46,7 +46,8 @@ public class MemberService {
      * @return 신규 회원가입한 회원정보를 담은 MemberDto 객체
      */
     @Transactional
-    public ResponseMemberDto saveMember(RequestMemberDto member, List<MemberAuthority> authorities) {
+    public ResponseMemberDto saveMember(RequestMemberDto member,
+                                        List<MemberAuthority> authorities) {
         // 사전 validation check
         saveMemberPreValidationCheck(member);
         // 전화번호 정책 check 및 정규화
@@ -57,12 +58,13 @@ public class MemberService {
                 validateAndEncodePasswordPolicy(member.getPassword());
 
         // 정책 검증값 반영
-        member.setName(member.getName().trim());
-        member.setTelephone(normalizedTelephone);
-        member.setPassword(encodedPassword);
+        Member memberEntity = memberMapper.toEntity(member);
+        memberEntity.setName(member.getName().trim()); // 공백문자 제거
+        memberEntity.setTelephone(normalizedTelephone);
+        memberEntity.setPassword(encodedPassword);
 
         // 회원정보등록
-        Member savedMember = memberRepository.save(memberMapper.toEntity(member));
+        Member savedMember = memberRepository.save(memberEntity);
         // 회원권한정보등록
         authorities.forEach(authority -> {
                     authority.setMember(savedMember);
@@ -108,12 +110,12 @@ public class MemberService {
     // 회원가입 validation check
     private void saveMemberPreValidationCheck(RequestMemberDto member) {
         // 회원 객체 존재여부 check (계약 방어, 프로그래밍 오류)
-        if(ObjectUtils.isEmpty(member)) {
+        if(member == null) {
             throw new IllegalArgumentException("RequestMemberDto must not be null.");
         }
 
         // id 존재여부 check (회원가입 유스케이스의 비즈니스 규칙)
-        if(!ObjectUtils.isEmpty(member.getId())) {
+        if(member.getId() != null) {
             throw new MemberException(MEMBER_ALREADY_REGISTERED);
         }
 

@@ -61,6 +61,8 @@
     - 메시지 조회 Locale 문제 해결방법
     - MessageSource placeholder 규칙으로 인한 메시지 파싱 오류와 해결
 16. HTTP 상태코드
+17. null과 ObjectUtils.isEmpty()
+    - ObjectUtils.isEmpty() 남용 문제
 
 ---
 ## 1. Spring
@@ -2293,4 +2295,36 @@ error.cart.limit.max.size=장바구니에는 최대 {value}건만 추가 가능�
         - API 소비자가 에러 의미를 상태코드로 판단 불가.
         - REST 의미 약화
         - 프론트/외부 API 연동 시 분기 처리 어려움
+
+
+## 17. null과 ObjectUtils.isEmpty()
+### < ObjectUtils.isEmpty() 남용 문제 >
+1. ObjectUtils.isEmpty() 사용 시 문제점   
+   내부적으로 null, Optional.empty, 빈 문자열, 빈 컬렉션, 배열 길이=0 을 검증한다.
+   ObjectUtils.isEmpty는 “범용 유틸”이고 도메인 코드에서는 의도가 흐려진다.
+   이 코드를 보면 'member가 null인가?', 'member 내부 필드가 비었나?', '빈 컬렉션인가?', 'Optional인가?'
+   질문하게 되므로 의도를 전혀 알 수 없음
+   즉, DTO 객체에 쓰면 의미가 모호해진다.
+   따라서 null 체크는 명시적으로 하는 게 더 좋다.
+   내가 누린 것은 범용성의 장점이지, 도메인 코드의 장점이 되지 않는다.
+   ~~~
+   if (ObjectUtils.isEmpty(member)) {
+      //... 
+   }
+   ~~~
+
+2. ObjectUtils.isEmpty() 사용을 권장하지 않는 경우
+    1) 도메인 객체
+    2) 비즈니스 규칙 검증
+    3) Bean Validation 로직
+
+3. ObjectUtils.isEmpty() 사용하는 경우   
+   타입과 의미가 불명확한 경계 계층에서 사용.
+    1) Controller / API 입구   
+       의미보다 방어가 중요한 지점.   
+       외부 입력에 대해 타입이 불명확하지만 어쨌든 비어있으면 안 되는 경우.
+    2) 유틸 / 공통 라이브러리 코드   
+       의미 표현보다 범용성이 더 중요한 경우.
+    3) Map / Collection 처리
+    4) Optional 처리
 

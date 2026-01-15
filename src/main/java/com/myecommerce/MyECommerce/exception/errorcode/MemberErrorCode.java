@@ -14,28 +14,26 @@ public enum MemberErrorCode implements CommonErrorCode {
             "error.member.empty.member.info"),
 
     // 회원ID validation check
-    ALREADY_REGISTERED_MEMBER(HttpStatus.BAD_REQUEST.value(),
-            "error.member.already.registered.member"),
-
-    // 사용자명 validation check
+    MEMBER_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST.value(),
+            "error.member.already.registered"),
 
     // 비밀번호 validation check
-    LIMIT_PASSWORD_CHARACTERS_FROM_8_TO_100(HttpStatus.BAD_REQUEST.value(),
-            "error.member.limit.password.characters.from.8.to.100"),
+    PASSWORD_LENGTH_LIMITED(HttpStatus.BAD_REQUEST.value(),
+            "error.member.password.length.limited"),
 
     // 전화번호 validation check
-    ALREADY_REGISTERED_PHONE_NUMBER(HttpStatus.BAD_REQUEST.value(),
-            "error.member.already.registered.phone.number"),
+    TELEPHONE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST.value(),
+            "error.member.telephone.already.registered"),
 
     // login validation check
     USER_NOT_FOUND(HttpStatus.BAD_REQUEST.value(),
             "error.member.user.not.found"),
-    MISMATCH_PASSWORD(HttpStatus.BAD_REQUEST.value(),
-            "error.member.mismatch.password"),
+    PASSWORD_MISMATCHED(HttpStatus.BAD_REQUEST.value(),
+            "error.member.password.mismatched"),
 
     // logout validation check
-    ALREADY_SIGN_OUT_USER(HttpStatus.BAD_REQUEST.value(),
-            "error.member.already.sign.out.user")
+    USER_ALREADY_SIGNED_OUT(HttpStatus.BAD_REQUEST.value(),
+            "error.member.user.already.signed.out")
     ;
 
 

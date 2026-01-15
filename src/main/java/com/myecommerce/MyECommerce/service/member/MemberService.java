@@ -76,7 +76,7 @@ public class MemberService {
 
         // 2. 비밀번호 검증
         if(!passwordEncoder.matches(memberDto.getPassword(), member.getPassword())) {
-            throw new MemberException(MISMATCH_PASSWORD);
+            throw new MemberException(PASSWORD_MISMATCHED);
         }
 
         // 3. JWT 토큰 생성
@@ -96,7 +96,7 @@ public class MemberService {
 
         // 2. Redis에서 유효한 토큰 삭제
         if (ObjectUtils.isEmpty(redisSingleDataService.getAndDeleteSingleData(LOGIN, token))) {
-            throw new MemberException(ALREADY_SIGN_OUT_USER);
+            throw new MemberException(USER_ALREADY_SIGNED_OUT);
         }
     }
 
@@ -109,7 +109,7 @@ public class MemberService {
 
         // id 존재여부 validation check
         if(!ObjectUtils.isEmpty(member.getId())) {
-            throw new MemberException(ALREADY_REGISTERED_MEMBER);
+            throw new MemberException(MEMBER_ALREADY_REGISTERED);
         }
 
         // 비밀번호 validation check
@@ -117,7 +117,7 @@ public class MemberService {
         if (ObjectUtils.isEmpty(member.getPassword().trim())
                 || 8 > member.getPassword().length()
                 || member.getPassword().length() > 100) {
-            throw new MemberException(LIMIT_PASSWORD_CHARACTERS_FROM_8_TO_100);
+            throw new MemberException(PASSWORD_LENGTH_LIMITED);
         }
 
         // 전화번호 validation check
@@ -126,7 +126,7 @@ public class MemberService {
         Optional<Member> memberEntityIncludeTel =
                 memberRepository.findByTelephone(realPhoneNumber);
         if(!ObjectUtils.isEmpty(memberEntityIncludeTel)) {
-            throw new MemberException(ALREADY_REGISTERED_PHONE_NUMBER);
+            throw new MemberException(TELEPHONE_ALREADY_REGISTERED);
         }
     }
 

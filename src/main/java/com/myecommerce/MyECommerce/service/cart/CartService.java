@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Map;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.LIMIT_CART_MAX_SIZE;
+import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_SIZE_EXCEEDED;
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.NOT_EXIST_PRODUCT;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 
@@ -74,7 +74,7 @@ public class CartService {
                 .reduce(0, Integer::sum);
 
         if (cartItemCount >= CART_MAX_SIZE) {
-            throw new CartException(LIMIT_CART_MAX_SIZE, CART_MAX_SIZE);
+            throw new CartException(CART_SIZE_EXCEEDED, CART_MAX_SIZE);
         }
     }
 

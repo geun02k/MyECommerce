@@ -255,7 +255,7 @@ class ProductionControllerTest {
                 .andExpect(jsonPath("$.errorCode")
                         .value("INVALID_VALUE"))
                 .andExpect(jsonPath("$.errorMessage")
-                        .value("상품 ID는 양수입니다."));
+                        .value("유효하지 않은 상품 ID 입니다."));
         verify(productionService, never()).searchDetailProduction(invalidProductId);
     }
 

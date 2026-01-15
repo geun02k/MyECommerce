@@ -35,8 +35,6 @@ import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 @RequiredArgsConstructor
 public class ProductionService {
 
-    private final static int PRODUCTION_NAME_LENGTH = 200;
-
     private final ProductionMapper productionMapper;
     private final ProductionOptionMapper productionOptionMapper;
 
@@ -59,11 +57,11 @@ public class ProductionService {
                         .map(productionOptionMapper::toEntity)
                         .toList();
 
-        // 판매자별 상품코드 중복체크
-        checkIfProductionCodeExists(member.getId(), requestProductionDto.getCode());
-
-        // 상품옵션목록 중복체크
-        checkIfOptionCodeExists(optionList, production.getCode());
+        // 판매자별 상품코드 중복체크 정책
+        enforceProductionCodeUniquenessPolicy(
+                member.getId(), requestProductionDto.getCode());
+        // 상품옵션목록 중복체크 정책
+        enforceProductionOptionCodeUniquenessPolicy(optionList, production.getCode());
 
         // 상품등록
         Production savedProduction = saveProduction(production, member);
@@ -79,12 +77,17 @@ public class ProductionService {
     @Transactional
     public ResponseProductionDto modifyProduction(RequestModifyProductionDto requestProductionDto,
                                                   Member member) {
-        // 상품 조회 및 상품 판매자 체크
+        // 상품 조회
         Production production = getProductionEntityByIdAndSeller(
                 requestProductionDto.getId(), member.getId());
 
-        // validation check
-        updateProductionValidationCheck(production, requestProductionDto);
+        // 사전 validation check
+        validateUpdateOptionIds(production, requestProductionDto);
+        // 판매상태 정책 검증
+        enforceProductModifySaleStatusPolicy(production.getSaleStatus());
+        // 등록할 상품옵션 중복 검증
+        enforceProductModifyProductOptionUniquenessPolicy(
+                production.getCode(), requestProductionDto);
 
         // 수정할 옵션목록 dto -> entity 변환
         List<ProductionOption> requestUpdateOptionList =
@@ -115,11 +118,9 @@ public class ProductionService {
     /** 상품목록조회 **/
     public Page<ResponseProductionDto> searchProductionList(
             RequestSearchProductionDto requestDto) {
-        // 키워드 200자로 제한
-        String limitedKeyword = getLimitedKeyword(requestDto.getKeyword());
-
         // 정렬순서에 따른 상품목록조회
-        Page<Production> productionPage = getSortedProductions(requestDto, limitedKeyword);
+        Page<Production> productionPage =
+                getSortedProductions(requestDto, requestDto.getKeyword());
 
         // entity -> dto로 변환
         return  productionPage.map(productionMapper::toDto);
@@ -145,16 +146,17 @@ public class ProductionService {
         });
     }
 
-    // 상품 중복체크
-    private void checkIfProductionCodeExists(Long sellerId, String code) {
+    // 상품코드 유일성 검증 정책 (판매자별 상품코드 중복체크)
+    private void enforceProductionCodeUniquenessPolicy(Long sellerId, String code) {
         productionRepository.findBySellerAndCode(sellerId, code)
                 .ifPresent(existingProduction -> {
                     throw new ProductionException(PRODUCT_CODE_ALREADY_REGISTERED);
                 });
     }
 
-    // 상품옵션 중복체크
-    private void checkIfOptionCodeExists(List<ProductionOption> options, String productionCode) {
+    // 상품옵션코드 유일성 검증 정책 (상품옵션 중복체크)
+    private void enforceProductionOptionCodeUniquenessPolicy(
+            List<ProductionOption> options, String productionCode) {
         // 중복코드 제거된 옵션코드목록 set
         Set<String> optionCodeSet = options.stream()
                 .map(ProductionOption::getOptionCode)
@@ -193,20 +195,10 @@ public class ProductionService {
                 .toList();
     }
 
-    // 상품수정 validation check
-    private void updateProductionValidationCheck(Production production,
-                                                 RequestModifyProductionDto requestProductionDto) {
-        // 상품 기존 판매상태 체크
-        if (production.getSaleStatus() == DELETION) {
-            throw new ProductionException(PRODUCT_ALREADY_DELETED);
-        }
-
-        // 상품옵션목록 중복체크
-        List<ProductionOption> requestInsertOptionList =
-                convertToInsertOptionEntities(requestProductionDto);
-        checkIfOptionCodeExists(requestInsertOptionList, production.getCode());
-
-        // 수정 요청 옵션 중 잘못된 옵션ID 체크
+    // 상품수정 사전 validation check
+    private void validateUpdateOptionIds(
+            Production production, RequestModifyProductionDto requestProductionDto) {
+        // 수정요청 옵션목록 반환
         List<ProductionOption> requestUpdateOptionList =
                 convertToUpdateOptionEntities(requestProductionDto);
 
@@ -223,6 +215,24 @@ public class ProductionService {
         if (!isExistAllOptionIds) {
             throw new ProductionException(PRODUCT_OPTION_NOT_EXIST);
         }
+    }
+
+    // 상품 수정 시 판매상태 정책
+    private void enforceProductModifySaleStatusPolicy(ProductionSaleStatusType saleStatus) {
+        if (saleStatus == DELETION) {
+            throw new ProductionException(PRODUCT_ALREADY_DELETED);
+        }
+    }
+
+    // 상품 수정 시 중복검증 정책
+    private void enforceProductModifyProductOptionUniquenessPolicy(
+            String stdProductCode, RequestModifyProductionDto productionDto) {
+        // 등록 요청 옵션 목록 반환
+        List<ProductionOption> requestInsertOptionList =
+                convertToInsertOptionEntities(productionDto);
+        // 등록요청 옵션목록 중복 검증 (정책)
+        enforceProductionOptionCodeUniquenessPolicy(
+                requestInsertOptionList, stdProductCode);
     }
 
     // 상품ID, 셀러ID와 일치하는 상품 단건 조회
@@ -266,12 +276,6 @@ public class ProductionService {
             // 조회한 상품옵션목록에 신규옵션 추가
             production.getOptions().add(option);
         });
-    }
-
-    // 상품명 조회 키워드 자릿수 제한해 반환
-    private String getLimitedKeyword(String keyword) {
-        return keyword.length() > PRODUCTION_NAME_LENGTH ?
-                keyword.substring(0, PRODUCTION_NAME_LENGTH) : keyword;
     }
 
     // keyword를 포함하는 상품정보 페이지 조회

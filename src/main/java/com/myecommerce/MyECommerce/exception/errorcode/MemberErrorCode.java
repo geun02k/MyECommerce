@@ -14,7 +14,7 @@ public enum MemberErrorCode implements CommonErrorCode {
             "error.member.empty.member.info"),
 
     // 회원ID validation check
-    MEMBER_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST.value(),
+    MEMBER_ALREADY_REGISTERED(HttpStatus.CONFLICT.value(),
             "error.member.already.registered"),
 
     // 비밀번호 validation check
@@ -22,17 +22,17 @@ public enum MemberErrorCode implements CommonErrorCode {
             "error.member.password.length.limited"),
 
     // 전화번호 validation check
-    TELEPHONE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST.value(),
+    TELEPHONE_ALREADY_REGISTERED(HttpStatus.CONFLICT.value(),
             "error.member.telephone.already.registered"),
 
     // login validation check
-    USER_NOT_FOUND(HttpStatus.BAD_REQUEST.value(),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND.value(),
             "error.member.user.not.found"),
     PASSWORD_MISMATCHED(HttpStatus.BAD_REQUEST.value(),
             "error.member.password.mismatched"),
 
     // logout validation check
-    USER_ALREADY_SIGNED_OUT(HttpStatus.BAD_REQUEST.value(),
+    USER_ALREADY_SIGNED_OUT(HttpStatus.CONFLICT.value(),
             "error.member.user.already.signed.out")
     ;
 

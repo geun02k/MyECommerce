@@ -232,7 +232,7 @@ class ProductionControllerTest {
                         .with(user(seller()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode")
                         .value("PRODUCT_CODE_ALREADY_REGISTERED"))
                 .andExpect(jsonPath("$.errorMessage")

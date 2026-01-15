@@ -47,14 +47,19 @@ public class MemberService {
      */
     @Transactional
     public ResponseMemberDto saveMember(RequestMemberDto member, List<MemberAuthority> authorities) {
-        // validation check
-        saveMemberValidationCheck(member);
+        // 사전 validation check
+        saveMemberPreValidationCheck(member);
+        // 전화번호 정책 check 및 정규화
+        String normalizedTelephone =
+                validateAndNormalizeTelephonePolicy(member.getTelephone());
+        // 비밀번호 정책 check
+        String encodedPassword =
+                validateAndEncodePasswordPolicy(member.getPassword());
 
-        // 공백문자 제거
+        // 정책 검증값 반영
         member.setName(member.getName().trim());
-        member.setTelephone(member.getTelephone().trim());
-        // 비밀번호 암호화
-        member.setPassword(passwordEncoder.encode(member.getPassword().trim()));
+        member.setTelephone(normalizedTelephone);
+        member.setPassword(encodedPassword);
 
         // 회원정보등록
         Member savedMember = memberRepository.save(memberMapper.toEntity(member));
@@ -101,33 +106,17 @@ public class MemberService {
     }
 
     // 회원가입 validation check
-    private void saveMemberValidationCheck(RequestMemberDto member) {
-        // 회원 객체 존재여부 validation check
+    private void saveMemberPreValidationCheck(RequestMemberDto member) {
+        // 회원 객체 존재여부 check (계약 방어, 프로그래밍 오류)
         if(ObjectUtils.isEmpty(member)) {
-            throw new MemberException(EMPTY_MEMBER_INFO);
+            throw new IllegalArgumentException("RequestMemberDto must not be null.");
         }
 
-        // id 존재여부 validation check
+        // id 존재여부 check (회원가입 유스케이스의 비즈니스 규칙)
         if(!ObjectUtils.isEmpty(member.getId())) {
             throw new MemberException(MEMBER_ALREADY_REGISTERED);
         }
 
-        // 비밀번호 validation check
-        // 글자수
-        if (ObjectUtils.isEmpty(member.getPassword().trim())
-                || 8 > member.getPassword().length()
-                || member.getPassword().length() > 100) {
-            throw new MemberException(PASSWORD_LENGTH_LIMITED);
-        }
-
-        // 전화번호 validation check
-        // 전화번호 중복등록 체크
-        String realPhoneNumber = member.getTelephone().trim().replaceAll("-", "");
-        Optional<Member> memberEntityIncludeTel =
-                memberRepository.findByTelephone(realPhoneNumber);
-        if(!ObjectUtils.isEmpty(memberEntityIncludeTel)) {
-            throw new MemberException(TELEPHONE_ALREADY_REGISTERED);
-        }
     }
 
     // Redis에 로그인 시 생성된 토큰 저장
@@ -140,4 +129,44 @@ public class MemberService {
         redisSingleDataService.saveSingleData(
                 LOGIN, token, null, Duration.ofMillis(validTime));
     }
+
+    private String validateAndEncodePasswordPolicy(String password) {
+        // 비밀번호 보안 정책 (길이가 너무 짧지 않을 것)
+        if (8 > password.length() || password.length() > 100) {
+            throw new MemberException(PASSWORD_LENGTH_LIMITED);
+        }
+
+        // 비밀번호 암호화
+        return passwordEncoder.encode(password);
+    }
+
+    private String validateAndNormalizeTelephonePolicy(String telephone) {
+        final String PHONE_MEMBER_REGEX = "^01[016789]\\d{7,8}$";
+
+        // 1. 데이터 정규화 - 숫자만 남김
+        String normalizedTel = normalizeTelephone(telephone);
+
+        // 2. 전화번호 길이 제한
+        if(!(10 <= normalizedTel.length() && normalizedTel.length() <= 11)) {
+            throw new MemberException(TELEPHONE_LENGTH_LIMITED);
+        }
+        // 3. 전화번호 패턴 검증
+        if (!normalizedTel.matches(PHONE_MEMBER_REGEX)) {
+            throw new MemberException(TELEPHONE_PATTERN_INVALID);
+        }
+
+        // 4. 전화번호 중복등록 체크
+        Optional<Member> memberEntityIncludeTel =
+                memberRepository.findByTelephone(normalizedTel);
+        if(memberEntityIncludeTel.isPresent()) {
+            throw new MemberException(TELEPHONE_ALREADY_REGISTERED);
+        }
+
+        return normalizedTel;
+    }
+
+    private String normalizeTelephone(String telephone) {
+        return telephone.replaceAll("[^0-9]", "");
+    }
+
 }

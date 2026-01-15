@@ -9,10 +9,6 @@ import org.springframework.http.HttpStatus;
 @AllArgsConstructor
 public enum MemberErrorCode implements CommonErrorCode {
 
-    // 회원 객체 validation check
-    EMPTY_MEMBER_INFO(HttpStatus.BAD_REQUEST.value(),
-            "error.member.empty.member.info"),
-
     // 회원ID validation check
     MEMBER_ALREADY_REGISTERED(HttpStatus.CONFLICT.value(),
             "error.member.already.registered"),
@@ -22,6 +18,10 @@ public enum MemberErrorCode implements CommonErrorCode {
             "error.member.password.length.limited"),
 
     // 전화번호 validation check
+    TELEPHONE_LENGTH_LIMITED(HttpStatus.BAD_REQUEST.value(),
+            "error.member.telephone.length.limited"),
+    TELEPHONE_PATTERN_INVALID(HttpStatus.BAD_REQUEST.value(),
+            "error.member.telephone.pattern.invalid"),
     TELEPHONE_ALREADY_REGISTERED(HttpStatus.CONFLICT.value(),
             "error.member.telephone.already.registered"),
 

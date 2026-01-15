@@ -12,6 +12,10 @@
    - 매핑 라이브러리 MapStruct
    - 유효성 검사 라이브러리 validation
 3. 유효성 검증
+   - 정책과 보호 
+   - DTO Validation과 Service 정책 검증의 책임 분리 기준
+   - 잘못된 Service Validation Check
+   - 전화번호 검증 중복으로 인한 구조적 문제와 개선 방향
    - 검증관련처리
    - PathVariable에 대한 @NotNull 검증 제외 판단
    - PathVariable 검증
@@ -413,6 +417,206 @@
 
 ---
 ## 3. 유효성 검증
+### < 정책과 보호 >
+1. 정책과 보호의 판단 기준
+   1) 도메인이 규칙을 보장해야 한다.    
+      해당 규칙이 깨지면 비즈니스가 성립하지 않는 경우, 정책으로 취급.   
+      예를 들어 비밀번호 형식이 틀리면 인증, 알림, 본인 확인이 불가해 비즈니스가 붕괴된다.
+      반면 아이디를 30자로 제한했지만 31자리가 되더라도 대부분의 비즈니스에 영향이 없다.
+      이 때 비밀번호는 정책으로 관리해야 한다.
+   2) 입력 채널이 바뀌어도 동일하게 적용돼야 하는가?   
+      변경되지 안항야 한다면 정책이다.   
+      전화번호는 API, Batch, Admin, Event 등에서 호출하더라도 항상 동일하게 적용되어야 한다.
+      아이디는 DB, UI, 기술 스택에 따라 바뀔 수 있다.
+   3) 왜 해당 규칙이 존재하하는지 설명 가능한가?
+      비즈니스 언어로 설명 가능하면 정책이다.
+      전화번호 패턴의 경우, 대한민국 휴대폰 정책 때문에 정책으로 관리해야 한다.   
+      비밀번호 길이의 경우, 보안 정책 때문에 관리가 필요하다.   
+      반면, 아이디의 경우, DB 컬럼이 30자라서 제한한다는 건 모호하다.    
+      필수로 지켜야하는 일이라 보기 힘들기 때문이다. 길이 제한의 이유가 기술적일 가능성이 크다.
+
+2. 정책과 보호의 모호함 제거 장치
+   1) 규칙을 정책으로 메서드명으로 명명   
+      가장 흔하고 효과적인 방법이다.
+      정책은 반드시 이름(policy)으로 고정한다.
+      ~~~
+      validatePasswordPolicy(password);
+      validatePhoneNumberPolicy(phoneNumber);
+      ~~~
+      반대로 보호는 아래와 같이 작성한다.
+      ~~~
+      validateUserIdLengthForStorage(userId);            
+      ~~~
+   2) 정책과 보호의 코드 위치 고정   
+      구조를 통해 의사결정을 고정한다.
+      입력 보호는 validation으로 dto에, 비즈니스 규칙은 도메인(service)에 위치시킨다.
+   3) 주석이 아닌 커밋 메시지로 결정 기록을 남긴다.
+      ~~~
+      ADR-004: Password Validation Policy Location
+
+      - 비밀번호 정책은 Service/Domain 책임으로 한다.
+      - DTO에는 NotBlank만 둔다.
+      - 이유:
+          - 입력 채널 확장
+          - 정책 변경 빈도
+      ~~~
+   4) 테스트를 정책 문서로 만든다.
+      테스트 이름 자체가 정책 선언이다.
+      ~~~
+      @Test
+      void password_policy_requires_8_to_100_characters() {
+      assertThrows(MemberException.class,
+          () -> Password.from("short"));
+      }
+      ~~~
+   5) Value Object로 정책을 구조에 묶는다. (최종형)
+      모호함이 없다. 
+      해당 Value Obejct를 생성하지 못한다는 것은 정책을 위반하는 것으로 판단한다.
+      정책과 보호에 대한 위치 논쟁이 생길 수 없다.
+
+
+### < DTO Validation과 Service 정책 검증의 책임 분리 기준 >
+- 문제상황   
+  비밀번호 길이 및 일치여부 체크, 전화번호 중복 체크의 경우  
+  회원가입 서비스 로직에서 일회성으로만 사용할 로직이라 커스텀 어노테이션을 생성해 dto에 적용하지 않았다.
+- 권장방법
+  - 비밀번호 길이 및 일치여부 체크의 경우, 커스텀 Validator 생성 권장 가능.
+    (단, 추후 2곳 이상에서 재사용하면 고려)
+  - 전화번호 중복 체크의 경우, 서비스 로직에 유지.
+
+1. DTO Validation으로 생성해야 하는 것  
+   ***요청이 형식적으로 유효한가를 검증.***
+    - 형태/포맷/길이/필수값
+2. Service 로직에 남아야 하는 것   
+   ***현재, 해당 비즈니스를 수행해도 되는가를 검증.***
+    - DB 조회 필요   
+      경쟁 조건 발생 가능, 트랜잭션 락 이슈 등 존재.
+    - 비즈니스 규칙
+    - 조건이 복잡하고 맥락 의존적인 경우
+3. 커스텀 Validaiton 생성 가치가 있는 경우
+    - 2곳 이상에서 재사용하는 경우
+    - 선언적으로 표현하면 의도가 더 명확한 경우
+    - DTO 내부 정보만 사용하는 경우
+    - 테스트 가치가 있는 경우
+
+
+### < 잘못된 Service Validation Check >
+1. 문제상황   
+   ***Service에서 프로그래밍 오류(null 전달) 를 비즈니스 오류처럼 처리하고 있다.***
+   기본적으로 Controller에서 null 객체가 들어오는 것은 비즈니스 오류가 아닌 서버 내부 계약 위반일 뿐이다.
+   따라서 ***서비스에서 더블 체크하는 경우***는 개발자의 실수거나 API 사용 오류로 정상 시나리오가 아니라 프론트가 이해할 필요가 없다.
+   이 떄 서버 내부 사용 오류(프로그래밍 오류)를 ***Validation Exception을 던지는 것은 옳지 않다.***
+   이는 심지어, validation Exception을 비즈니스 에러로 관리하는 것으로 잘못된 방어이다.
+   ~~~
+    // 회원가입 validation check
+    private void saveMemberValidationCheck(RequestMemberDto member) {
+        // 회원 객체 존재여부 validation check
+        if(ObjectUtils.isEmpty(member)) {
+            throw new MemberException(EMPTY_MEMBER_INFO);
+        }
+        // ...
+    }
+   ~~~
+2. 해결방법   
+   비즈니스 예외를 쓰지 말자.
+   ***메서드 사용 오류인 IllegalArgumentException을 이용***하자.   
+   하지만, 실무 코드에서 Service에서도 HTTP Status 담긴 예외 던지는 경우 많음.
+   그래서 “이게 왜 문제지?”가 자연스럽지만, 구조적으로 깔끔한 기준은 분명히 존재한다.   
+   시스템 에러는 “관리 대상”이 아니라 “조기 발견·즉시 실패 대상”이기 때문에
+   보통 Enum으로 관리하지 않고 하드코딩한다.
+   ~~~
+   public void saveMemberValidationCheck(RequestMemberDto member) {
+       if (member == null) {
+           throw new IllegalArgumentException("RequestMemberDto must not be null");
+       }
+      // ...
+   }
+   ~~~
+
+3. Service 방어는 중요.  
+   서비스는 거의 항상 재사용되므로 방어가 중요하다.   
+   예를 들어 배치, 스케줄러, 이벤트 리스너, 다른 서비스 호출, 테스트 코드 등 Controller를 거치지 않는 경우가 훨씬 많기 때문이다.   
+   방어가 없다면, NPE 발생 위치가 애매해지고, 로그로 원인 추적이 어려워 장애 시 원인 분석 시간이 증가된다.  
+   따라서 초기 방어가 디버깅 비용을 줄인다.
+
+
+### < 전화번호 검증 중복으로 인한 구조적 문제와 개선 방향 >
+DTO와 Service에서 동일한 패턴을 중복 관리하는 구조는 장기적으로 반드시 깨진다.
+책임을 분리해 중복을 제거해야한다.
+
+1. 현재 구조의 문제점    
+   현재 request DTO와 Service에서 동일한 전화번호 패턴에 해대 검증을 수행하고 있다.
+   이 상태에서 정책 변경 시, 한쪽만 수정되고 테스트는 통과되면서 운영에서 버그가 발생할 가능성이 높아진다.
+
+2. 해결방법   
+   DTO는 입력 필터이고 Service는 도메인 규칙이므로 레벨이 다르다.
+   따라서 같은 정규식이라도 의미가 다를 수 있으므로 패턴을 공유하는 방식으로 해결하면 안된다.
+    1) ***Controller DTO는 느슨하게, Service는 단일 진실*** (Best)   
+       Controller validation은 1차 필터, Service는 진짜 책임자 역할을 수행하도록 한다.   
+       DTO는 형식만 검증해 전화번호처럼 생긴 입력만 통과 가능하도록 한다.
+       Service나 도메인은 정책의 단일 진실이다.
+       이 방법은 정책 변경 시 Service만 수정하면되고, DTO는 거의 바뀌지 않는다.
+       테스트도 도메인 기준으로만 작성하면 된다.
+       정책 변경이 잦은 도메인, 외부 API / 앱 / 백오피스 등 입력 채널이 여러 개인 경우,
+       테스트/도메인 주도 설계를 중시하는 팀에서 거의 표준처럼 쓰인다.
+       정책 변경 대응력이 높고, 입력 채널 증가에 유리하며 테스트 용이성과 중복 제거의 장점을 가지기 때문이다.
+
+    2) 전화번호 Value Obejct로 캡슐화   
+       가장 이상적인 방법으로 정책, 정규화, 검증을 한 곳에서 수행한다.
+       ~~~
+       public class PhoneNumber {
+           private final String value;
+ 
+           private PhoneNumber(String value) {
+               this.value = value;
+           }
+ 
+           public static PhoneNumber from(String raw) {
+               String normalized = raw.replaceAll("[^0-9]", "");
+ 
+               if (!normalized.matches(PHONE_REGEX)) {
+                   throw new MemberException(INVALID_PHONE_NUMBER);
+               }
+ 
+               return new PhoneNumber(normalized);
+           }
+       }
+       ~~~
+
+3. 구조를 개선하지 않을 때 최소 조치    
+   리팩터링 비용 부담과 다른 기능의 우선순위로 인해 구조를 개선하지 않고 현 상태를 유지하고자 한다.   
+   이 떄, 임시 구조임을 명확히 표시하고 깨질 가능성을 최소화하는 장치를 해야한다.
+    1) Service를 단일 진실로 만듦    
+       DTO 패턴을 완화하거나 최소한 주석으로 의도를 남긴다.
+       주석으로는 Service와 중복, 임시 구조임을 명시하고 의사결정을 기록한다.
+       ~~~
+       // RequestMemberDto.java 
+       @Size(min=10, max=11, message = "{validation.member.telephone.size}")
+       @Pattern(regexp = "^01[016789]\\d{7,8}$",
+       message = "{validation.member.telephone.pattern}")
+       // NOTE: 데이터 정규화를 위해 실제 전화번호 정책 검증은 Service에서 수행한다.
+       // TODO: 전화번호 정책이 확장되면 telephone을 Value Object로 분리 예정
+       private String telephone;
+       ~~~
+    2) Service의 정규식 상수화    
+       상수화를 통해 수정 포인트를 단일화하고 테스트에서 재사용 가능해진다.
+       ~~~
+       private static final String PHONE_MEMBER_REGEX = "^01[016789]\\d{7,8}$";
+       ~~~
+    3) 테스트로 정책 고정   
+       테스트가 문서 역할을 함.
+       ~~~
+       @ParameterizedTest
+       @ValueSource(strings = {
+           "010-1234-5678",
+           "01012345678"
+       })
+       void valid_phone_numbers(String input) {
+           assertDoesNotThrow(() -> service.normalizeAndValidate(input));
+       }
+       ~~~
+
+
 ### < 검증관련처리 > 
 1. DTO에서 처리
    > 단순한 검증 로직은 DTO에서 @Valid 어노테이션을 사용.   

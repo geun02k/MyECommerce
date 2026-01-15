@@ -10,26 +10,26 @@ import org.springframework.http.HttpStatus;
 public enum ProductionErrorCode implements CommonErrorCode {
 
     // 상품 validation check
-    ALREADY_REGISTERED_CODE(HttpStatus.BAD_REQUEST.value(),
-            "error.product.already.registered.code"),
+    PRODUCT_CODE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST.value(),
+            "error.product.code.already.registered"),
 
     // 상품옵션 validation check
-    ALREADY_REGISTERED_OPTION_CODE(HttpStatus.BAD_REQUEST.value(),
-            "error.product.already.registered.option.code"),
-    ENTER_DUPLICATED_OPTION_CODE(HttpStatus.BAD_REQUEST.value(),
-            "error.product.enter.duplicated.option.code"),
+    PRODUCT_OPTION_CODE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST.value(),
+            "error.product.option.code.already.registered"),
+    PRODUCT_OPTION_CODE_DUPLICATED(HttpStatus.BAD_REQUEST.value(),
+            "error.product.option.code.duplicated"),
 
     // 상품수정 validation check
-    NO_EDIT_PERMISSION(HttpStatus.BAD_REQUEST.value(),
-            "error.product.no.edit.permission"),
-    NO_EDIT_DELETION_STATUS(HttpStatus.BAD_REQUEST.value(),
-            "error.product.no.edit.deletion.status"),
-    NO_EDIT_FOR_NOT_EXIST_OPTION(HttpStatus.BAD_REQUEST.value(),
-            "error.product.for.not.exist.option"),
+    PRODUCT_EDIT_FORBIDDEN(HttpStatus.BAD_REQUEST.value(),
+            "error.product.edit.forbidden"),
+    PRODUCT_ALREADY_DELETED(HttpStatus.BAD_REQUEST.value(),
+            "error.product.already.deleted"),
+    PRODUCT_OPTION_NOT_EXIST(HttpStatus.BAD_REQUEST.value(),
+            "error.product.option.not.exist"),
 
     // 상품상세조회
-    NOT_EXIST_PRODUCT(HttpStatus.BAD_REQUEST.value(),
-            "error.product.not.exist.product")
+    PRODUCT_NOT_EXIST(HttpStatus.BAD_REQUEST.value(),
+            "error.product.not.exist")
     ;
 
     private final int statusCode;

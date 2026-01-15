@@ -108,7 +108,8 @@ public class ProductionService {
     public ResponseSearchDetailProductionDto searchDetailProduction(Long id) {
         return searchDetailProductionMapper.toDto(
                 productionRepository.findById(id)
-                        .orElseThrow(() -> new ProductionException(NOT_EXIST_PRODUCT)));
+                        .orElseThrow(() ->
+                                new ProductionException(PRODUCT_NOT_EXIST)));
     }
   
     /** 상품목록조회 **/
@@ -148,7 +149,7 @@ public class ProductionService {
     private void checkIfProductionCodeExists(Long sellerId, String code) {
         productionRepository.findBySellerAndCode(sellerId, code)
                 .ifPresent(existingProduction -> {
-                    throw new ProductionException(ALREADY_REGISTERED_CODE);
+                    throw new ProductionException(PRODUCT_CODE_ALREADY_REGISTERED);
                 });
     }
 
@@ -161,14 +162,14 @@ public class ProductionService {
 
         // 1. 입력받은 옵션코드목록 중 중복데이터 체크
         if (optionCodeSet.size() != options.size()) {
-            throw new ProductionException(ENTER_DUPLICATED_OPTION_CODE);
+            throw new ProductionException(PRODUCT_OPTION_CODE_DUPLICATED);
         }
 
         // 2. 입력받은 옵션코드목록과 등록된 옵션코드목록 중복 체크
         if (!productionOptionRepository.findByProductionCodeAndOptionCodeIn(
                         productionCode, optionCodeSet.stream().toList())
                 .isEmpty()) {
-            throw new ProductionException(ALREADY_REGISTERED_OPTION_CODE);
+            throw new ProductionException(PRODUCT_OPTION_CODE_ALREADY_REGISTERED);
         }
     }
 
@@ -197,7 +198,7 @@ public class ProductionService {
                                                  RequestModifyProductionDto requestProductionDto) {
         // 상품 기존 판매상태 체크
         if (production.getSaleStatus() == DELETION) {
-            throw new ProductionException(NO_EDIT_DELETION_STATUS);
+            throw new ProductionException(PRODUCT_ALREADY_DELETED);
         }
 
         // 상품옵션목록 중복체크
@@ -220,14 +221,14 @@ public class ProductionService {
 
         // 3. 포함되지않는 경우에 대한 예외처리
         if (!isExistAllOptionIds) {
-            throw new ProductionException(NO_EDIT_FOR_NOT_EXIST_OPTION);
+            throw new ProductionException(PRODUCT_OPTION_NOT_EXIST);
         }
     }
 
     // 상품ID, 셀러ID와 일치하는 상품 단건 조회
     private Production getProductionEntityByIdAndSeller(Long productionId, Long sellerId) {
         return productionRepository.findByIdAndSeller(productionId, sellerId)
-                .orElseThrow(() -> new ProductionException(NO_EDIT_PERMISSION));
+                .orElseThrow(() -> new ProductionException(PRODUCT_EDIT_FORBIDDEN));
     }
 
     // 상품 Entity 데이터 변경
@@ -252,7 +253,7 @@ public class ProductionService {
             if (foundOption != null) {
                 foundOption.setQuantity(requestOption.getQuantity());
             } else {
-                throw new ProductionException(NO_EDIT_FOR_NOT_EXIST_OPTION);
+                throw new ProductionException(PRODUCT_OPTION_NOT_EXIST);
             }
         }
     }

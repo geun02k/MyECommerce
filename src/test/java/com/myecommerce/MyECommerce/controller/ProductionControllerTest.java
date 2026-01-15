@@ -27,7 +27,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.ALREADY_REGISTERED_CODE;
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.PRODUCT_CODE_ALREADY_REGISTERED;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
 import static com.myecommerce.MyECommerce.type.ProductionCategoryType.WOMEN_CLOTHING;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
@@ -224,7 +224,7 @@ class ProductionControllerTest {
         RequestProductionDto request = validRequestProduction();
 
         given(productionService.registerProduction(any(), any(Member.class)))
-                .willThrow(new ProductionException(ALREADY_REGISTERED_CODE));
+                .willThrow(new ProductionException(PRODUCT_CODE_ALREADY_REGISTERED));
 
         // when
         // then
@@ -234,7 +234,7 @@ class ProductionControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode")
-                        .value("ALREADY_REGISTERED_CODE"))
+                        .value("PRODUCT_CODE_ALREADY_REGISTERED"))
                 .andExpect(jsonPath("$.errorMessage")
                         .value("이미 등록된 상품코드입니다."));
     }

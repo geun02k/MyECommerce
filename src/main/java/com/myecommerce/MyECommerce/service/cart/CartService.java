@@ -20,7 +20,7 @@ import java.time.LocalDate;
 import java.util.Map;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_SIZE_EXCEEDED;
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.NOT_EXIST_PRODUCT;
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.PRODUCT_NOT_EXIST;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 
 @Service
@@ -108,7 +108,7 @@ public class CartService {
         // 상품옵션조회
         ProductionOption foundOption =
                 productionOptionRepository.findById(optionId)
-                        .orElseThrow(() -> new ProductionException(NOT_EXIST_PRODUCT));
+                        .orElseThrow(() -> new ProductionException(PRODUCT_NOT_EXIST));
 
         // entity -> dto 변환
         return serviceCartMapper.toDto(foundOption);

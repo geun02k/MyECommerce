@@ -9,7 +9,7 @@ import org.springframework.http.HttpStatus;
 public enum CartErrorCode implements CommonErrorCode {
 
     // 장바구니 validation check
-    CART_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST.value(),
+    CART_SIZE_EXCEEDED(HttpStatus.CONFLICT.value(),
             "error.cart.size.exceeded")
     ;
 

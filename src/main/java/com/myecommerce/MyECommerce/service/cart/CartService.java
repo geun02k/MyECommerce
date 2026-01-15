@@ -48,7 +48,7 @@ public class CartService {
         //       - hashValue = 등록할 상품옵션 정보
 
         // 0. 장바구니 물품 100건 제한
-        checkUserCartSize(member.getUserId());
+        checkUserCartSizePolicy(member.getUserId());
 
         // 1. 상품옵션조회 (DB)
         ServiceCartDto foundOptionDto =
@@ -62,8 +62,8 @@ public class CartService {
         return serviceCartMapper.toResponseDto(foundOptionDto);
     }
 
-    // 장바구니 제품 수량 체크
-    private void checkUserCartSize(String userId) {
+    // 장바구니 제품 수량 체크 정책
+    private void checkUserCartSizePolicy(String userId) {
         Map<Object, Object> optionsInCart =
                 redisMultiDataService.getHashEntries(CART, userId);
 

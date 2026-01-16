@@ -58,6 +58,7 @@
     - properties 파일 한글 깨짐 문제 해결
     - 메시지 관리 방식 개선
     - 서버 에러 메시지 하드코딩 제거: placeholder 기반 메시지 분리 전략
+    - 메시지 호출 테스트 문제해결 : Spring Validation과 ExceptionHandler에서 메시지 처리
     - 메시지 조회 Locale 문제 해결방법
     - MessageSource placeholder 규칙으로 인한 메시지 파싱 오류와 해결
 16. HTTP 상태코드
@@ -2222,6 +2223,113 @@ messages.properties 도입을 고려하게 되면서, 기존 설계의 문제점
    ~~~
 
 
+### < 메시지 호출 테스트 문제해결 : Spring Validation과 ExceptionHandler에서 메시지 처리 >
+1. 발생에러
+   ~~~
+   2026-01-14T09:42:33.047+09:00  WARN 21560 --- [MyECommerce] [    Test worker] c.m.M.e.handler.CommonExceptionHandler   : error.default.invalid.value
+   
+   org.springframework.web.bind.MethodArgumentNotValidException: Validation failed for argument [0] in public org.springframework.http.ResponseEntity<com.myecommerce.MyECommerce.dto.production.ResponseProductionDto> com.myecommerce.MyECommerce.controller.ProductionController.registerProduction(com.myecommerce.MyECommerce.dto.production.RequestProductionDto,com.myecommerce.MyECommerce.entity.member.Member): [Field error in object 'requestProductionDto' on field 'code': rejected value [!!INVALID!!]; codes [Pattern.requestProductionDto.code,Pattern.code,Pattern.java.lang.String,Pattern]; arguments [org.springframework.context.support.DefaultMessageSourceResolvable: codes [requestProductionDto.code,code]; arguments []; default message [code],[Ljakarta.validation.constraints.Pattern$Flag;@687f62a5,^[a-zA-Z0-9][a-zA-Z0-9\-]*$]; default message [상품코드는 영문자, 숫자만 사용 가능합니다.
+   특수문자는 -만 허용하며 첫 글자로 사용 불가합니다.]]
+   // ... 생략
+   
+   MockHttpServletRequest:
+   HTTP Method = POST
+   Request URI = /production
+   Parameters = {}
+   Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"110"]
+   Body = {"code":"!!INVALID!!","name":"정상 상품명","category":"WOMEN_CLOTHING","description":null,"options":null}
+   Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.myecommerce.MyECommerce.entity.member.Member@1b26fac2, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[SELLER]]]}
+   
+   Handler:
+   Type = com.myecommerce.MyECommerce.controller.ProductionController
+   Method = com.myecommerce.MyECommerce.controller.ProductionController#registerProduction(RequestProductionDto, Member)
+   
+   Async:
+   Async started = false
+   Async result = null
+   
+   Resolved Exception:
+   Type = org.springframework.web.bind.MethodArgumentNotValidException
+   
+   // ... 생략
+   
+   MockHttpServletResponse:
+   Status = 400
+   Error message = null
+   Headers = [Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+   Content type = application/json
+   Body = {"errorCode":"INVALID_VALUE","errorMessage":"error.default.invalid.value\n상품코드는 영문자, 숫자만 사용 가능합니다.\n특수문자는 -만 허용하며 첫 글자로 사용 불가합니다."}
+   Forwarded URL = null
+   Redirected URL = null
+   Cookies = []
+   
+   JSON path "$.errorMessage"
+   <Click to see difference>
+   
+   java.lang.AssertionError: JSON path "$.errorMessage" expected:<유효하지 않은 값입니다.
+   상품코드는 영문자, 숫자만 사용 가능합니다.
+   특수문자는 -만 허용하며 첫 글자로 사용 불가합니다.> but was:<error.default.invalid.value
+   상품코드는 영문자, 숫자만 사용 가능합니다.
+   특수문자는 -만 허용하며 첫 글자로 사용 불가합니다.>
+   at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:61)
+   at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:128)
+   // ... 생략
+   at com.myecommerce.MyECommerce.controller.ProductionControllerTest.failRegisterProduction_invalidCode(ProductionControllerTest.java:157)
+   // ... 생략
+   ~~~
+2. 에러발생원인   
+   Validation관련 ExceptionHandler는 DefaultErrorCode.java에 존재하는 에러코드의 메시지를, Validation 메시지에 앞에 붙여 사용하고 있었다.
+   이 때 서버 비즈니스 메시지에 대해 하드코딩에서 messages.properties 파일로 관리하게 되면서 기존에 잘 수행되던 테스트가 깨지게 되었다.   
+   MockMvc 기반 컨트롤러 테스트에서는 MessageSource가 자동으로 메시지 key르 문자열로 변환해주지 않는다.
+   그래서 기존에 메시지가 출력되던 위치에 메시지 key 자체가 출력되고 테스트 예상값과 동일하지 않게 되어 테스트가 실패한 것이다.
+   에러 메시지를 파일로 관리하기로 결정한 순간, 메시지 생성 책임은 전부 Handler로 이동한다.
+   따라서 messages.properties를 사용하는 경우, 명시적인 MessageSource 설정 또는 메시지 해석 로직을 직접 호출해야 한다.   
+   결론적으로, ***메시지 관리 구조를 개선하면서 Exceptionhandelr에 메시지 생성 로직을 누락***해 에러가 발생했다.
+3. 해결방법
+   Exceptionhandelr에 messageSource를 이용해 메시지 생성 로직을 추가해, 생성된 메시지를 응답으로 전달한다.   
+   테스트코드 수정은 필요없다.
+   ~~~
+   public class CommonExceptionHandler{
+      /** DTO 유효성검사 예외처리 **/
+      @ExceptionHandler(MethodArgumentNotValidException.class)
+      @ResponseStatus(HttpStatus.BAD_REQUEST)
+      protected ResponseEntity<CommonErrorResponse> methodArgumentNotValidExceptionHandler(
+              MethodArgumentNotValidException e) {
+          // 서버에러객체생성
+          DefaultErrorCode errorCode = INVALID_VALUE;
+
+          // 서버 에러 메시지 생성
+          String errorCodeMessage = messageSource.getMessage(
+                  errorCode.getErrorMessage(),
+                  null,
+                  LocaleContextHolder.getLocale()
+          );
+
+         // Validation Bean 에러 메시지 (에러메시지 여러개일 수 있음, BindingResult에서 가져옴)
+         String defaultErrorMessage = e.getBindingResult().getFieldError().getDefaultMessage() == null ?
+                 "" : "\n" + e.getBindingResult().getFieldError().getDefaultMessage() ;
+
+          // 응답 객체 생성
+          CommonErrorResponse errorResponse = CommonErrorResponse.builder()
+                  .errorCode(errorCode) // DefaultErrorCode.INVALID_VALUE
+                  .errorMessage(errorCodeMessage + defaultErrorMessage)
+                  .build();
+
+          // 응답 객체 반환
+          // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
+          return new ResponseEntity<>(errorResponse,
+                  Objects.requireNonNull(HttpStatus.resolve(errorCode.getStatusCode())));
+   }
+   ~~~ 
+4. Validation 메시지는 자동으로 key에 대한 메시지 생성되는 이유   
+   Spring Validation은 내부적으로 MessageSource를 이미 사용하고 있다.   
+   Hibernate Validator가 동작하면 Spring MessageSource가 실행되어
+   ValidationMessages.properties에서 key에 대한 value 값을 가져온다.
+5. 메시지 key와 자동 변환   
+   Validation 메시지는 Spring이 대신 MessageSource를 호출해주지만
+   비즈니스 에러 메시지는 절대 자동 변환되지 않는다
+
+  
 ### < 메시지 조회 Locale 문제 해결방법 >
 1. 발생에러   
    Bean Validation에서 발생한 메시지를 MessageSource로 가져올 때 Locale이 엉뚱하게 잡히는 문제.

@@ -11,14 +11,15 @@ public interface ServiceProductionMapper {
 
     ServiceProductionMapper INSTANCE = Mappers.getMapper(ServiceProductionMapper.class);
 
-    ServiceProductionDto toServiceDto(RequestProductionDto production);
-    ServiceProductionDto toServiceDto(RequestModifyProductionDto production);
+    ServiceProductionDto toServiceDto(RequestProductionDto productionDto);
+    ServiceProductionDto toServiceDto(RequestModifyProductionDto productionDto);
 
+    ResponseSearchDetailProductionDto toSearchDetailDto(Production production);
     ResponseProductionDto toDto(Production production);
     Production toEntity(ServiceProductionDto productionDto);
 
     ResponseProductionOptionDto toOptionDto(ProductionOption option);
-    ProductionOption toOptionEntity(ServiceProductionOptionDto option);
+    ProductionOption toOptionEntity(ServiceProductionOptionDto optionDto);
 
 
 }

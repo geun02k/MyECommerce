@@ -41,6 +41,7 @@ class ProductionPolicyTest {
         Test Fixtures
        ------------------ */
 
+    /** 신규옵션 포함 상품 */
     ServiceProductionDto createProductionForInsert() {
         ServiceProductionOptionDto option =
                 createOptionForInsert("optionCode");
@@ -52,6 +53,7 @@ class ProductionPolicyTest {
                         .build();
     }
 
+    /** 신규옵션 */
     ServiceProductionOptionDto createOptionForInsert(String optionCode) {
         return ServiceProductionOptionDto.builder()
                 .id(null)
@@ -59,6 +61,7 @@ class ProductionPolicyTest {
                 .build();
     }
 
+    /** 옵션 미포함 상품 */
     ServiceProductionDto createProductionWithoutOptionsForInsert() {
         return ServiceProductionDto.builder()
                 .id(null)
@@ -68,6 +71,7 @@ class ProductionPolicyTest {
                 .build();
     }
 
+    /** 판매자 권한 사용자 */
     Member seller() {
         return Member.builder()
                 .id(1L)
@@ -136,11 +140,9 @@ class ProductionPolicyTest {
     void validateRegister_shouldThrowException_whenDuplicatedOptionCodeRequest() {
         // given
         ServiceProductionDto production = createProductionWithoutOptionsForInsert();
-        ServiceProductionOptionDto option =
-                createOptionForInsert("optionCode01");
-        ServiceProductionOptionDto duplicatedOption =
-                createOptionForInsert("optionCode01"); // 중복
-        production.setOptions(List.of(option, duplicatedOption));
+        production.setOptions(List.of(
+                createOptionForInsert("optionCode01"),
+                createOptionForInsert("optionCode01"))); // 중복
         Member seller = seller();
 
         given(productionRepository.

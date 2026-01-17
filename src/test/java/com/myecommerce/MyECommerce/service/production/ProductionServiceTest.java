@@ -30,19 +30,19 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ProductionServiceTest {
 
     @Mock
-    private ServiceProductionMapper serviceProductionMapper;
-
+    private ProductionPolicy productionPolicy;
     @Mock
     private ProductionRepository productionRepository;
     @Mock
     private ProductionOptionRepository productionOptionRepository;
+    @Mock
+    private ServiceProductionMapper serviceProductionMapper;
 
     @InjectMocks
     private ProductionService productionService;
@@ -170,14 +170,6 @@ class ProductionServiceTest {
         given(serviceProductionMapper.toEntity(serviceProductionDto))
                 .willReturn(expectedEntityOfServiceProductionDto);
 
-        // stub(가설) : productionRepository.findBySellerAndCode() 실행 시 빈 optional 객체 반환 예상.
-        given(productionRepository.findBySellerAndCode(any(Long.class), any(String.class)))
-                .willReturn(Optional.empty());
-        // stub(가설) : productionOptionRepository.findByProductionIdAndOptionCodeIn() 실행 시 null 반환 예상.
-        given(productionOptionRepository.findByProductionCodeAndOptionCodeIn(
-                any(String.class), any(List.class)))
-                .willReturn(new ArrayList());
-
         ArgumentCaptor<Production> productionCaptor =
                 ArgumentCaptor.forClass(Production.class);
         ArgumentCaptor<ProductionOption> optionCaptor =
@@ -199,6 +191,8 @@ class ProductionServiceTest {
                 productionService.registerProduction(requestProductionDto, member);
 
         // then
+        verify(productionPolicy, times(1))
+                .validateRegister(serviceProductionDto, member);
         verify(productionRepository, times(1))
                 .save(productionCaptor.capture());
         verify(productionOptionRepository, times(1))
@@ -389,12 +383,6 @@ class ProductionServiceTest {
                 eq(requestProductionDto.getId()), eq(member.getId())))
                 .willReturn(Optional.of(originProductionEntity));
 
-        // stub(가설) : productionOptionRepository.findByProductionCodeAndOptionCodeIn() 실행 시
-        // 상품코드, 요청옵션코드목록에 대해 null 반환 예상.
-        given(productionOptionRepository.findByProductionCodeAndOptionCodeIn(
-                productionCode, Collections.singletonList(insertReqOptEntity.getOptionCode())))
-                .willReturn(new ArrayList());
-
         // ArgumentCaptor 생성
         ArgumentCaptor<Production> productionCaptor = ArgumentCaptor.forClass(Production.class);
 
@@ -407,6 +395,8 @@ class ProductionServiceTest {
                 productionService.modifyProduction(requestProductionDto, member);
 
         // then
+        verify(productionPolicy, times(1))
+                .validateModify(any(), any());
         // 0. toDto에 전달된 인자 캡처 후 검증
         Production capturedProduction = productionCaptor.getValue();
         assertEquals(requestProductionDto.getId(), capturedProduction.getId());

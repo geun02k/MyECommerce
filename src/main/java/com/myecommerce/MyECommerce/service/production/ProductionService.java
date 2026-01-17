@@ -31,10 +31,12 @@ import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 @RequiredArgsConstructor
 public class ProductionService {
 
-    private final ServiceProductionMapper serviceProductionMapper;
+    private final ProductionPolicy productionPolicy;
 
     private final ProductionRepository productionRepository;
     private final ProductionOptionRepository productionOptionRepository;
+
+    private final ServiceProductionMapper serviceProductionMapper;
 
     /** 상품등록 **/
     @Transactional
@@ -45,12 +47,8 @@ public class ProductionService {
         ServiceProductionDto serviceProductionDto =
                 serviceProductionMapper.toServiceDto(requestProductionDto);
 
-        // 판매자별 상품코드 중복체크 정책
-        enforceProductionCodeUniquenessPolicy(
-                member.getId(), serviceProductionDto.getCode());
-        // 상품옵션목록 중복체크 정책
-        enforceOptionCodeUniquenessPolicy(
-                serviceProductionDto.getCode(), serviceProductionDto.getOptions());
+        // 정책 검증
+        productionPolicy.validateRegister(serviceProductionDto, member);
 
         // serviceDto -> entity 변환
         Production production = serviceProductionMapper.toEntity(serviceProductionDto);
@@ -81,12 +79,11 @@ public class ProductionService {
                 serviceProductionDto.getId(), member.getId());
 
         // 사전 validation check
-        validateOptionIdsForUpdate(targetProduction, serviceOptionDtoListForUpdate);
-        // 판매상태 정책 검증
-        enforceProductModifySaleStatusPolicy(targetProduction.getSaleStatus());
-        // 등록할 상품옵션 중복 검증
-        enforceOptionCodeUniquenessPolicy(
-                targetProduction.getCode(), serviceOptionDtoListForInsert);
+        validateOptionIdsForUpdate(
+                targetProduction, serviceOptionDtoListForUpdate);
+        // 정책 검증
+        productionPolicy.validateModify(
+                targetProduction, serviceOptionDtoListForInsert);
 
         // 수정, 신규 등록 옵션 목록 dto -> entity 변환
         List<ProductionOption> updateTargetOptions =
@@ -152,36 +149,6 @@ public class ProductionService {
         });
     }
 
-    // 상품코드 유일성 검증 정책 (판매자별 상품코드 중복체크)
-    private void enforceProductionCodeUniquenessPolicy(Long sellerId,
-                                                       String productionCode) {
-        productionRepository.findBySellerAndCode(sellerId, productionCode)
-                .ifPresent(existingProduction -> {
-                    throw new ProductionException(PRODUCT_CODE_ALREADY_REGISTERED);
-                });
-    }
-
-    // 상품옵션코드 유일성 검증 정책 (상품옵션 중복체크)
-    private void enforceOptionCodeUniquenessPolicy(
-            String productionCode, List<ServiceProductionOptionDto> optionDtoList) {
-        // 중복코드 제거된 옵션코드목록 set
-        Set<String> deduplicatedOptionCodes = optionDtoList.stream()
-                .map(ServiceProductionOptionDto::getOptionCode)
-                .collect(Collectors.toSet());
-
-        // 1. 입력받은 옵션코드목록 중 중복데이터 체크
-        if (deduplicatedOptionCodes.size() != optionDtoList.size()) {
-            throw new ProductionException(PRODUCT_OPTION_CODE_DUPLICATED);
-        }
-
-        // 2. 입력받은 옵션코드목록과 등록된 옵션코드목록 중복 체크
-        List<Production> duplicatedOptions =
-                productionOptionRepository.findByProductionCodeAndOptionCodeIn(
-                        productionCode, deduplicatedOptionCodes.stream().toList());
-        if (!duplicatedOptions.isEmpty()) {
-            throw new ProductionException(PRODUCT_OPTION_CODE_ALREADY_REGISTERED);
-        }
-    }
 
     // 수정할 옵션목록 반환
     private List<ServiceProductionOptionDto> filterUpdateOptions(
@@ -219,14 +186,6 @@ public class ProductionService {
             throw new ProductionException(PRODUCT_OPTION_NOT_EXIST);
         }
     }
-
-    // 상품 수정 시 판매상태 정책
-    private void enforceProductModifySaleStatusPolicy(ProductionSaleStatusType saleStatus) {
-        if (saleStatus == DELETION) {
-            throw new ProductionException(PRODUCT_ALREADY_DELETED);
-        }
-    }
-
 
     // 상품ID, 셀러ID와 일치하는 상품 단건 조회
     private Production getProductionEntityByIdAndSeller(Long productionId, Long sellerId) {

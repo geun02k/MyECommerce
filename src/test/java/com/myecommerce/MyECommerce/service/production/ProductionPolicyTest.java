@@ -16,13 +16,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.*;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
+import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.DELETION;
+import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
@@ -185,4 +184,94 @@ class ProductionPolicyTest {
         assertEquals(PRODUCT_OPTION_CODE_ALREADY_REGISTERED, exception.getErrorCode());
     }
 
+    /* ----------------------
+        상품수정정책 Tests
+       ---------------------- */
+
+    @Test
+    @DisplayName("상품수정정책 통과")
+    void validateModify_shouldPass_whenAllValid() {
+        // given
+        Production production = Production.builder()
+                .code("code")
+                .saleStatus(ON_SALE)
+                .build();
+        ServiceProductionOptionDto insertOption  =
+                ServiceProductionOptionDto.builder()
+                        .id(null)
+                        .optionCode("insertOptionCode")
+                        .build();
+
+        given(productionOptionRepository.findByProductionCodeAndOptionCodeIn(
+                "code", List.of("insertOptionCode")))
+                .willReturn(Collections.emptyList());
+
+        // when
+        // then
+        assertDoesNotThrow(() ->
+                productionPolicy.validateModify(production, List.of(insertOption)));
+    }
+
+    @Test
+    @DisplayName("상품수정정책 실패 - 판매상태가 삭제이면 예외발생")
+    void validateModify_shouldFail_whenDeletionSaleStatus() {
+        // given
+        Production deletedProduction = Production.builder()
+                .saleStatus(DELETION).build();
+
+        // when
+        // then
+        ProductionException e = assertThrows(ProductionException.class, () ->
+                productionPolicy.validateModify(
+                        deletedProduction, Collections.emptyList()));
+        assertEquals(PRODUCT_ALREADY_DELETED, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("상품수정정책 실패 - 신규 옵션 중 옵션코드 중복되면 예외발생")
+    void validateModify_shouldFail_whenDuplicatedOptionCode() {
+        // given
+        Production production = Production.builder()
+                .saleStatus(ON_SALE)
+                .build();
+        List<ServiceProductionOptionDto> invalidOptions = List.of(
+                createOptionForInsert("optionCode01"),
+                 createOptionForInsert("optionCode01")); // 중복
+
+        // when
+        // then
+        ProductionException e = assertThrows(ProductionException.class, () ->
+                productionPolicy.validateModify(production, invalidOptions));
+        assertEquals(PRODUCT_OPTION_CODE_DUPLICATED, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("상품수정정책 실패 - 신규 옵션 중 이미 등록된 옵션코드를 추가하면 예외발생")
+    void validateModify_shouldFail_whenAlreadyRegisteredOptionCode() {
+        // given
+        Production production = Production.builder()
+                .code("code")
+                .saleStatus(ON_SALE)
+                .build();
+        ServiceProductionOptionDto invalidOption =
+                createOptionForInsert("insertOptionCode");
+
+        // 이미 등록된 기존 동일 옵션코드 존재
+        given(productionOptionRepository.
+                findByProductionCodeAndOptionCodeIn(
+                        production.getCode(), List.of("insertOptionCode")))
+                .willReturn(List.of(Production.builder()
+                        .code("code")
+                        .options(List.of(ProductionOption.builder()
+                                .optionCode("insertOptionCode")
+                                .build()))
+                        .build()));
+
+        // when
+        // then
+        ProductionException e = assertThrows(ProductionException.class, () ->
+                productionPolicy.validateModify(
+                        production, List.of(invalidOption)));
+        assertEquals(PRODUCT_OPTION_CODE_ALREADY_REGISTERED, e.getErrorCode());
+    }
 }

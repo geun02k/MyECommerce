@@ -60,18 +60,7 @@ class ProductionPolicyTest {
                 .build();
     }
 
-    Production productionEntityOfDuplicatedOption() {
-        return Production.builder()
-                .id(1L)
-                .code("code")
-                .options(List.of(ProductionOption.builder()
-                                    .id(1L)
-                                    .optionCode("optionCode")
-                                    .build()))
-                .build();
-    }
-
-    ServiceProductionDto createProductionOnlyForInsert() {
+    ServiceProductionDto createProductionWithoutOptionsForInsert() {
         return ServiceProductionDto.builder()
                 .id(null)
                 .code("code")
@@ -84,7 +73,6 @@ class ProductionPolicyTest {
         return Member.builder()
                 .id(1L)
                 .roles(List.of(MemberAuthority.builder()
-                        .id(1L)
                         .authority(SELLER)
                         .build()))
                 .build();
@@ -98,7 +86,16 @@ class ProductionPolicyTest {
     @DisplayName("상품등록정책통과")
     void validateRegister_shouldPass_WhenAllValid() {
         // given
-        ServiceProductionDto production = createProductionForInsert();
+        ServiceProductionOptionDto option = ServiceProductionOptionDto.builder()
+                .id(null)
+                .optionCode("optionCode")
+                .build();
+        ServiceProductionDto production = ServiceProductionDto.builder()
+                .id(null)
+                .code("code")
+                .saleStatus(null)
+                .options(new ArrayList<>(List.of(option)))
+                .build();
 
         given(productionRepository.findBySellerAndCode(anyLong(), anyString()))
                 .willReturn(Optional.empty());
@@ -139,7 +136,7 @@ class ProductionPolicyTest {
     @DisplayName("상품등록정책실패 - 중복된 옵션코드 입력 시 예외발생")
     void validateRegister_shouldThrowException_whenDuplicatedOptionCodeRequest() {
         // given
-        ServiceProductionDto production = createProductionOnlyForInsert();
+        ServiceProductionDto production = createProductionWithoutOptionsForInsert();
         ServiceProductionOptionDto option =
                 createOptionForInsert("optionCode01");
         ServiceProductionOptionDto duplicatedOption =
@@ -147,7 +144,8 @@ class ProductionPolicyTest {
         production.setOptions(List.of(option, duplicatedOption));
         Member seller = seller();
 
-        given(productionRepository.findBySellerAndCode(anyLong(), anyString()))
+        given(productionRepository.
+                findBySellerAndCode(seller.getId(), production.getCode()))
                 .willReturn(Optional.empty());
 
         // when
@@ -165,15 +163,19 @@ class ProductionPolicyTest {
         ServiceProductionDto production = createProductionForInsert();
         Member seller = seller();
 
-        given(productionRepository.findBySellerAndCode(anyLong(), anyString()))
+        given(productionRepository.
+                findBySellerAndCode(seller.getId(), production.getCode()))
                 .willReturn(Optional.empty());
         // 이미 등록된 기존 동일 옵션코드 존재
         given(productionOptionRepository.
                 findByProductionCodeAndOptionCodeIn(
-                        production.getCode(), production.getOptions().stream()
-                                .map(ServiceProductionOptionDto::getOptionCode)
-                                .toList()))
-                .willReturn(List.of(productionEntityOfDuplicatedOption()));
+                        production.getCode(), List.of("optionCode")))
+                .willReturn(List.of(Production.builder()
+                                    .code("code")
+                                    .options(List.of(ProductionOption.builder()
+                                            .optionCode("optionCode")
+                                            .build()))
+                                    .build()));
 
         // when
         // then

@@ -1,4 +1,4 @@
-package com.myecommerce.MyECommerce.service.production;
+package com.myecommerce.MyECommerce.service.product;
 
 import com.myecommerce.MyECommerce.dto.production.*;
 import com.myecommerce.MyECommerce.entity.member.Member;
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.*;
 class ProductionServiceTest {
 
     @Mock
-    private ProductionPolicy productionPolicy;
+    private ProductPolicy productionPolicy;
     @Mock
     private ProductRepository productRepository;
     @Mock
@@ -45,7 +45,7 @@ class ProductionServiceTest {
     private ServiceProductMapper serviceProductMapper;
 
     @InjectMocks
-    private ProductionService productionService;
+    private ProductService productService;
 
     @Test
     @DisplayName("상품등록 성공")
@@ -188,7 +188,7 @@ class ProductionServiceTest {
 
         // when
         ResponseProductionDto response =
-                productionService.registerProduction(requestProductionDto, member);
+                productService.registerProduction(requestProductionDto, member);
 
         // then
         verify(productionPolicy, times(1))
@@ -392,7 +392,7 @@ class ProductionServiceTest {
 
         // when
         ResponseProductionDto responseProductionDto =
-                productionService.modifyProduction(requestProductionDto, member);
+                productService.modifyProduction(requestProductionDto, member);
 
         // then
         verify(productionPolicy, times(1))

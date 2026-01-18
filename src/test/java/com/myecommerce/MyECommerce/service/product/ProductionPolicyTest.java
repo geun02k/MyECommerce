@@ -1,4 +1,4 @@
-package com.myecommerce.MyECommerce.service.production;
+package com.myecommerce.MyECommerce.service.product;
 
 import com.myecommerce.MyECommerce.dto.production.ServiceProductionDto;
 import com.myecommerce.MyECommerce.dto.production.ServiceProductionOptionDto;
@@ -35,7 +35,7 @@ class ProductionPolicyTest {
     ProductOptionRepository productOptionRepository;
 
     @InjectMocks
-    ProductionPolicy productionPolicy;
+    ProductPolicy productPolicy;
 
     /* ------------------
         Test Fixtures
@@ -109,7 +109,7 @@ class ProductionPolicyTest {
         // when
         // then
         assertDoesNotThrow(() ->
-                productionPolicy.validateRegister(production, seller()));
+                productPolicy.validateRegister(production, seller()));
     }
 
     @Test
@@ -131,7 +131,7 @@ class ProductionPolicyTest {
         // then
         ProductionException exception =
                 assertThrows(ProductionException.class, () ->
-                        productionPolicy.validateRegister(production, seller));
+                        productPolicy.validateRegister(production, seller));
         assertEquals(PRODUCT_CODE_ALREADY_REGISTERED, exception.getErrorCode());
     }
 
@@ -153,7 +153,7 @@ class ProductionPolicyTest {
         // then
         ProductionException exception =
                 assertThrows(ProductionException.class, () ->
-                        productionPolicy.validateRegister(production, seller));
+                        productPolicy.validateRegister(production, seller));
         assertEquals(PRODUCT_OPTION_CODE_DUPLICATED, exception.getErrorCode());
     }
 
@@ -182,7 +182,7 @@ class ProductionPolicyTest {
         // then
         ProductionException exception =
                 assertThrows(ProductionException.class, () ->
-                        productionPolicy.validateRegister(production, seller));
+                        productPolicy.validateRegister(production, seller));
         assertEquals(PRODUCT_OPTION_CODE_ALREADY_REGISTERED, exception.getErrorCode());
     }
 
@@ -211,7 +211,7 @@ class ProductionPolicyTest {
         // when
         // then
         assertDoesNotThrow(() ->
-                productionPolicy.validateModify(production, List.of(insertOption)));
+                productPolicy.validateModify(production, List.of(insertOption)));
     }
 
     @Test
@@ -224,7 +224,7 @@ class ProductionPolicyTest {
         // when
         // then
         ProductionException e = assertThrows(ProductionException.class, () ->
-                productionPolicy.validateModify(
+                productPolicy.validateModify(
                         deletedProduction, Collections.emptyList()));
         assertEquals(PRODUCT_ALREADY_DELETED, e.getErrorCode());
     }
@@ -243,7 +243,7 @@ class ProductionPolicyTest {
         // when
         // then
         ProductionException e = assertThrows(ProductionException.class, () ->
-                productionPolicy.validateModify(production, invalidOptions));
+                productPolicy.validateModify(production, invalidOptions));
         assertEquals(PRODUCT_OPTION_CODE_DUPLICATED, e.getErrorCode());
     }
 
@@ -272,7 +272,7 @@ class ProductionPolicyTest {
         // when
         // then
         ProductionException e = assertThrows(ProductionException.class, () ->
-                productionPolicy.validateModify(
+                productPolicy.validateModify(
                         production, List.of(invalidOption)));
         assertEquals(PRODUCT_OPTION_CODE_ALREADY_REGISTERED, e.getErrorCode());
     }

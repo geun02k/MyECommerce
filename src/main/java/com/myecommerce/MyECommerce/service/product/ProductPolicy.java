@@ -1,4 +1,4 @@
-package com.myecommerce.MyECommerce.service.production;
+package com.myecommerce.MyECommerce.service.product;
 
 import com.myecommerce.MyECommerce.dto.production.ServiceProductionDto;
 import com.myecommerce.MyECommerce.dto.production.ServiceProductionOptionDto;
@@ -20,7 +20,7 @@ import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.DELETION
 
 @Component
 @RequiredArgsConstructor
-public class ProductionPolicy {
+public class ProductPolicy {
 
     private final ProductRepository productRepository;
     private final ProductOptionRepository productOptionRepository;

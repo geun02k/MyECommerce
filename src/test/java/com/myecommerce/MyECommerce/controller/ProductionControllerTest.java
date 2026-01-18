@@ -11,7 +11,7 @@ import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.exception.ProductionException;
 import com.myecommerce.MyECommerce.security.filter.JwtAuthenticationFilter;
-import com.myecommerce.MyECommerce.service.production.ProductionService;
+import com.myecommerce.MyECommerce.service.product.ProductService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,7 +62,7 @@ class ProductionControllerTest {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private ProductionService productionService;
+    private ProductService productService;
 
     /* ------------------
         Test Fixtures
@@ -118,7 +118,7 @@ class ProductionControllerTest {
         // 응답 상품 DTO
         ResponseProductionDto response = serviceResponseProduction();
 
-        given(productionService.registerProduction(
+        given(productService.registerProduction(
                 any(RequestProductionDto.class), any(Member.class)))
                 .willReturn(response);
 
@@ -158,7 +158,7 @@ class ProductionControllerTest {
                 .andExpect(jsonPath("$.errorCode")
                         .value("INVALID_VALUE"));
         // 2. service 미호출 검증
-        verify(productionService, never()).registerProduction(any(), any());
+        verify(productService, never()).registerProduction(any(), any());
     }
 
     @Test
@@ -181,7 +181,7 @@ class ProductionControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode")
                         .value("INVALID_VALUE"));
-        verify(productionService, never()).registerProduction(any(), any());
+        verify(productService, never()).registerProduction(any(), any());
     }
 
     @Test
@@ -214,7 +214,7 @@ class ProductionControllerTest {
                 .andExpect(jsonPath("$.errorMessage")
                         .value("유효하지 않은 값입니다.\n해당 옵션의 판매가능 수량은 1 이상이어야 합니다."));
 
-        verify(productionService, never()).registerProduction(any(), any());
+        verify(productService, never()).registerProduction(any(), any());
     }
 
     @Test
@@ -223,7 +223,7 @@ class ProductionControllerTest {
         // given
         RequestProductionDto request = validRequestProduction();
 
-        given(productionService.registerProduction(any(), any(Member.class)))
+        given(productService.registerProduction(any(), any(Member.class)))
                 .willThrow(new ProductionException(PRODUCT_CODE_ALREADY_REGISTERED));
 
         // when
@@ -256,7 +256,7 @@ class ProductionControllerTest {
                         .value("INVALID_VALUE"))
                 .andExpect(jsonPath("$.errorMessage")
                         .value("유효하지 않은 상품 ID 입니다."));
-        verify(productionService, never()).searchDetailProduction(invalidProductId);
+        verify(productService, never()).searchDetailProduction(invalidProductId);
     }
 
 }

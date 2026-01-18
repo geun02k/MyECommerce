@@ -1,4 +1,4 @@
-package com.myecommerce.MyECommerce.service.production;
+package com.myecommerce.MyECommerce.service.product;
 
 import com.myecommerce.MyECommerce.dto.production.*;
 import com.myecommerce.MyECommerce.entity.member.Member;
@@ -28,9 +28,9 @@ import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 
 @Service
 @RequiredArgsConstructor
-public class ProductionService {
+public class ProductService {
 
-    private final ProductionPolicy productionPolicy;
+    private final ProductPolicy productPolicy;
 
     private final ProductRepository productRepository;
     private final ProductOptionRepository productOptionRepository;
@@ -47,7 +47,7 @@ public class ProductionService {
                 serviceProductMapper.toServiceDto(requestProductionDto);
 
         // 정책 검증
-        productionPolicy.validateRegister(serviceProductionDto, member);
+        productPolicy.validateRegister(serviceProductionDto, member);
 
         // serviceDto -> entity 변환
         Product production = serviceProductMapper.toEntity(serviceProductionDto);
@@ -81,7 +81,7 @@ public class ProductionService {
         validateOptionIdsForUpdate(
                 targetProduction, serviceOptionDtoListForUpdate);
         // 정책 검증
-        productionPolicy.validateModify(
+        productPolicy.validateModify(
                 targetProduction, serviceOptionDtoListForInsert);
 
         // 수정, 신규 등록 옵션 목록 dto -> entity 변환

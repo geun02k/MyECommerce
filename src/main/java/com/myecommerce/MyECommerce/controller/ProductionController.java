@@ -6,7 +6,7 @@ import com.myecommerce.MyECommerce.dto.production.RequestSearchProductionDto;
 import com.myecommerce.MyECommerce.dto.production.ResponseProductionDto;
 import com.myecommerce.MyECommerce.dto.production.ResponseSearchDetailProductionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
-import com.myecommerce.MyECommerce.service.production.ProductionService;
+import com.myecommerce.MyECommerce.service.product.ProductService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
 @Validated
 public class ProductionController {
 
-    private final ProductionService productionService;
+    private final ProductService productService;
 
     /**
      * 상품, 상품옵션목록 등록 post /production
@@ -35,7 +35,7 @@ public class ProductionController {
             @AuthenticationPrincipal Member member) {
 
         return ResponseEntity.ok(
-                productionService.registerProduction(production, member));
+                productService.registerProduction(production, member));
     }
 
     /**
@@ -48,7 +48,7 @@ public class ProductionController {
             @AuthenticationPrincipal Member member) {
 
         return ResponseEntity.ok(
-                productionService.modifyProduction(production, member));
+                productService.modifyProduction(production, member));
     }
 
     /**
@@ -62,7 +62,7 @@ public class ProductionController {
     public ResponseEntity<ResponseSearchDetailProductionDto> searchDetailProduction(
             @PathVariable @Positive(message = "{validation.product.id.positive}") Long id) {
         return ResponseEntity.ok(
-                productionService.searchDetailProduction(id));
+                productService.searchDetailProduction(id));
     }
 
     /**
@@ -72,7 +72,7 @@ public class ProductionController {
     public ResponseEntity<Page<ResponseProductionDto>> searchProductionList(
             @Valid RequestSearchProductionDto requestSearchProductionDto) {
         return ResponseEntity.ok(
-                productionService.searchProductionList(requestSearchProductionDto));
+                productService.searchProductionList(requestSearchProductionDto));
     }
 
 }

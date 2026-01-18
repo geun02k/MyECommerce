@@ -1,8 +1,8 @@
 package com.myecommerce.MyECommerce.mapper;
 
 import com.myecommerce.MyECommerce.dto.production.*;
-import com.myecommerce.MyECommerce.entity.production.Production;
-import com.myecommerce.MyECommerce.entity.production.ProductionOption;
+import com.myecommerce.MyECommerce.entity.product.ProductOption;
+import com.myecommerce.MyECommerce.entity.product.Product;
 import org.mapstruct.Mapper;
 import org.mapstruct.factory.Mappers;
 
@@ -14,12 +14,12 @@ public interface ServiceProductionMapper {
     ServiceProductionDto toServiceDto(RequestProductionDto productionDto);
     ServiceProductionDto toServiceDto(RequestModifyProductionDto productionDto);
 
-    ResponseSearchDetailProductionDto toSearchDetailDto(Production production);
-    ResponseProductionDto toDto(Production production);
-    Production toEntity(ServiceProductionDto productionDto);
+    ResponseSearchDetailProductionDto toSearchDetailDto(Product product);
+    ResponseProductionDto toDto(Product product);
+    Product toEntity(ServiceProductionDto productDto);
 
-    ResponseProductionOptionDto toOptionDto(ProductionOption option);
-    ProductionOption toOptionEntity(ServiceProductionOptionDto optionDto);
+    ResponseProductionOptionDto toOptionDto(ProductOption option);
+    ProductOption toOptionEntity(ServiceProductionOptionDto optionDto);
 
 
 }

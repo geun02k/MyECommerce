@@ -3,10 +3,10 @@ package com.myecommerce.MyECommerce.service.production;
 import com.myecommerce.MyECommerce.dto.production.ServiceProductionDto;
 import com.myecommerce.MyECommerce.dto.production.ServiceProductionOptionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
-import com.myecommerce.MyECommerce.entity.production.Production;
+import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.exception.ProductionException;
-import com.myecommerce.MyECommerce.repository.production.ProductionOptionRepository;
-import com.myecommerce.MyECommerce.repository.production.ProductionRepository;
+import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -22,8 +22,8 @@ import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.DELETION
 @RequiredArgsConstructor
 public class ProductionPolicy {
 
-    private final ProductionRepository productionRepository;
-    private final ProductionOptionRepository productionOptionRepository;
+    private final ProductRepository productRepository;
+    private final ProductOptionRepository productOptionRepository;
 
     /** 등록 정책 검증 **/
     public void validateRegister(ServiceProductionDto productionDto,
@@ -37,7 +37,7 @@ public class ProductionPolicy {
     }
 
     /** 수정 정책 검증 **/
-    public void validateModify(Production production,
+    public void validateModify(Product production,
                                List<ServiceProductionOptionDto> insertOptionList) {
         // 판매상태 정책 검증
         enforceProductModifySaleStatusPolicy(production.getSaleStatus());
@@ -49,7 +49,7 @@ public class ProductionPolicy {
     // 상품코드 유일성 검증 정책 (판매자별 상품코드 중복체크)
     private void enforceProductionCodeUniquenessPolicy(Long sellerId,
                                                        String productionCode) {
-        productionRepository.findBySellerAndCode(sellerId, productionCode)
+        productRepository.findBySellerAndCode(sellerId, productionCode)
                 .ifPresent(existingProduction -> {
                     throw new ProductionException(PRODUCT_CODE_ALREADY_REGISTERED);
                 });
@@ -69,8 +69,8 @@ public class ProductionPolicy {
         }
 
         // 2. 이미 등록된 옵션코드와 중복 체크
-        List<Production> duplicatedOptions =
-                productionOptionRepository.findByProductionCodeAndOptionCodeIn(
+        List<Product> duplicatedOptions =
+                productOptionRepository.findByProductCodeAndOptionCodeIn(
                         productionCode, deduplicatedOptionCodes.stream().toList());
         if (!duplicatedOptions.isEmpty()) {
             throw new ProductionException(PRODUCT_OPTION_CODE_ALREADY_REGISTERED);

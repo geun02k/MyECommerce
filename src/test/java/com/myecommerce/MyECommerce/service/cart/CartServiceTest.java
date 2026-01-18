@@ -5,10 +5,10 @@ import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ServiceCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
-import com.myecommerce.MyECommerce.entity.production.Production;
-import com.myecommerce.MyECommerce.entity.production.ProductionOption;
+import com.myecommerce.MyECommerce.entity.product.Product;
+import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.mapper.ServiceCartMapper;
-import com.myecommerce.MyECommerce.repository.production.ProductionOptionRepository;
+import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import org.junit.jupiter.api.DisplayName;
@@ -45,7 +45,7 @@ class CartServiceTest {
     private RedisMultiDataService redisMultiDataService;
 
     @Mock
-    private ProductionOptionRepository productionOptionRepository;
+    private ProductOptionRepository productOptionRepository;
 
     @InjectMocks
     private CartService cartService;
@@ -65,13 +65,13 @@ class CartServiceTest {
                 .build();
 
         // DB 상품정보
-        ProductionOption foundOption = ProductionOption.builder()
+        ProductOption foundOption = ProductOption.builder()
                 .id(10L)
                 .optionCode("optionCode")
                 .optionName("상품옵션명")
                 .price(new BigDecimal(10000))
                 .quantity(500)
-                .production(Production.builder()
+                .product(Product.builder()
                         .id(1L)
                         .name("상품명")
                         .build())
@@ -81,8 +81,8 @@ class CartServiceTest {
                 .optionName(foundOption.getOptionName())
                 .price(foundOption.getPrice())
                 .quantity(foundOption.getQuantity())
-                .productId(foundOption.getProduction().getId())
-                .productName(foundOption.getProduction().getName())
+                .productId(foundOption.getProduct().getId())
+                .productName(foundOption.getProduct().getName())
                 .build();
         // Redis 장바구니 상품정보 단건
         Map<Object, Object> orgOption = new HashMap<>();
@@ -124,7 +124,7 @@ class CartServiceTest {
                         .build());
 
         // stub(가설) : productionOptionRepository.findById() 실행 시 DB에서 상품옵션ID에 해당하는 상품옵션 반환 예상.
-        given(productionOptionRepository.findById(eq(requestCartDto.getOptionId())))
+        given(productOptionRepository.findById(eq(requestCartDto.getOptionId())))
                 .willReturn(Optional.of(foundOption));
 
         // stub(가설) : redisSingleDataService.getSingleHashValueData() 실행 시
@@ -173,7 +173,7 @@ class CartServiceTest {
         assertEquals(foundOption.getOptionName(), responseCartDto.getOptionName());
         assertEquals(foundOption.getPrice(), responseCartDto.getPrice());
         assertEquals(2, responseCartDto.getQuantity());
-        assertEquals(foundOption.getProduction().getId(), responseCartDto.getProductId());
-        assertEquals(foundOption.getProduction().getName(), responseCartDto.getProductName());
+        assertEquals(foundOption.getProduct().getId(), responseCartDto.getProductId());
+        assertEquals(foundOption.getProduct().getName(), responseCartDto.getProductName());
     }
 }

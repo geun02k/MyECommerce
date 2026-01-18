@@ -4,11 +4,11 @@ import com.myecommerce.MyECommerce.dto.production.ServiceProductionDto;
 import com.myecommerce.MyECommerce.dto.production.ServiceProductionOptionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
-import com.myecommerce.MyECommerce.entity.production.Production;
-import com.myecommerce.MyECommerce.entity.production.ProductionOption;
+import com.myecommerce.MyECommerce.entity.product.ProductOption;
+import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.exception.ProductionException;
-import com.myecommerce.MyECommerce.repository.production.ProductionOptionRepository;
-import com.myecommerce.MyECommerce.repository.production.ProductionRepository;
+import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,9 +30,9 @@ import static org.mockito.BDDMockito.given;
 class ProductionPolicyTest {
 
     @Mock
-    ProductionRepository productionRepository;
+    ProductRepository productRepository;
     @Mock
-    ProductionOptionRepository productionOptionRepository;
+    ProductOptionRepository productOptionRepository;
 
     @InjectMocks
     ProductionPolicy productionPolicy;
@@ -100,10 +100,10 @@ class ProductionPolicyTest {
                 .options(new ArrayList<>(List.of(option)))
                 .build();
 
-        given(productionRepository.findBySellerAndCode(anyLong(), anyString()))
+        given(productRepository.findBySellerAndCode(anyLong(), anyString()))
                 .willReturn(Optional.empty());
-        given(productionOptionRepository
-                .findByProductionCodeAndOptionCodeIn(anyString(), anyList()))
+        given(productOptionRepository
+                .findByProductCodeAndOptionCodeIn(anyString(), anyList()))
                 .willReturn(Collections.emptyList());
 
         // when
@@ -120,9 +120,9 @@ class ProductionPolicyTest {
         Member seller = seller();
 
         // 이미 등록된 동일 상품코드 존재
-        given(productionRepository
+        given(productRepository
                 .findBySellerAndCode(seller.getId(), production.getCode()))
-                .willReturn(Optional.of(Production.builder()
+                .willReturn(Optional.of(Product.builder()
                                 .id(1L)
                                 .code(production.getCode())
                                 .build()));
@@ -145,7 +145,7 @@ class ProductionPolicyTest {
                 createOptionForInsert("optionCode01"))); // 중복
         Member seller = seller();
 
-        given(productionRepository.
+        given(productRepository.
                 findBySellerAndCode(seller.getId(), production.getCode()))
                 .willReturn(Optional.empty());
 
@@ -164,16 +164,16 @@ class ProductionPolicyTest {
         ServiceProductionDto production = createProductionForInsert();
         Member seller = seller();
 
-        given(productionRepository.
+        given(productRepository.
                 findBySellerAndCode(seller.getId(), production.getCode()))
                 .willReturn(Optional.empty());
         // 이미 등록된 기존 동일 옵션코드 존재
-        given(productionOptionRepository.
-                findByProductionCodeAndOptionCodeIn(
+        given(productOptionRepository.
+                findByProductCodeAndOptionCodeIn(
                         production.getCode(), List.of("optionCode")))
-                .willReturn(List.of(Production.builder()
+                .willReturn(List.of(Product.builder()
                                     .code("code")
-                                    .options(List.of(ProductionOption.builder()
+                                    .options(List.of(ProductOption.builder()
                                             .optionCode("optionCode")
                                             .build()))
                                     .build()));
@@ -194,7 +194,7 @@ class ProductionPolicyTest {
     @DisplayName("상품수정정책 통과")
     void validateModify_shouldPass_whenAllValid() {
         // given
-        Production production = Production.builder()
+        Product production = Product.builder()
                 .code("code")
                 .saleStatus(ON_SALE)
                 .build();
@@ -204,7 +204,7 @@ class ProductionPolicyTest {
                         .optionCode("insertOptionCode")
                         .build();
 
-        given(productionOptionRepository.findByProductionCodeAndOptionCodeIn(
+        given(productOptionRepository.findByProductCodeAndOptionCodeIn(
                 "code", List.of("insertOptionCode")))
                 .willReturn(Collections.emptyList());
 
@@ -218,7 +218,7 @@ class ProductionPolicyTest {
     @DisplayName("상품수정정책 실패 - 판매상태가 삭제이면 예외발생")
     void validateModify_shouldFail_whenDeletionSaleStatus() {
         // given
-        Production deletedProduction = Production.builder()
+        Product deletedProduction = Product.builder()
                 .saleStatus(DELETION).build();
 
         // when
@@ -233,7 +233,7 @@ class ProductionPolicyTest {
     @DisplayName("상품수정정책 실패 - 신규 옵션 중 옵션코드 중복되면 예외발생")
     void validateModify_shouldFail_whenDuplicatedOptionCode() {
         // given
-        Production production = Production.builder()
+        Product production = Product.builder()
                 .saleStatus(ON_SALE)
                 .build();
         List<ServiceProductionOptionDto> invalidOptions = List.of(
@@ -251,7 +251,7 @@ class ProductionPolicyTest {
     @DisplayName("상품수정정책 실패 - 신규 옵션 중 이미 등록된 옵션코드를 추가하면 예외발생")
     void validateModify_shouldFail_whenAlreadyRegisteredOptionCode() {
         // given
-        Production production = Production.builder()
+        Product production = Product.builder()
                 .code("code")
                 .saleStatus(ON_SALE)
                 .build();
@@ -259,12 +259,12 @@ class ProductionPolicyTest {
                 createOptionForInsert("insertOptionCode");
 
         // 이미 등록된 기존 동일 옵션코드 존재
-        given(productionOptionRepository.
-                findByProductionCodeAndOptionCodeIn(
+        given(productOptionRepository.
+                findByProductCodeAndOptionCodeIn(
                         production.getCode(), List.of("insertOptionCode")))
-                .willReturn(List.of(Production.builder()
+                .willReturn(List.of(Product.builder()
                         .code("code")
-                        .options(List.of(ProductionOption.builder()
+                        .options(List.of(ProductOption.builder()
                                 .optionCode("insertOptionCode")
                                 .build()))
                         .build()));

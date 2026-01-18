@@ -5,11 +5,11 @@ import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ServiceCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
-import com.myecommerce.MyECommerce.entity.production.ProductionOption;
+import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.exception.CartException;
 import com.myecommerce.MyECommerce.exception.ProductionException;
 import com.myecommerce.MyECommerce.mapper.ServiceCartMapper;
-import com.myecommerce.MyECommerce.repository.production.ProductionOptionRepository;
+import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +36,7 @@ public class CartService {
     private final RedisSingleDataService redisSingleDataService;
     private final RedisMultiDataService redisMultiDataService;
 
-    private final ProductionOptionRepository productionOptionRepository;
+    private final ProductOptionRepository productOptionRepository;
 
     /** 장바구니 상품 등록 **/
     @Transactional
@@ -106,8 +106,8 @@ public class CartService {
     // 상품옵션ID에 해당하는 상품옵션 Entity 조회해 ServiceCartDto로 변환해 반환
     private ServiceCartDto findOptionDtoById(Long optionId) {
         // 상품옵션조회
-        ProductionOption foundOption =
-                productionOptionRepository.findById(optionId)
+        ProductOption foundOption =
+                productOptionRepository.findById(optionId)
                         .orElseThrow(() -> new ProductionException(PRODUCT_NOT_EXIST));
 
         // entity -> dto 변환

@@ -2,11 +2,11 @@ package com.myecommerce.MyECommerce.service.production;
 
 import com.myecommerce.MyECommerce.dto.production.*;
 import com.myecommerce.MyECommerce.entity.member.Member;
-import com.myecommerce.MyECommerce.entity.production.Production;
-import com.myecommerce.MyECommerce.entity.production.ProductionOption;
+import com.myecommerce.MyECommerce.entity.product.ProductOption;
+import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.mapper.*;
-import com.myecommerce.MyECommerce.repository.production.ProductionOptionRepository;
-import com.myecommerce.MyECommerce.repository.production.ProductionRepository;
+import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.type.ProductionCategoryType;
 import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
 import org.junit.jupiter.api.DisplayName;
@@ -38,9 +38,9 @@ class ProductionServiceTest {
     @Mock
     private ProductionPolicy productionPolicy;
     @Mock
-    private ProductionRepository productionRepository;
+    private ProductRepository productRepository;
     @Mock
-    private ProductionOptionRepository productionOptionRepository;
+    private ProductOptionRepository productOptionRepository;
     @Mock
     private ServiceProductionMapper serviceProductionMapper;
 
@@ -101,15 +101,15 @@ class ProductionServiceTest {
                         .category(category)
                         .options(Collections.singletonList(serviceOptionDto))
                         .build();
-        ProductionOption expectedEntityServiceOptionDto =
-                ProductionOption.builder()
+        ProductOption expectedEntityServiceOptionDto =
+                ProductOption.builder()
                         .optionCode(optionCode)
                         .optionName(optionName)
                         .price(price)
                         .quantity(quantity)
                         .build();
-        Production expectedEntityOfServiceProductionDto =
-                Production.builder()
+        Product expectedEntityOfServiceProductionDto =
+                Product.builder()
                         .code(productionCode)
                         .name(productionName)
                         .category(category)
@@ -118,14 +118,14 @@ class ProductionServiceTest {
                         .build();
 
         // 저장할 상품옵션 Entity
-        ProductionOption optionEntity = ProductionOption.builder()
+        ProductOption optionEntity = ProductOption.builder()
                 .optionCode(optionCode)
                 .optionName(optionName)
                 .price(price)
                 .quantity(quantity)
                 .build();
         // 저장할 상품 Entity
-        Production productionEntity  = Production.builder()
+        Product productionEntity  = Product.builder()
                 .seller(member.getId())
                 .code(requestProductionDto.getCode())
                 .name(requestProductionDto.getName())
@@ -135,7 +135,7 @@ class ProductionServiceTest {
                 .build();
 
         // 저장된 상품 Entity
-        Production expectedProductionEntity = Production.builder()
+        Product expectedProductionEntity = Product.builder()
                 .id(1L)
                 .seller(productionEntity.getSeller())
                 .code(productionEntity.getCode())
@@ -146,13 +146,13 @@ class ProductionServiceTest {
                 .options(null)
                 .build();
         // 저장된 상품옵션 Entity
-        ProductionOption expectedOptionEntity = ProductionOption.builder()
+        ProductOption expectedOptionEntity = ProductOption.builder()
                 .id(1L)
                 .optionCode(optionEntity.getOptionCode())
                 .optionName(optionEntity.getOptionName())
                 .price(optionEntity.getPrice())
                 .quantity(optionEntity.getQuantity())
-                .production(expectedProductionEntity)
+                .product(expectedProductionEntity)
                 .build();
         // response 상품 DTO
         ResponseProductionDto expectedProductionDto = ResponseProductionDto.builder()
@@ -170,16 +170,16 @@ class ProductionServiceTest {
         given(serviceProductionMapper.toEntity(serviceProductionDto))
                 .willReturn(expectedEntityOfServiceProductionDto);
 
-        ArgumentCaptor<Production> productionCaptor =
-                ArgumentCaptor.forClass(Production.class);
-        ArgumentCaptor<ProductionOption> optionCaptor =
-                ArgumentCaptor.forClass(ProductionOption.class);
+        ArgumentCaptor<Product> productionCaptor =
+                ArgumentCaptor.forClass(Product.class);
+        ArgumentCaptor<ProductOption> optionCaptor =
+                ArgumentCaptor.forClass(ProductOption.class);
         // stub(가설) : productionRepository.save() 실행 시 expectedProductionEntity 반환 예상.
-        given(productionRepository.save(productionCaptor.capture()))
+        given(productRepository.save(productionCaptor.capture()))
                 .willReturn(expectedProductionEntity);
         // stub(가설) : productionOptionRepository.save() 실행 시
-        // expectedProductionEntity 정보를 포함한 ProductionOption Entity 반환 예상.
-        given(productionOptionRepository.save(optionCaptor.capture()))
+        // expectedProductionEntity 정보를 포함한 ProductOption Entity 반환 예상.
+        given(productOptionRepository.save(optionCaptor.capture()))
                 .willReturn(expectedOptionEntity);
 
         // stub(가설) : productionMapper.toDto() 실행 시 productionEntity에 대한 DTO 반환 예상.
@@ -193,12 +193,12 @@ class ProductionServiceTest {
         // then
         verify(productionPolicy, times(1))
                 .validateRegister(serviceProductionDto, member);
-        verify(productionRepository, times(1))
+        verify(productRepository, times(1))
                 .save(productionCaptor.capture());
-        verify(productionOptionRepository, times(1))
+        verify(productOptionRepository, times(1))
                 .save(optionCaptor.capture());
         // 상품 전달인자 검증
-        Production capturedProduction = productionCaptor.getValue();
+        Product capturedProduction = productionCaptor.getValue();
         assertNull(capturedProduction.getId());
         assertEquals(productionCode, capturedProduction.getCode());
         assertEquals(productionName, capturedProduction.getName());
@@ -207,7 +207,7 @@ class ProductionServiceTest {
         assertEquals(member.getId(), capturedProduction.getSeller());
         assertNull(capturedProduction.getOptions());
         // 상품옵션 전달인자 검증
-        ProductionOption capturedOption = optionCaptor.getAllValues().get(0);
+        ProductOption capturedOption = optionCaptor.getAllValues().get(0);
         assertNull(capturedOption.getId());
         assertEquals(optionCode, capturedOption.getOptionCode());
         assertEquals(quantity, capturedOption.getQuantity());
@@ -226,8 +226,8 @@ class ProductionServiceTest {
         assertEquals(reqOptFromReqProduction.getOptionName(), expectedOptionEntity.getOptionName());
         assertEquals(reqOptFromReqProduction.getPrice(), expectedOptionEntity.getPrice());
         assertEquals(reqOptFromReqProduction.getQuantity(), expectedOptionEntity.getQuantity());
-        assertEquals(expectedProductionEntity, expectedOptionEntity.getProduction());
-        assertEquals(expectedOptionEntity.getId(), expectedOptionEntity.getProduction().getId());
+        assertEquals(expectedProductionEntity, expectedOptionEntity.getProduct());
+        assertEquals(expectedOptionEntity.getId(), expectedOptionEntity.getProduct().getId());
     }
 
     @Test
@@ -289,7 +289,7 @@ class ProductionServiceTest {
                 .build();
 
         // 수정을 위한 요청 상품옵션 Entity
-        ProductionOption updateReqOptEntity = ProductionOption.builder()
+        ProductOption updateReqOptEntity = ProductOption.builder()
                 .id(requestUpdateOptionDto.getId())
                 .optionCode(requestUpdateOptionDto.getOptionCode())
                 .optionName(requestUpdateOptionDto.getOptionName())
@@ -297,7 +297,7 @@ class ProductionServiceTest {
                 .quantity(requestUpdateOptionDto.getQuantity())
                 .build();
         // 신규 등록을 위한 요청 상품옵션 Entity
-        ProductionOption insertReqOptEntity = ProductionOption.builder()
+        ProductOption insertReqOptEntity = ProductOption.builder()
                 .optionCode(requestInsertOptionDto.getOptionCode())
                 .optionName(requestInsertOptionDto.getOptionName())
                 .price(requestInsertOptionDto.getPrice())
@@ -305,7 +305,7 @@ class ProductionServiceTest {
                 .build();
 
         // 조회된 업데이트를 위한 상품옵션 Entity (dirty checking entity)
-        ProductionOption originOptionEntity = ProductionOption.builder()
+        ProductOption originOptionEntity = ProductOption.builder()
                 .id(existingOptionId)
                 .optionCode(existingOptionCode)
                 .optionName(existingOptionName)
@@ -313,7 +313,7 @@ class ProductionServiceTest {
                 .quantity(existingQuantity)
                 .build();
         // 조회된 업데이트를 위한 상품 Entity (dirty checking entity)
-        Production originProductionEntity = Production.builder()
+        Product originProductionEntity = Product.builder()
                 .id(productionId)
                 .seller(member.getId())
                 .code(productionCode)
@@ -358,13 +358,13 @@ class ProductionServiceTest {
                 .options(serviceOptionDtoList)
                 .build();
 
-        ProductionOption insertUpdateOptionEntity =
-                ProductionOption.builder()
+        ProductOption insertUpdateOptionEntity =
+                ProductOption.builder()
                         .id(existingOptionId)
                         .quantity(updateQuantity)
                         .build();
-        ProductionOption insertOptionDtoEntity =
-                ProductionOption.builder()
+        ProductOption insertOptionDtoEntity =
+                ProductOption.builder()
                         .optionCode(optionCode)
                         .optionName(optionName)
                         .price(price)
@@ -379,12 +379,12 @@ class ProductionServiceTest {
                 .willReturn(insertOptionDtoEntity);
 
         // stub(가설) : productionRepository.findByIdAndSeller() 실행 시 productionEntity 반환 예상.
-        given(productionRepository.findByIdAndSeller(
+        given(productRepository.findByIdAndSeller(
                 eq(requestProductionDto.getId()), eq(member.getId())))
                 .willReturn(Optional.of(originProductionEntity));
 
         // ArgumentCaptor 생성
-        ArgumentCaptor<Production> productionCaptor = ArgumentCaptor.forClass(Production.class);
+        ArgumentCaptor<Product> productionCaptor = ArgumentCaptor.forClass(Product.class);
 
         // stub(가설) : productionMapper.toDto() 실행 시 productionCaptor로 인자를 캡처하도록 설정.
         given(serviceProductionMapper.toDto(productionCaptor.capture()))
@@ -398,7 +398,7 @@ class ProductionServiceTest {
         verify(productionPolicy, times(1))
                 .validateModify(any(), any());
         // 0. toDto에 전달된 인자 캡처 후 검증
-        Production capturedProduction = productionCaptor.getValue();
+        Product capturedProduction = productionCaptor.getValue();
         assertEquals(requestProductionDto.getId(), capturedProduction.getId());
         assertEquals(requestProductionDto.getDescription(), capturedProduction.getDescription());
         assertEquals(requestProductionDto.getSaleStatus(), capturedProduction.getSaleStatus());
@@ -413,12 +413,12 @@ class ProductionServiceTest {
         assertEquals(originProductionEntity.getCategory(), responseProductionDto.getCategory());
         // 2. 상품옵션 수정 검증
         RequestModifyProductionOptionDto requestUpdateOption = requestProductionDto.getOptions().get(0);
-        ProductionOption responseUpdatedOption = capturedProduction.getOptions().get(0);
+        ProductOption responseUpdatedOption = capturedProduction.getOptions().get(0);
         assertEquals(requestUpdateOption.getId(), responseUpdatedOption.getId());
         assertEquals(requestUpdateOption.getQuantity(), responseUpdatedOption.getQuantity());
         // 3. 상품옵션 신규등록 검증
         RequestModifyProductionOptionDto requestInsertOption = requestProductionDto.getOptions().get(1);
-        ProductionOption responseInsertedOption = capturedProduction.getOptions().get(1);
+        ProductOption responseInsertedOption = capturedProduction.getOptions().get(1);
         assertNull(requestInsertOption.getId());
         assertNotNull(responseInsertedOption);
     }

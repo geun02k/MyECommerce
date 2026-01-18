@@ -1,4 +1,4 @@
-package com.myecommerce.MyECommerce.entity.production;
+package com.myecommerce.MyECommerce.entity.product;
 
 import com.myecommerce.MyECommerce.entity.BaseEntity;
 import jakarta.persistence.*;
@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class ProductionOption extends BaseEntity {
+public class ProductOption extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,7 +35,7 @@ public class ProductionOption extends BaseEntity {
     private int quantity;
 
     @ManyToOne
-    @JoinColumn(name="productionId") // 테이블 매핑 시 foreign key 지정
-    private Production production;
+    @JoinColumn(name="productId") // 테이블 매핑 시 foreign key 지정
+    private Product product;
 
 }

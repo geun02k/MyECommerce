@@ -1,6 +1,6 @@
 package com.myecommerce.MyECommerce.service.product;
 
-import com.myecommerce.MyECommerce.dto.product.ServiceProductionDto;
+import com.myecommerce.MyECommerce.dto.product.ServiceProductDto;
 import com.myecommerce.MyECommerce.dto.product.ServiceProductionOptionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.product.Product;
@@ -26,7 +26,7 @@ public class ProductPolicy {
     private final ProductOptionRepository productOptionRepository;
 
     /** 등록 정책 검증 **/
-    public void validateRegister(ServiceProductionDto productDto,
+    public void validateRegister(ServiceProductDto productDto,
                                  Member member) {
         // 판매자별 상품코드 중복체크 정책
         enforceProductCodeUniquenessPolicy(

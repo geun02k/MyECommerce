@@ -42,7 +42,7 @@ public class ProductService {
             RequestProductionDto requestProductionDto, Member member) {
 
         // requestDto -> serviceDto 변환
-        ServiceProductionDto serviceProductionDto =
+        ServiceProductDto serviceProductionDto =
                 serviceProductMapper.toServiceDto(requestProductionDto);
 
         // 정책 검증
@@ -65,7 +65,7 @@ public class ProductService {
             RequestModifyProductionDto requestProductionDto, Member member) {
 
         // requestDto -> ServiceDto 변환
-        ServiceProductionDto serviceProductionDto =
+        ServiceProductDto serviceProductionDto =
                 serviceProductMapper.toServiceDto(requestProductionDto);
         List<ServiceProductionOptionDto> serviceOptionDtoListForUpdate =
                 filterUpdateOptions(serviceProductionDto.getOptions());
@@ -192,7 +192,7 @@ public class ProductService {
 
     // 상품 Entity 데이터 변경
     private void updateProduction(Product production,
-                                  ServiceProductionDto serviceProductionDto) {
+                                  ServiceProductDto serviceProductionDto) {
         production.setDescription(serviceProductionDto.getDescription());
         production.setSaleStatus(serviceProductionDto.getSaleStatus());
     }

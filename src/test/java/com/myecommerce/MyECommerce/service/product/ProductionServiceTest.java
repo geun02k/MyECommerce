@@ -94,8 +94,8 @@ class ProductionServiceTest {
                         .price(price)
                         .quantity(quantity)
                         .build();
-        ServiceProductionDto serviceProductionDto =
-                ServiceProductionDto.builder()
+        ServiceProductDto serviceProductionDto =
+                ServiceProductDto.builder()
                         .code(productionCode)
                         .name(productionName)
                         .category(category)
@@ -350,8 +350,8 @@ class ProductionServiceTest {
         List<ServiceProductionOptionDto> serviceOptionDtoList =
                 List.of(serviceUpdateOptionDto, serviceInsertOptionDto);
 
-        ServiceProductionDto serviceProductionDto =
-        ServiceProductionDto.builder()
+        ServiceProductDto serviceProductionDto =
+                ServiceProductDto.builder()
                 .id(productionId)
                 .description(updateDescription)
                 .saleStatus(updateSaleStatus)

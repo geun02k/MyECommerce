@@ -11,7 +11,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ServiceProductionDto {
+public class ServiceProductDto {
     private Long id;
     private String code;
     private String name;

@@ -1,6 +1,6 @@
 package com.myecommerce.MyECommerce.service.product;
 
-import com.myecommerce.MyECommerce.dto.product.ServiceProductionDto;
+import com.myecommerce.MyECommerce.dto.product.ServiceProductDto;
 import com.myecommerce.MyECommerce.dto.product.ServiceProductionOptionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
@@ -42,10 +42,10 @@ class ProductionPolicyTest {
        ------------------ */
 
     /** 신규옵션 포함 상품 */
-    ServiceProductionDto createProductionForInsert() {
+    ServiceProductDto createProductionForInsert() {
         ServiceProductionOptionDto option =
                 createOptionForInsert("optionCode");
-        return ServiceProductionDto.builder()
+        return ServiceProductDto.builder()
                         .id(null)
                         .code("code")
                         .saleStatus(null)
@@ -62,8 +62,8 @@ class ProductionPolicyTest {
     }
 
     /** 옵션 미포함 상품 */
-    ServiceProductionDto createProductionWithoutOptionsForInsert() {
-        return ServiceProductionDto.builder()
+    ServiceProductDto createProductionWithoutOptionsForInsert() {
+        return ServiceProductDto.builder()
                 .id(null)
                 .code("code")
                 .saleStatus(null)
@@ -93,7 +93,7 @@ class ProductionPolicyTest {
                 .id(null)
                 .optionCode("optionCode")
                 .build();
-        ServiceProductionDto production = ServiceProductionDto.builder()
+        ServiceProductDto production = ServiceProductDto.builder()
                 .id(null)
                 .code("code")
                 .saleStatus(null)
@@ -116,7 +116,7 @@ class ProductionPolicyTest {
     @DisplayName("상품등록정책실패 - 판매자별 상품코드 중복 발생 시 예외발생")
     void validationRegister_shouldThrowException_whenDuplicatedProductionCode() {
         // given
-        ServiceProductionDto production = createProductionForInsert();
+        ServiceProductDto production = createProductionForInsert();
         Member seller = seller();
 
         // 이미 등록된 동일 상품코드 존재
@@ -139,7 +139,7 @@ class ProductionPolicyTest {
     @DisplayName("상품등록정책실패 - 중복된 옵션코드 입력 시 예외발생")
     void validateRegister_shouldThrowException_whenDuplicatedOptionCodeRequest() {
         // given
-        ServiceProductionDto production = createProductionWithoutOptionsForInsert();
+        ServiceProductDto production = createProductionWithoutOptionsForInsert();
         production.setOptions(List.of(
                 createOptionForInsert("optionCode01"),
                 createOptionForInsert("optionCode01"))); // 중복
@@ -161,7 +161,7 @@ class ProductionPolicyTest {
     @DisplayName("상품등록정책실패 - 이미 등록된 옵션코드 입력 시 예외발생")
     void validateRegister_shouldThrowException_whenAlreadyRegisteredOptionCode() {
        // given
-        ServiceProductionDto production = createProductionForInsert();
+        ServiceProductDto production = createProductionForInsert();
         Member seller = seller();
 
         given(productRepository.

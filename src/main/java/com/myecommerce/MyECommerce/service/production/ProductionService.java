@@ -35,7 +35,7 @@ public class ProductionService {
     private final ProductRepository productRepository;
     private final ProductOptionRepository productOptionRepository;
 
-    private final ServiceProductionMapper serviceProductionMapper;
+    private final ServiceProductMapper serviceProductMapper;
 
     /** 상품등록 **/
     @Transactional
@@ -44,20 +44,20 @@ public class ProductionService {
 
         // requestDto -> serviceDto 변환
         ServiceProductionDto serviceProductionDto =
-                serviceProductionMapper.toServiceDto(requestProductionDto);
+                serviceProductMapper.toServiceDto(requestProductionDto);
 
         // 정책 검증
         productionPolicy.validateRegister(serviceProductionDto, member);
 
         // serviceDto -> entity 변환
-        Product production = serviceProductionMapper.toEntity(serviceProductionDto);
+        Product production = serviceProductMapper.toEntity(serviceProductionDto);
 
         // 상품, 옵션 등록
         Product savedProduction = saveProduction(production, member);
         saveProductionOptions(savedProduction, production.getOptions());
 
         // 상품, 상품옵션목록 반환
-        return serviceProductionMapper.toDto(savedProduction);
+        return serviceProductMapper.toDto(savedProduction);
     }
 
     /** 상품수정 **/
@@ -67,7 +67,7 @@ public class ProductionService {
 
         // requestDto -> ServiceDto 변환
         ServiceProductionDto serviceProductionDto =
-                serviceProductionMapper.toServiceDto(requestProductionDto);
+                serviceProductMapper.toServiceDto(requestProductionDto);
         List<ServiceProductionOptionDto> serviceOptionDtoListForUpdate =
                 filterUpdateOptions(serviceProductionDto.getOptions());
         List<ServiceProductionOptionDto> serviceOptionDtoListForInsert =
@@ -87,11 +87,11 @@ public class ProductionService {
         // 수정, 신규 등록 옵션 목록 dto -> entity 변환
         List<ProductOption> updateTargetOptions =
                 serviceOptionDtoListForUpdate.stream()
-                        .map(serviceProductionMapper::toOptionEntity)
+                        .map(serviceProductMapper::toOptionEntity)
                         .toList();
         List<ProductOption> insertTargetOptions =
                 serviceOptionDtoListForInsert.stream()
-                        .map(serviceProductionMapper::toOptionEntity)
+                        .map(serviceProductMapper::toOptionEntity)
                         .toList();
 
         // 상품 설명, 판매상태 변경
@@ -102,12 +102,12 @@ public class ProductionService {
         insertOptions(targetProduction, insertTargetOptions);
 
         // 상품, 상품옵션목록 반환
-        return serviceProductionMapper.toDto(targetProduction);
+        return serviceProductMapper.toDto(targetProduction);
     }
 
     /** 상품상세조회 **/
     public ResponseSearchDetailProductionDto searchDetailProduction(Long id) {
-        return serviceProductionMapper.toSearchDetailDto(
+        return serviceProductMapper.toSearchDetailDto(
                 productRepository.findById(id)
                         .orElseThrow(() ->
                                 new ProductionException(PRODUCT_NOT_EXIST)));
@@ -118,7 +118,7 @@ public class ProductionService {
             RequestSearchProductionDto requestDto) {
         // 정렬순서에 따른 상품목록조회 & entity -> dto로 변환
         return getSortedProductions(requestDto)
-                        .map(serviceProductionMapper::toDto);
+                        .map(serviceProductMapper::toDto);
     }
 
     // 상품 insert

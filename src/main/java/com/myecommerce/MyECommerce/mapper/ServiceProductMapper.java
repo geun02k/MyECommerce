@@ -7,12 +7,12 @@ import org.mapstruct.Mapper;
 import org.mapstruct.factory.Mappers;
 
 @Mapper(componentModel = "spring")
-public interface ServiceProductionMapper {
+public interface ServiceProductMapper {
 
-    ServiceProductionMapper INSTANCE = Mappers.getMapper(ServiceProductionMapper.class);
+    ServiceProductMapper INSTANCE = Mappers.getMapper(ServiceProductMapper.class);
 
-    ServiceProductionDto toServiceDto(RequestProductionDto productionDto);
-    ServiceProductionDto toServiceDto(RequestModifyProductionDto productionDto);
+    ServiceProductionDto toServiceDto(RequestProductionDto productDto);
+    ServiceProductionDto toServiceDto(RequestModifyProductionDto productDto);
 
     ResponseSearchDetailProductionDto toSearchDetailDto(Product product);
     ResponseProductionDto toDto(Product product);

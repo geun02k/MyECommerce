@@ -42,7 +42,7 @@ class ProductionServiceTest {
     @Mock
     private ProductOptionRepository productOptionRepository;
     @Mock
-    private ServiceProductionMapper serviceProductionMapper;
+    private ServiceProductMapper serviceProductMapper;
 
     @InjectMocks
     private ProductionService productionService;
@@ -165,9 +165,9 @@ class ProductionServiceTest {
                 .saleStatus(ON_SALE)
                 .build();
 
-        given(serviceProductionMapper.toServiceDto(requestProductionDto))
+        given(serviceProductMapper.toServiceDto(requestProductionDto))
                 .willReturn(serviceProductionDto);
-        given(serviceProductionMapper.toEntity(serviceProductionDto))
+        given(serviceProductMapper.toEntity(serviceProductionDto))
                 .willReturn(expectedEntityOfServiceProductionDto);
 
         ArgumentCaptor<Product> productionCaptor =
@@ -183,7 +183,7 @@ class ProductionServiceTest {
                 .willReturn(expectedOptionEntity);
 
         // stub(가설) : productionMapper.toDto() 실행 시 productionEntity에 대한 DTO 반환 예상.
-        given(serviceProductionMapper.toDto(expectedProductionEntity))
+        given(serviceProductMapper.toDto(expectedProductionEntity))
                 .willReturn(expectedProductionDto);
 
         // when
@@ -371,11 +371,11 @@ class ProductionServiceTest {
                         .quantity(quantity)
                         .build();
 
-        given(serviceProductionMapper.toServiceDto(requestProductionDto))
+        given(serviceProductMapper.toServiceDto(requestProductionDto))
                 .willReturn(serviceProductionDto);
-        given(serviceProductionMapper.toOptionEntity(serviceUpdateOptionDto))
+        given(serviceProductMapper.toOptionEntity(serviceUpdateOptionDto))
                 .willReturn(insertUpdateOptionEntity);
-        given(serviceProductionMapper.toOptionEntity(serviceInsertOptionDto))
+        given(serviceProductMapper.toOptionEntity(serviceInsertOptionDto))
                 .willReturn(insertOptionDtoEntity);
 
         // stub(가설) : productionRepository.findByIdAndSeller() 실행 시 productionEntity 반환 예상.
@@ -387,7 +387,7 @@ class ProductionServiceTest {
         ArgumentCaptor<Product> productionCaptor = ArgumentCaptor.forClass(Product.class);
 
         // stub(가설) : productionMapper.toDto() 실행 시 productionCaptor로 인자를 캡처하도록 설정.
-        given(serviceProductionMapper.toDto(productionCaptor.capture()))
+        given(serviceProductMapper.toDto(productionCaptor.capture()))
                 .willReturn(expectedResultProductionDto);
 
         // when

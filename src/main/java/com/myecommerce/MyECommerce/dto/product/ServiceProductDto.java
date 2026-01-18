@@ -18,5 +18,5 @@ public class ServiceProductDto {
     private ProductCategoryType category;
     private String description;
     private ProductSaleStatusType saleStatus;
-    private List<ServiceProductionOptionDto> options;
+    private List<ServiceProductOptionDto> options;
 }

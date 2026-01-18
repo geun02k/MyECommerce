@@ -67,9 +67,9 @@ public class ProductService {
         // requestDto -> ServiceDto 변환
         ServiceProductDto serviceProductDto =
                 serviceProductMapper.toServiceDto(requestProductDto);
-        List<ServiceProductionOptionDto> serviceOptionDtoListForUpdate =
+        List<ServiceProductOptionDto> serviceOptionDtoListForUpdate =
                 filterUpdateOptions(serviceProductDto.getOptions());
-        List<ServiceProductionOptionDto> serviceOptionDtoListForInsert =
+        List<ServiceProductOptionDto> serviceOptionDtoListForInsert =
                 filterInsertOptions(serviceProductDto.getOptions());
 
         // 상품 조회
@@ -148,8 +148,8 @@ public class ProductService {
     }
 
     // 수정할 옵션목록 반환
-    private List<ServiceProductionOptionDto> filterUpdateOptions(
-            List<ServiceProductionOptionDto> optionDtoList) {
+    private List<ServiceProductOptionDto> filterUpdateOptions(
+            List<ServiceProductOptionDto> optionDtoList) {
         return optionDtoList.stream()
                 .filter(option ->
                         option.getId() != null && option.getId() > 0)
@@ -157,8 +157,8 @@ public class ProductService {
     }
 
     // 신규 저장할 옵션목록 반환
-    private List<ServiceProductionOptionDto> filterInsertOptions(
-            List<ServiceProductionOptionDto> optionDtoList) {
+    private List<ServiceProductOptionDto> filterInsertOptions(
+            List<ServiceProductOptionDto> optionDtoList) {
         return optionDtoList.stream()
                 .filter(option ->
                         option.getId() == null || option.getId() <= 0)
@@ -167,7 +167,7 @@ public class ProductService {
 
     // 상품수정 사전 validation check
     private void validateOptionIdsForUpdate(
-            Product product, List<ServiceProductionOptionDto> serviceOptionDtoList) {
+            Product product, List<ServiceProductOptionDto> serviceOptionDtoList) {
         // 1. 기존옵션ID목록 Set으로 변환
         Set<Long> optionIds = product.getOptions().stream()
                 .map(ProductOption::getId)

@@ -1,7 +1,7 @@
 package com.myecommerce.MyECommerce.service.product;
 
 import com.myecommerce.MyECommerce.dto.product.ServiceProductDto;
-import com.myecommerce.MyECommerce.dto.product.ServiceProductionOptionDto;
+import com.myecommerce.MyECommerce.dto.product.ServiceProductOptionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
@@ -43,7 +43,7 @@ class ProductionPolicyTest {
 
     /** 신규옵션 포함 상품 */
     ServiceProductDto createProductionForInsert() {
-        ServiceProductionOptionDto option =
+        ServiceProductOptionDto option =
                 createOptionForInsert("optionCode");
         return ServiceProductDto.builder()
                         .id(null)
@@ -54,8 +54,8 @@ class ProductionPolicyTest {
     }
 
     /** 신규옵션 */
-    ServiceProductionOptionDto createOptionForInsert(String optionCode) {
-        return ServiceProductionOptionDto.builder()
+    ServiceProductOptionDto createOptionForInsert(String optionCode) {
+        return ServiceProductOptionDto.builder()
                 .id(null)
                 .optionCode(optionCode)
                 .build();
@@ -89,7 +89,7 @@ class ProductionPolicyTest {
     @DisplayName("상품등록정책통과")
     void validateRegister_shouldPass_WhenAllValid() {
         // given
-        ServiceProductionOptionDto option = ServiceProductionOptionDto.builder()
+        ServiceProductOptionDto option = ServiceProductOptionDto.builder()
                 .id(null)
                 .optionCode("optionCode")
                 .build();
@@ -198,8 +198,8 @@ class ProductionPolicyTest {
                 .code("code")
                 .saleStatus(ON_SALE)
                 .build();
-        ServiceProductionOptionDto insertOption  =
-                ServiceProductionOptionDto.builder()
+        ServiceProductOptionDto insertOption  =
+                ServiceProductOptionDto.builder()
                         .id(null)
                         .optionCode("insertOptionCode")
                         .build();
@@ -236,7 +236,7 @@ class ProductionPolicyTest {
         Product production = Product.builder()
                 .saleStatus(ON_SALE)
                 .build();
-        List<ServiceProductionOptionDto> invalidOptions = List.of(
+        List<ServiceProductOptionDto> invalidOptions = List.of(
                 createOptionForInsert("optionCode01"),
                  createOptionForInsert("optionCode01")); // 중복
 
@@ -255,7 +255,7 @@ class ProductionPolicyTest {
                 .code("code")
                 .saleStatus(ON_SALE)
                 .build();
-        ServiceProductionOptionDto invalidOption =
+        ServiceProductOptionDto invalidOption =
                 createOptionForInsert("insertOptionCode");
 
         // 이미 등록된 기존 동일 옵션코드 존재

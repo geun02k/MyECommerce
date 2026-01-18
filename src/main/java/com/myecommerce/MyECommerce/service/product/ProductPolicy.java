@@ -1,7 +1,7 @@
 package com.myecommerce.MyECommerce.service.product;
 
 import com.myecommerce.MyECommerce.dto.product.ServiceProductDto;
-import com.myecommerce.MyECommerce.dto.product.ServiceProductionOptionDto;
+import com.myecommerce.MyECommerce.dto.product.ServiceProductOptionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.exception.ProductException;
@@ -38,7 +38,7 @@ public class ProductPolicy {
 
     /** 수정 정책 검증 **/
     public void validateModify(Product product,
-                               List<ServiceProductionOptionDto> insertOptionList) {
+                               List<ServiceProductOptionDto> insertOptionList) {
         // 판매상태 정책 검증
         enforceProductModifySaleStatusPolicy(product.getSaleStatus());
         // 신규 등록할 상품옵션 중복 검증
@@ -57,10 +57,10 @@ public class ProductPolicy {
 
     // 신규 옵션 코드 유일성 검증 정책 (상품옵션 중복체크)
     private void enforceOptionCodeUniquenessPolicy(
-            String productCode, List<ServiceProductionOptionDto> optionDtoList) {
+            String productCode, List<ServiceProductOptionDto> optionDtoList) {
         // 중복코드 제거된 옵션코드목록 set
         Set<String> deduplicatedOptionCodes = optionDtoList.stream()
-                .map(ServiceProductionOptionDto::getOptionCode)
+                .map(ServiceProductOptionDto::getOptionCode)
                 .collect(Collectors.toSet());
 
         // 1. 입력받은 옵션코드목록 중 중복 옵션코드 체크

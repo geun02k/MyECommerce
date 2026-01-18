@@ -87,8 +87,8 @@ class ProductionServiceTest {
                 .build();
 
         // Service DTO
-        ServiceProductionOptionDto serviceOptionDto =
-                ServiceProductionOptionDto.builder()
+        ServiceProductOptionDto serviceOptionDto =
+                ServiceProductOptionDto.builder()
                         .optionCode(optionCode)
                         .optionName(optionName)
                         .price(price)
@@ -335,19 +335,19 @@ class ProductionServiceTest {
                 .saleStatus(updateSaleStatus)
                 .build();
 
-        ServiceProductionOptionDto serviceUpdateOptionDto =
-                ServiceProductionOptionDto.builder()
+        ServiceProductOptionDto serviceUpdateOptionDto =
+                ServiceProductOptionDto.builder()
                         .id(existingOptionId)
                         .quantity(updateQuantity)
                         .build();
-        ServiceProductionOptionDto serviceInsertOptionDto =
-                ServiceProductionOptionDto.builder()
+        ServiceProductOptionDto serviceInsertOptionDto =
+                ServiceProductOptionDto.builder()
                         .optionCode(optionCode)
                         .optionName(optionName)
                         .price(price)
                         .quantity(quantity)
                         .build();
-        List<ServiceProductionOptionDto> serviceOptionDtoList =
+        List<ServiceProductOptionDto> serviceOptionDtoList =
                 List.of(serviceUpdateOptionDto, serviceInsertOptionDto);
 
         ServiceProductDto serviceProductionDto =

@@ -19,7 +19,7 @@ public interface ServiceProductMapper {
     Product toEntity(ServiceProductDto productDto);
 
     ResponseProductionOptionDto toOptionDto(ProductOption option);
-    ProductOption toOptionEntity(ServiceProductionOptionDto optionDto);
+    ProductOption toOptionEntity(ServiceProductOptionDto optionDto);
 
 
 }

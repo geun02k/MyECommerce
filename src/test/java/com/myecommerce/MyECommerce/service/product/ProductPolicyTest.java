@@ -27,7 +27,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
-class ProductionPolicyTest {
+class ProductPolicyTest {
 
     @Mock
     ProductRepository productRepository;

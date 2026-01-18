@@ -33,7 +33,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class ProductionServiceTest {
+class ProductServiceTest {
 
     @Mock
     private ProductPolicy productionPolicy;

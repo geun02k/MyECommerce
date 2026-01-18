@@ -35,7 +35,7 @@ public class ProductionController {
             @AuthenticationPrincipal Member member) {
 
         return ResponseEntity.ok(
-                productService.registerProduction(production, member));
+                productService.registerProduct(production, member));
     }
 
     /**
@@ -48,7 +48,7 @@ public class ProductionController {
             @AuthenticationPrincipal Member member) {
 
         return ResponseEntity.ok(
-                productService.modifyProduction(production, member));
+                productService.modifyProduct(production, member));
     }
 
     /**
@@ -62,7 +62,7 @@ public class ProductionController {
     public ResponseEntity<ResponseSearchDetailProductionDto> searchDetailProduction(
             @PathVariable @Positive(message = "{validation.product.id.positive}") Long id) {
         return ResponseEntity.ok(
-                productService.searchDetailProduction(id));
+                productService.searchDetailProduct(id));
     }
 
     /**
@@ -72,7 +72,7 @@ public class ProductionController {
     public ResponseEntity<Page<ResponseProductionDto>> searchProductionList(
             @Valid RequestSearchProductionDto requestSearchProductionDto) {
         return ResponseEntity.ok(
-                productService.searchProductionList(requestSearchProductionDto));
+                productService.searchProductList(requestSearchProductionDto));
     }
 
 }

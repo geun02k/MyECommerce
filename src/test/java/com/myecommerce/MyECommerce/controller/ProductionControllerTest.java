@@ -118,7 +118,7 @@ class ProductionControllerTest {
         // 응답 상품 DTO
         ResponseProductionDto response = serviceResponseProduction();
 
-        given(productService.registerProduction(
+        given(productService.registerProduct(
                 any(RequestProductionDto.class), any(Member.class)))
                 .willReturn(response);
 
@@ -158,7 +158,7 @@ class ProductionControllerTest {
                 .andExpect(jsonPath("$.errorCode")
                         .value("INVALID_VALUE"));
         // 2. service 미호출 검증
-        verify(productService, never()).registerProduction(any(), any());
+        verify(productService, never()).registerProduct(any(), any());
     }
 
     @Test
@@ -181,7 +181,7 @@ class ProductionControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode")
                         .value("INVALID_VALUE"));
-        verify(productService, never()).registerProduction(any(), any());
+        verify(productService, never()).registerProduct(any(), any());
     }
 
     @Test
@@ -214,7 +214,7 @@ class ProductionControllerTest {
                 .andExpect(jsonPath("$.errorMessage")
                         .value("유효하지 않은 값입니다.\n해당 옵션의 판매가능 수량은 1 이상이어야 합니다."));
 
-        verify(productService, never()).registerProduction(any(), any());
+        verify(productService, never()).registerProduct(any(), any());
     }
 
     @Test
@@ -223,7 +223,7 @@ class ProductionControllerTest {
         // given
         RequestProductionDto request = validRequestProduction();
 
-        given(productService.registerProduction(any(), any(Member.class)))
+        given(productService.registerProduct(any(), any(Member.class)))
                 .willThrow(new ProductException(PRODUCT_CODE_ALREADY_REGISTERED));
 
         // when
@@ -256,7 +256,7 @@ class ProductionControllerTest {
                         .value("INVALID_VALUE"))
                 .andExpect(jsonPath("$.errorMessage")
                         .value("유효하지 않은 상품 ID 입니다."));
-        verify(productService, never()).searchDetailProduction(invalidProductId);
+        verify(productService, never()).searchDetailProduct(invalidProductId);
     }
 
 }

@@ -188,7 +188,7 @@ class ProductionServiceTest {
 
         // when
         ResponseProductionDto response =
-                productService.registerProduction(requestProductionDto, member);
+                productService.registerProduct(requestProductionDto, member);
 
         // then
         verify(productionPolicy, times(1))
@@ -392,7 +392,7 @@ class ProductionServiceTest {
 
         // when
         ResponseProductionDto responseProductionDto =
-                productService.modifyProduction(requestProductionDto, member);
+                productService.modifyProduct(requestProductionDto, member);
 
         // then
         verify(productionPolicy, times(1))

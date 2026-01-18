@@ -1,6 +1,5 @@
-package com.myecommerce.MyECommerce.dto.production;
+package com.myecommerce.MyECommerce.dto.product;
 
-import com.myecommerce.MyECommerce.entity.member.Member;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -11,7 +10,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ResponseProductionOptionDto {
+public class ResponseProductOptionDto {
 
     private Long id;
 

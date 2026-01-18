@@ -1,18 +1,17 @@
-package com.myecommerce.MyECommerce.dto.production;
+package com.myecommerce.MyECommerce.dto.product;
 
-import com.myecommerce.MyECommerce.type.ProductionCategoryType;
-import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
+import com.myecommerce.MyECommerce.type.ProductCategoryType;
+import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ResponseProductionDto {
+public class ResponseProductDto {
 
     private Long id;
 
@@ -22,11 +21,11 @@ public class ResponseProductionDto {
 
     private String name;
 
-    private ProductionCategoryType category;
+    private ProductCategoryType category;
 
     private String description;
 
-    private ProductionSaleStatusType saleStatus;
+    private ProductSaleStatusType saleStatus;
 
     private Long createId;
 

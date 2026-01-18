@@ -1,6 +1,6 @@
-package com.myecommerce.MyECommerce.dto.production;
+package com.myecommerce.MyECommerce.dto.product;
 
-import com.myecommerce.MyECommerce.type.ProductionCategoryType;
+import com.myecommerce.MyECommerce.type.ProductCategoryType;
 import com.myecommerce.MyECommerce.validation.EnumValid;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -13,7 +13,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RequestProductionDto {
+public class RequestProductDto {
 
     @NotBlank(message = "{validation.product.code.not.blank}")
     @Size(min=1, max=100, message ="{validation.product.code.size}")
@@ -28,15 +28,15 @@ public class RequestProductionDto {
     private String name;
 
     @NotNull(message = "{validation.product.category.not.null}")
-    @EnumValid(enumClass = ProductionCategoryType.class,
+    @EnumValid(enumClass = ProductCategoryType.class,
             message = "{validation.product.category.enum.invalid}")
-    private ProductionCategoryType category;
+    private ProductCategoryType category;
 
     @Size(max = 4000, message = "{validation.product.description.size}")
     private String description;
 
     @Size(max = 100, message = "{validation.product.option.size}")
     @Valid
-    private List<RequestProductionOptionDto> options;
+    private List<RequestProductOptionDto> options;
 
 }

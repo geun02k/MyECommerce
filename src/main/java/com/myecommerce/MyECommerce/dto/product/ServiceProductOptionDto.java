@@ -1,4 +1,4 @@
-package com.myecommerce.MyECommerce.dto.production;
+package com.myecommerce.MyECommerce.dto.product;
 
 import lombok.*;
 
@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ServiceProductionOptionDto {
+public class ServiceProductOptionDto {
     private Long id;
     private String optionCode;
     private String optionName;

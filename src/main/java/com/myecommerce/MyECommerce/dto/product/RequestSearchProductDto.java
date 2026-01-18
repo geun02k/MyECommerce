@@ -1,7 +1,7 @@
-package com.myecommerce.MyECommerce.dto.production;
+package com.myecommerce.MyECommerce.dto.product;
 
-import com.myecommerce.MyECommerce.type.ProductionCategoryType;
-import com.myecommerce.MyECommerce.type.ProductionOrderByStdType;
+import com.myecommerce.MyECommerce.type.ProductCategoryType;
+import com.myecommerce.MyECommerce.type.ProductOrderByStdType;
 import com.myecommerce.MyECommerce.validation.EnumValid;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -13,17 +13,17 @@ import org.springframework.data.domain.Pageable;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RequestSearchProductionDto {
+public class RequestSearchProductDto {
 
     @NotNull(message = "{validation.product.order.by.std.not.null}")
-    @EnumValid(enumClass = ProductionOrderByStdType.class,
+    @EnumValid(enumClass = ProductOrderByStdType.class,
             message = "{validation.product.order.by.std.enum.invalid}")
-    private ProductionOrderByStdType orderByStd;
+    private ProductOrderByStdType orderByStd;
 
     @NotNull(message = "{validation.product.category.not.null}")
-    @EnumValid(enumClass = ProductionCategoryType.class,
+    @EnumValid(enumClass = ProductCategoryType.class,
             message = "{validation.product.category.enum.invalid}")
-    private ProductionCategoryType category;
+    private ProductCategoryType category;
 
     @NotBlank(message = "{validation.product.keyword.not.blank}")
     @Size(max = 200, message = "{validation.product.keyword.size}")

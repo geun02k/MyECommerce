@@ -1,0 +1,23 @@
+package com.myecommerce.MyECommerce.repository.product;
+
+import com.myecommerce.MyECommerce.entity.product.Product;
+import com.myecommerce.MyECommerce.entity.product.ProductOption;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface ProductOptionRepository extends JpaRepository<ProductOption, Long> {
+    // 판매자 상품의 동일 상품옵션코드 조회
+    @Query(" SELECT PRD " +
+            " FROM Product PRD" +
+            " INNER JOIN FETCH PRD.options OPTION" +
+            " WHERE PRD.code = ?1" +
+            " AND OPTION.optionCode IN (?2)")
+    List<Product> findByProductCodeAndOptionCodeIn(String productionCode, List<String> optionCodes);
+
+    // 상품ID에 해당하는 상품옵션목록 조회
+    List<ProductOption> findByProductId(Long productionId);
+}

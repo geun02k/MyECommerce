@@ -19,8 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Map;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.LIMIT_CART_MAX_SIZE;
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.NOT_EXIST_PRODUCT;
+import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_SIZE_EXCEEDED;
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.PRODUCT_NOT_EXIST;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 
 @Service
@@ -48,7 +48,7 @@ public class CartService {
         //       - hashValue = 등록할 상품옵션 정보
 
         // 0. 장바구니 물품 100건 제한
-        checkUserCartSize(member.getUserId());
+        checkUserCartSizePolicy(member.getUserId());
 
         // 1. 상품옵션조회 (DB)
         ServiceCartDto foundOptionDto =
@@ -62,8 +62,8 @@ public class CartService {
         return serviceCartMapper.toResponseDto(foundOptionDto);
     }
 
-    // 장바구니 제품 수량 체크
-    private void checkUserCartSize(String userId) {
+    // 장바구니 제품 수량 체크 정책
+    private void checkUserCartSizePolicy(String userId) {
         Map<Object, Object> optionsInCart =
                 redisMultiDataService.getHashEntries(CART, userId);
 
@@ -74,7 +74,7 @@ public class CartService {
                 .reduce(0, Integer::sum);
 
         if (cartItemCount >= CART_MAX_SIZE) {
-            throw new CartException(LIMIT_CART_MAX_SIZE);
+            throw new CartException(CART_SIZE_EXCEEDED, CART_MAX_SIZE);
         }
     }
 
@@ -108,7 +108,7 @@ public class CartService {
         // 상품옵션조회
         ProductionOption foundOption =
                 productionOptionRepository.findById(optionId)
-                        .orElseThrow(() -> new ProductionException(NOT_EXIST_PRODUCT));
+                        .orElseThrow(() -> new ProductionException(PRODUCT_NOT_EXIST));
 
         // entity -> dto 변환
         return serviceCartMapper.toDto(foundOption);

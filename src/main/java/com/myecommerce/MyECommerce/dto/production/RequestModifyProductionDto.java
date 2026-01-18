@@ -16,15 +16,18 @@ import java.util.List;
 public class RequestModifyProductionDto {
 
     @NotNull(message = "{validation.product.id.not.null}")
-    @Min(value = 1, message = "{validation.product.id.min}")
+    @Positive(message = "{validation.product.id.positive}")
     private Long id;
 
+    @Size(max = 4000, message = "{validation.product.description.size}")
     private String description;
 
+    @NotNull(message = "{validation.product.category.not.null}")
     @EnumValid(enumClass = ProductionSaleStatusType.class,
             message = "{validation.product.sale.status.enum.invalid}")
     private ProductionSaleStatusType saleStatus;
 
+    @Size(max = 100, message = "{validation.product.option.size}")
     @Valid
     private List<RequestModifyProductionOptionDto> options;
 

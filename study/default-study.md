@@ -12,6 +12,10 @@
    - 매핑 라이브러리 MapStruct
    - 유효성 검사 라이브러리 validation
 3. 유효성 검증
+   - 정책과 보호 
+   - DTO Validation과 Service 정책 검증의 책임 분리 기준
+   - 잘못된 Service Validation Check
+   - 전화번호 검증 중복으로 인한 구조적 문제와 개선 방향
    - 검증관련처리
    - PathVariable에 대한 @NotNull 검증 제외 판단
    - PathVariable 검증
@@ -36,6 +40,10 @@
    - 인터페이스와 추상화 클래스의 차이
    - service, service impl 분리하지 않는 이유
 8. 예외처리
+   - 예외 처리 표준화: Custom RuntimeException 기반 설계
+   - BaseAbstractException 설계 선택: 계약 중심에서 데이터 중심으로
+   - BaseAbstractException 설계 개선: Lombok 생성자 제거와 불변 구조 확립
+   - 예외 처리 구조 개선: ErrorCode 식별자화 및 메시지 책임 분리
 9. JWT 이용한 로그아웃
 10. 로그 레벨 결정
 11. 상수 선언
@@ -49,6 +57,13 @@
 15. 메시지 관리
     - properties 파일 한글 깨짐 문제 해결
     - 메시지 관리 방식 개선
+    - 서버 에러 메시지 하드코딩 제거: placeholder 기반 메시지 분리 전략
+    - 메시지 호출 테스트 문제해결 : Spring Validation과 ExceptionHandler에서 메시지 처리
+    - 메시지 조회 Locale 문제 해결방법
+    - MessageSource placeholder 규칙으로 인한 메시지 파싱 오류와 해결
+16. HTTP 상태코드
+17. null과 ObjectUtils.isEmpty()
+    - ObjectUtils.isEmpty() 남용 문제
 
 ---
 ## 1. Spring
@@ -405,6 +420,206 @@
 
 ---
 ## 3. 유효성 검증
+### < 정책과 보호 >
+1. 정책과 보호의 판단 기준
+   1) 도메인이 규칙을 보장해야 한다.    
+      해당 규칙이 깨지면 비즈니스가 성립하지 않는 경우, 정책으로 취급.   
+      예를 들어 비밀번호 형식이 틀리면 인증, 알림, 본인 확인이 불가해 비즈니스가 붕괴된다.
+      반면 아이디를 30자로 제한했지만 31자리가 되더라도 대부분의 비즈니스에 영향이 없다.
+      이 때 비밀번호는 정책으로 관리해야 한다.
+   2) 입력 채널이 바뀌어도 동일하게 적용돼야 하는가?   
+      변경되지 안항야 한다면 정책이다.   
+      전화번호는 API, Batch, Admin, Event 등에서 호출하더라도 항상 동일하게 적용되어야 한다.
+      아이디는 DB, UI, 기술 스택에 따라 바뀔 수 있다.
+   3) 왜 해당 규칙이 존재하하는지 설명 가능한가?
+      비즈니스 언어로 설명 가능하면 정책이다.
+      전화번호 패턴의 경우, 대한민국 휴대폰 정책 때문에 정책으로 관리해야 한다.   
+      비밀번호 길이의 경우, 보안 정책 때문에 관리가 필요하다.   
+      반면, 아이디의 경우, DB 컬럼이 30자라서 제한한다는 건 모호하다.    
+      필수로 지켜야하는 일이라 보기 힘들기 때문이다. 길이 제한의 이유가 기술적일 가능성이 크다.
+
+2. 정책과 보호의 모호함 제거 장치
+   1) 규칙을 정책으로 메서드명으로 명명   
+      가장 흔하고 효과적인 방법이다.
+      정책은 반드시 이름(policy)으로 고정한다.
+      ~~~
+      validatePasswordPolicy(password);
+      validatePhoneNumberPolicy(phoneNumber);
+      ~~~
+      반대로 보호는 아래와 같이 작성한다.
+      ~~~
+      validateUserIdLengthForStorage(userId);            
+      ~~~
+   2) 정책과 보호의 코드 위치 고정   
+      구조를 통해 의사결정을 고정한다.
+      입력 보호는 validation으로 dto에, 비즈니스 규칙은 도메인(service)에 위치시킨다.
+   3) 주석이 아닌 커밋 메시지로 결정 기록을 남긴다.
+      ~~~
+      ADR-004: Password Validation Policy Location
+
+      - 비밀번호 정책은 Service/Domain 책임으로 한다.
+      - DTO에는 NotBlank만 둔다.
+      - 이유:
+          - 입력 채널 확장
+          - 정책 변경 빈도
+      ~~~
+   4) 테스트를 정책 문서로 만든다.
+      테스트 이름 자체가 정책 선언이다.
+      ~~~
+      @Test
+      void password_policy_requires_8_to_100_characters() {
+      assertThrows(MemberException.class,
+          () -> Password.from("short"));
+      }
+      ~~~
+   5) Value Object로 정책을 구조에 묶는다. (최종형)
+      모호함이 없다. 
+      해당 Value Obejct를 생성하지 못한다는 것은 정책을 위반하는 것으로 판단한다.
+      정책과 보호에 대한 위치 논쟁이 생길 수 없다.
+
+
+### < DTO Validation과 Service 정책 검증의 책임 분리 기준 >
+- 문제상황   
+  비밀번호 길이 및 일치여부 체크, 전화번호 중복 체크의 경우  
+  회원가입 서비스 로직에서 일회성으로만 사용할 로직이라 커스텀 어노테이션을 생성해 dto에 적용하지 않았다.
+- 권장방법
+  - 비밀번호 길이 및 일치여부 체크의 경우, 커스텀 Validator 생성 권장 가능.
+    (단, 추후 2곳 이상에서 재사용하면 고려)
+  - 전화번호 중복 체크의 경우, 서비스 로직에 유지.
+
+1. DTO Validation으로 생성해야 하는 것  
+   ***요청이 형식적으로 유효한가를 검증.***
+    - 형태/포맷/길이/필수값
+2. Service 로직에 남아야 하는 것   
+   ***현재, 해당 비즈니스를 수행해도 되는가를 검증.***
+    - DB 조회 필요   
+      경쟁 조건 발생 가능, 트랜잭션 락 이슈 등 존재.
+    - 비즈니스 규칙
+    - 조건이 복잡하고 맥락 의존적인 경우
+3. 커스텀 Validaiton 생성 가치가 있는 경우
+    - 2곳 이상에서 재사용하는 경우
+    - 선언적으로 표현하면 의도가 더 명확한 경우
+    - DTO 내부 정보만 사용하는 경우
+    - 테스트 가치가 있는 경우
+
+
+### < 잘못된 Service Validation Check >
+1. 문제상황   
+   ***Service에서 프로그래밍 오류(null 전달) 를 비즈니스 오류처럼 처리하고 있다.***
+   기본적으로 Controller에서 null 객체가 들어오는 것은 비즈니스 오류가 아닌 서버 내부 계약 위반일 뿐이다.
+   따라서 ***서비스에서 더블 체크하는 경우***는 개발자의 실수거나 API 사용 오류로 정상 시나리오가 아니라 프론트가 이해할 필요가 없다.
+   이 떄 서버 내부 사용 오류(프로그래밍 오류)를 ***Validation Exception을 던지는 것은 옳지 않다.***
+   이는 심지어, validation Exception을 비즈니스 에러로 관리하는 것으로 잘못된 방어이다.
+   ~~~
+    // 회원가입 validation check
+    private void saveMemberValidationCheck(RequestMemberDto member) {
+        // 회원 객체 존재여부 validation check
+        if(ObjectUtils.isEmpty(member)) {
+            throw new MemberException(EMPTY_MEMBER_INFO);
+        }
+        // ...
+    }
+   ~~~
+2. 해결방법   
+   비즈니스 예외를 쓰지 말자.
+   ***메서드 사용 오류인 IllegalArgumentException을 이용***하자.   
+   하지만, 실무 코드에서 Service에서도 HTTP Status 담긴 예외 던지는 경우 많음.
+   그래서 “이게 왜 문제지?”가 자연스럽지만, 구조적으로 깔끔한 기준은 분명히 존재한다.   
+   시스템 에러는 “관리 대상”이 아니라 “조기 발견·즉시 실패 대상”이기 때문에
+   보통 Enum으로 관리하지 않고 하드코딩한다.
+   ~~~
+   public void saveMemberValidationCheck(RequestMemberDto member) {
+       if (member == null) {
+           throw new IllegalArgumentException("RequestMemberDto must not be null");
+       }
+      // ...
+   }
+   ~~~
+
+3. Service 방어는 중요.  
+   서비스는 거의 항상 재사용되므로 방어가 중요하다.   
+   예를 들어 배치, 스케줄러, 이벤트 리스너, 다른 서비스 호출, 테스트 코드 등 Controller를 거치지 않는 경우가 훨씬 많기 때문이다.   
+   방어가 없다면, NPE 발생 위치가 애매해지고, 로그로 원인 추적이 어려워 장애 시 원인 분석 시간이 증가된다.  
+   따라서 초기 방어가 디버깅 비용을 줄인다.
+
+
+### < 전화번호 검증 중복으로 인한 구조적 문제와 개선 방향 >
+DTO와 Service에서 동일한 패턴을 중복 관리하는 구조는 장기적으로 반드시 깨진다.
+책임을 분리해 중복을 제거해야한다.
+
+1. 현재 구조의 문제점    
+   현재 request DTO와 Service에서 동일한 전화번호 패턴에 해대 검증을 수행하고 있다.
+   이 상태에서 정책 변경 시, 한쪽만 수정되고 테스트는 통과되면서 운영에서 버그가 발생할 가능성이 높아진다.
+
+2. 해결방법   
+   DTO는 입력 필터이고 Service는 도메인 규칙이므로 레벨이 다르다.
+   따라서 같은 정규식이라도 의미가 다를 수 있으므로 패턴을 공유하는 방식으로 해결하면 안된다.
+    1) ***Controller DTO는 느슨하게, Service는 단일 진실*** (Best)   
+       Controller validation은 1차 필터, Service는 진짜 책임자 역할을 수행하도록 한다.   
+       DTO는 형식만 검증해 전화번호처럼 생긴 입력만 통과 가능하도록 한다.
+       Service나 도메인은 정책의 단일 진실이다.
+       이 방법은 정책 변경 시 Service만 수정하면되고, DTO는 거의 바뀌지 않는다.
+       테스트도 도메인 기준으로만 작성하면 된다.
+       정책 변경이 잦은 도메인, 외부 API / 앱 / 백오피스 등 입력 채널이 여러 개인 경우,
+       테스트/도메인 주도 설계를 중시하는 팀에서 거의 표준처럼 쓰인다.
+       정책 변경 대응력이 높고, 입력 채널 증가에 유리하며 테스트 용이성과 중복 제거의 장점을 가지기 때문이다.
+
+    2) 전화번호 Value Obejct로 캡슐화   
+       가장 이상적인 방법으로 정책, 정규화, 검증을 한 곳에서 수행한다.
+       ~~~
+       public class PhoneNumber {
+           private final String value;
+ 
+           private PhoneNumber(String value) {
+               this.value = value;
+           }
+ 
+           public static PhoneNumber from(String raw) {
+               String normalized = raw.replaceAll("[^0-9]", "");
+ 
+               if (!normalized.matches(PHONE_REGEX)) {
+                   throw new MemberException(INVALID_PHONE_NUMBER);
+               }
+ 
+               return new PhoneNumber(normalized);
+           }
+       }
+       ~~~
+
+3. 구조를 개선하지 않을 때 최소 조치    
+   리팩터링 비용 부담과 다른 기능의 우선순위로 인해 구조를 개선하지 않고 현 상태를 유지하고자 한다.   
+   이 떄, 임시 구조임을 명확히 표시하고 깨질 가능성을 최소화하는 장치를 해야한다.
+    1) Service를 단일 진실로 만듦    
+       DTO 패턴을 완화하거나 최소한 주석으로 의도를 남긴다.
+       주석으로는 Service와 중복, 임시 구조임을 명시하고 의사결정을 기록한다.
+       ~~~
+       // RequestMemberDto.java 
+       @Size(min=10, max=11, message = "{validation.member.telephone.size}")
+       @Pattern(regexp = "^01[016789]\\d{7,8}$",
+       message = "{validation.member.telephone.pattern}")
+       // NOTE: 데이터 정규화를 위해 실제 전화번호 정책 검증은 Service에서 수행한다.
+       // TODO: 전화번호 정책이 확장되면 telephone을 Value Object로 분리 예정
+       private String telephone;
+       ~~~
+    2) Service의 정규식 상수화    
+       상수화를 통해 수정 포인트를 단일화하고 테스트에서 재사용 가능해진다.
+       ~~~
+       private static final String PHONE_MEMBER_REGEX = "^01[016789]\\d{7,8}$";
+       ~~~
+    3) 테스트로 정책 고정   
+       테스트가 문서 역할을 함.
+       ~~~
+       @ParameterizedTest
+       @ValueSource(strings = {
+           "010-1234-5678",
+           "01012345678"
+       })
+       void valid_phone_numbers(String input) {
+           assertDoesNotThrow(() -> service.normalizeAndValidate(input));
+       }
+       ~~~
+
+
 ### < 검증관련처리 > 
 1. DTO에서 처리
    > 단순한 검증 로직은 DTO에서 @Valid 어노테이션을 사용.   
@@ -832,7 +1047,9 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
 
 ---
 ## 8. 예외처리
-### < 예외처리 >
+### < 예외 처리 표준화: Custom RuntimeException 기반 설계 >
+Custom RuntimeException 기반 예외 처리 구조를 설명한다.
+
 1. Custom Exception을 생성해 예외처리하는 이유
    - throw new NullPointerException("error message") 와 같이 에러를 처리하면   
      통일성이 전혀 없고 또 정확한 에러 원인과 이유도 알 수 없다.
@@ -868,6 +1085,389 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
       return new ResponseEntity<>(errorResponse,
                 Objects.requireNonNull(HttpStatus.resolve(e.getStatusCode())));
     ~~~
+
+
+### < BaseAbstractException 설계 선택: 계약 중심에서 데이터 중심으로 >
+1. 추상메서드만 두는 경우 -> 계약 중심 설계   
+   ***계약만 강제하는 방식.***   
+   Exception 종류가 아주 적고
+   공통 필드가 거의 늘지 않을 것이 확실하고
+   팀이 작거나 개인 프로젝트이고
+   “중복”보다 “명시적 계약”이 더 중요한 경우에는
+   계약만 강제하는 구조가 더 깔끔하고 좋을 방법일 수 있다.
+   ~~~
+   public abstract class BaseAbstractException extends RuntimeException {
+       public abstract CommonErrorCode getErrorCode();
+   }
+   ~~~
+    1) 계약만 제공   
+       순수하게 계약만 제공하므로 모든 커스텀 Exception에서 getErrorCode() 구현을 강제.  
+       BaseAbstractException은 필드나 생성자 없이 순수 계약 역할만 수행.
+    2) 중복코드발생   
+       대부분 커스텀 Exception에서 동일한 errorCode를 만들고, getter를 구현 필요.
+    3) 공통필드관리 시 매번 구현 필요   
+       Handler에서 일괄 처리하려면 개발자 규칙에 의존해야 함.
+       결국 모든 커스텀 Exception이 동일한 필드·구조를 암묵적으로 유지해야 한다.
+       그러나 BaseAbstractException은 계약(getErrorCode)만 강제할 뿐,
+       공통 필드의 존재나 구조 일관성은 컴파일 타임에 보장하지 못한다.   
+       강제는 계약 하나뿐이고, 실제 구조 일관성은 개발자 규칙에 의존하는 구조가 되는 것이다.
+
+2. 필드+생성자+getter 모두 포함하는 경우 -> 데이터 중심 베이스 클래스   
+   커스텀 Exception이 많고, 공통 필드를 일관되게 관리하고 싶을 때 선택하는
+   실용적인 패턴으로 ***데이터 중심 베이스 클래스***이다.   
+   아주 소규모 프로젝트에서는 과할 수 있음.
+   ~~~
+   public abstract class BaseAbstractException extends RuntimeException {
+      private final CommonErrorCode errorCode;
+      private final Object[] messageArgs;
+
+      protected BaseAbstractException(CommonErrorCode errorCode, Object... messageArgs) {
+          this.errorCode = errorCode;
+          this.messageArgs = messageArgs;
+      }
+
+      public CommonErrorCode getErrorCode() { return errorCode; }
+      public Object[] getMessageArgs() { return messageArgs; }
+   }
+   ~~~
+    1) 중복 제거   
+       모든 커스텀 Exception에서 동일한 getter 구현 불필요.
+       super()만 호출하면 됨.
+    2) 공통 필드 제공
+       공통 필드를 베이스 클래스에서 직접 관리.   
+       하위 Exception은 super() 호출만으로 구현 가능.  
+       따라서 Handler가 메시지 조립을 위해 공통 필드에 일관되게 접근 가능.
+    3) 추상 클래스가 단순 계약 제공을 넘어,
+       공통 상태(errorCode, messageArgs)를 직접 관리하는 역할 수행.
+
+3. 데이터 중심 베이스 클래스가 더 보편적으로 사용되는 이유
+    1) 예외는 행위보다 상태 전달이 목적   
+       예외 객체는 로직을 수행하는 주체가 아니므로, 발생한 에러와 필요한 값을 담으면 된다.
+    2) 변경 사항이 한 곳   
+       베이스 클래스의 대부분의 경우 하위 Exception 수정 없이 변경을 흡수 가능.
+        - 필드 추가 시 베이스 클래스만 수정
+        - 메시지 전략 변경 시 ExceptionHandler만 수정
+    3) Handler가 중심 구조
+       표현 로직인 메시지, 상태코드 정책이 Handler에 모이게 된다.
+
+4. BaseAbstractException 구조 변경 결정
+   현재 프로젝트는 BaseAbstractException이 이미 존재하고 CommonExceptionHandler가 중심에 있다.   
+   ErrorCode 추상화가 되어있고 도메인별 Exception이 계속 늘어날 가능성이 존재한다.
+   messageArgs, 메시지 전략 변경 같은 경우가 실제로 발생했다.
+   이 상황에서 계약만 강제하는 방식의 문제는 변경이 생길 때, 항상 “모든 Exception”이 영향을 받는다는 것이다.
+   또한 기본 구조는 계약은 명확하나, 실질적으로 모든 커스텀 Exception이 동일한 필드와 구현을 반복하고 있었다.
+   이에 따라 BaseAbstractException을 계약 중심 추상 클래스에서 데이터 중심 베이스 클래스로 변경한다.
+   이는 설계 단순화가 아닌 중복제거와 변경 대응성 강화를 위한 구조적 개선이다.
+
+
+### < BaseAbstractException 설계 개선: Lombok 생성자 제거와 불변 구조 확립 >
+1. 문제점
+   1) 의도 불분명   
+      Lombok의 @AllArgsConstructor + @RequiredArgsConstructor 조합은 의도대로 
+      final 필드인 CommonErrorCode만 받는 생성자와 모든 필드를 받는 생성자를 자동 생성한다.   
+      컴파일 오류는 없지만 어떤 생성자가 의도된 진입점인지, messageArgs가 필수인지 선택인지 코드에서 명확히 드러나지 않는다.
+      베이스 클래스는 구조 변경에 영향을 자주 받는 지점으로, Lombok 조합보다는 명시적인 생성자 정의 방식이 안전하다.
+   2) 예외 객체의 가변성
+      messageArgs를 final로 선언하지 않으므로서 예외 객체를 가변 상태로 만들게 된다.   
+      하지만 예외는 생성 시점에 상태가 결정되고, 던져진 이후에는 변하지 않는 객체여야 한다.   
+      불변 객체는 디버깅, 로깅, 멀티스레드 안정성이 높다.
+   3) RuntimeException 메시지 사용 의도 불명확   
+      RuntimeExcception을 상속하지만 명시적으로 super()를 통해 호출하지 않는다. (자동 호출)
+      따라서 RuntimeException 메시지를 사용하지 않는 구조임이 명확하게 드러나지 않는다. 
+      이렇게 메시지를 Exception에 담지 않는 구조라면 의도를 더 명확히 드러내는 생성자 정의가 필요하다.
+   ~~~
+    @Getter
+    @AllArgsConstructor
+    @RequiredArgsConstructor
+    public abstract class BaseAbstractException extends RuntimeException {
+        // 에러코드 반환(HTTP 상태코드, 에러메시지)
+        private final CommonErrorCode errorCode;
+        // 에러 메시지 전달인자
+        private Object[] messageArgs;
+    }
+   ~~~
+
+2. 해결방법
+   1) 생성자로 의도 분명히   
+      messageArgs는 선택적, errorCode는 필수임을 생성자 시그니처만 봐도 확인 가능하도록 직접 정의.
+   2) 예외 객체 불변화
+      모든 필드를 final로 선언해 예외 객체 불변 처리.
+   3) Null-safe    
+      messageArgs는 “없음”을 null이 아니라 빈 배열로 표현 권장.
+      Handler는 null 체크 방어 로직 없이 MessageSource는 빈 배열을 자연스럽게 처리 가능.   
+      null 전달 시, 사용하는 Handler에서 null 체크 방어로직 필요함.
+   4) 생성자 접근제어자 제한
+      BaseAbstractException은 직접 throw하는 대상이 아니다.
+      따라서 도메인 예외를 통해서만 생성되어야 하므로, protected 생성자를 사용한다.
+      이로 인해 베이스 클래스는 계약과 공통 상태를 관리한다는 의도를 명확히할 수 있다.
+   ~~~
+    @Getter
+    public abstract class BaseAbstractException extends RuntimeException {
+        private static final Object[] EMPTY_ARGS = new Object[0];
+    
+        // 에러코드 반환(HTTP 상태코드, 에러메시지)
+        private final CommonErrorCode errorCode;
+        // 에러 메시지 전달인자
+        private final Object[] messageArgs;
+    
+        protected BaseAbstractException(CommonErrorCode errorCode) {
+            this(errorCode, EMPTY_ARGS);
+        }
+    
+        protected BaseAbstractException(CommonErrorCode errorCode, Object... messageArgs) {
+            this.errorCode = errorCode;
+            this.messageArgs = messageArgs == null ? EMPTY_ARGS : messageArgs;
+        }
+    }
+   ~~~
+
+
+### < 예외 처리 구조 개선: ErrorCode 식별자화 및 메시지 책임 분리 >
+messages.properties 도입을 고려하게 되면서, 기존 설계의 문제점을 개선하게 되었다.
+
+1. 기존 예외처리 결정 배경   
+   잘하려다 생긴 전형적인 과도 설계이다.   
+   각 계층(?)에 대한 책임을 분명하게 부여하지 못했다.
+   결론적으로 예외가 똑똑해지려다 책임이 섞인 상태이다.
+    1) Exception 표준화를 목적으로 함
+       모든 예외가 HTTP 상태코드, 에러코드(Enum), 사용자에게 내려줄 메시지를 가지므로
+       이를 같은 방식으로 갖도록 강제하려 했다.
+       그래서 BaseAbstractException에 추상 메서드를 생성해 해당 내용을 반드시 구현하도록 강제했다.
+    2) ExceptionHandler는 예외 내부 구현을 몰라도 됨.   
+       Handler는 타입 확인, 예외별 분기, 메시지 조합 로직을 전혀 몰라도 되도록 구현하고 싶었다.
+       예외가 스스로 응답 정보를 알고 있어야 한다고 생각했다.
+    3) ErrorCode는 Enum 중심으로 시스템 정리를 목적으로 함.   
+       CommonErrorCode 인터페이스를 구현해 에러의 단위가 enum이라는 명확한 기준을 세웠다.
+
+2. 상황 - 상황 변화로 인한 한계
+   (messages.properties 도입 시 기존 예외 구조의 한계)    
+   현재 시스템은 하드코딩된 에러 메시지를 제거하고,
+   messages.properties 기반으로 메시지를 관리하도록 구조를 변경하고 있다.
+   이 과정에서 메시지를 동적으로 구성해야 하는 요구가 발생했고,
+   기존 예외 구조가 이를 수용하지 못하는 한계에 직면했다.
+    1) 기존 구조   
+       기존 CartErrorCode는 에러 메시지를 직접 문자열로 보유하고 있으며,
+       이 과정에서 CartService.CART_MAX_SIZE와 같은 자바 코드 기반의 동적 값을 메시지 생성 시점에 참조하고 있다.
+    2) 발생한 구조적 문제 - messages.properties 도입으로 인한 제약    
+       messages.properties는 순수 리소스 파일로, 자바 코드를 직접 사용할 수 없다.   
+       Spring은 MessageSource를 통해 메시지 키 + 전달 인자(Object[]) 방식으로만 메시지를 조립한다.   
+       띠라서 에러 메시지를 런타임 시점에 동적으로 생성하려면
+       메시지의 구성 요소(placeholder에 들어갈 값)를 예외 발생 시점에 함께 전달해야 하는 구조가 필요해졌다.
+    3) 구조적 요구사항의 변화   
+       변경되어야 하는 구조로 인해 아래와 같은 요구사항이 생겼다.
+       즉, CartErrorCode는 더 이상 메시지를 직접 생성허지 않고 메시지 식별자(message key)만 제공해야 한다.
+       메시지 조립에 필요한 전달 인자는 에러가 발생한 도메인 계층에서 예외와 함께 전달되어야 한다.   
+       공통 예외 처리 계층에서는 전달받은 정보들을 기반으로 최종 메시지를 최종 조립해야 한다.
+
+3. ***원인 - 기존 설게의 본질적 문제***
+    1) ErrorCode는 메시지의 소유자가 아닌 식별자(identifier)   
+       메시지는 표현 계층(UI/응답)의 관심사이며,
+       ErrorCode는 시스템 내부에서 에러를 식별하고 분류하기 위한 값 객체이다.   
+       즉, ***ErrorCode는 식별자***이지 메시지 생성기가 아니다.
+       그러나 기존 구조에서는 역할 경계가 무너지면서 ErrorCode가 본래 의도보다 과도한 책임을 가지게 되었다.
+        - 기존 구조에서 ErrorCode가 가지는 책임
+            1. 서비스 상수 참조   
+               현재 CartErrorCode에서, ErrorCode가 Service 상수를 참조하면서 인프라를 침범했다.
+            2. 메시지 하드코딩    
+               다국어, 메시지 교체 불가
+            3. 테스트 취약   
+               메시지 변경이 코드 변경으로 이어져 테스트 범위가 불필요하게 확장됨.
+               (단순 문구 수정에도 enum 재컴파일 및 배포 필요)
+            4. 책임 혼합
+               ErrorCode가 식별의 책임을 지니는데 메시지 생성 책임까지 지님.
+       ~~~
+       LIMIT_CART_MAX_SIZE(
+            400,
+            "장바구니에는 최대 " + CartService.CART_MAX_SIZE + "건만 추가 가능합니다."
+       )
+       ~~~
+    2) BaseAbstractException을 중심으로 한 메시지 책임 혼란   
+       BaseAbstractException이 너무 많은 걸 강제하고 있다.
+       ErrorCode에도, Exception에도 메시지가 있으며 Handler에서 이미 있는 메시지를 다시 조합한다.
+       이로 인해 메시지의 최종 책임 주체가 모호해졌다.   
+       각 계층이 메시지에 부분적으로 관여하면서 명확한 소유권이 사라진 구조를 가지고 있다.
+    3) messages.properties 기반 메시지 조립 구조와 근본적 충돌    
+       현재 구조에서는 enum 생성 시점에 메시지가 이미 완성되어있다.   
+       이 구조에서는 plcaeholder 개념이 들어갈 여지가 없고,
+       Locale/MessageSource 사용 위치 또한 명확하지 않다.   
+       즉, 기존 예외 구조는 정적 메시지 생성에는 적합했지만,
+       messages.properties 기반의 동적 메시지 조립 구조와는 근본적으로 맞지 않는 설게였다.
+
+4. 수정 방향 검토 및 대안 비교   
+   messages.properties 기반의 동적 메시지 조립 구조를 도입하기 위해
+   다음과 같은 수정 방향을 검토했다.
+    1) CartException에만 messageArgs 필드를 추가하고 전용 Handler 분리   
+       CartException만을 위한 메시지 처리 로직을 별도로 구성하는 방법이다.
+       예외 처리 구조가 도메인별로 분기되어 예외가 늘어날수록 Handler 폭증 우려가 있다.
+       따라서 공통 예외 처리 전략이 붕괴된다.
+       확장성은 낮고 유지보수 비용은 증가하는 방법이다.   
+       추가적으로, 메시지 파라미터를 특정 도메인안의 예외에 한정된 특성으로 취급한다는 점에서 구조적으로 적절하지 않다.
+       messageArgs는 특정 도메인 예외의 구현 세부사항이 아니라, 에러 메시지가 표현되기 위해 필요한 공통 속성이다.
+       에러 메시지는 종종 수량, 한계값, 상태, 정책값 등 동적 정보를 포함하기 때문에 모든 도메인에서 발생할 수 있다.
+       따라서 특정 도메인의 특성이 아닌, 에러 표현의 일반 속성으로 취급되어야 하므로
+       BaseAbstractException 수준에서 다루는 것이 구조적으로 타당하다.
+    2) BaseAbstractException에 선택적 messageArgs 제공 메서드 추가   
+       전달인자가 필요한 경우에만 오버라이딩하도록 설계.
+       예외마다 메시지 인자 사용 여부가 다르므로 Handler는 분기 로직을 알아야한다.
+       또한 메시지 조립 책임이 불명확해진다.
+       표면적으로는 유연해보이지만, 내부 일관성이 깨지게 된다.
+    3) BaseAbstractException에 추상 메서드 추가   
+       모든 커스텀 Exception이 메시지 관련 메서드를 구현하도록 강제.
+       메시지가 필요 없는 예외까지 불필요한 구현을 강제하게 된다.
+       따라서 메시지 전략 변경 시 모든 예외 수정이 필요하다.
+       과도한 강제로 인해 변경 비용이 높아질 수 있다.
+    4) 기존 Exception + ErrorCode 구조 전면 개편 (최종 선택)
+       ErroCode는 식별자 역할에 집중하고,
+       Exception은 상황과 메시지 인자를 전달하고,
+       Handler는 메시지 조립과 응답을 책임지도록 변경한다.
+       역할이 명확하고 확징 시 구조가 흔들리지 않을 것이다.
+
+5. 역할 재정의 - 개선된 예외 구조의 책임 분리
+   기존 구조의 한계를 해결하기 위해 예외 처리 구조 전반에 대한 역할 재정의가 필요하다.
+   이 변경은 단순히 메시지 관리 방식을 바꾸는 것이 아니라,
+   ErrorCode, Exception, Handler 간 책임을 명확히 분리하기 위한 구조적 개선이다.
+   이 과정에서 CommonExceptionHandler가 예외에 포함된 전달 인자를 사용해 메시지를 조립할 수 있도록,
+   BaseAbstractException은 ErrorCode와 messageArgs를 공통으로 보유하는 구조로 수정되었다.
+   ***이 변경은 단순한 메시지 관리 방식 변경이 아니라,
+   ErrorCode · Exception · Handler 간 책임을 명확히 분리하기 위한 구조적 개선이다.***
+    1) CartErrorCode
+        - 에러의 의미를 식별하는 식별자
+        - HTTP 상태 코드 + 메시지 키만을 보유
+    2) CartException
+        - 어떤 에러가 발생했는지(ErrorCode)
+        - 메시지 조립에 필요한 전달 인자(messageArgs)를 함께 보유
+    3) CommonExceptionHandler
+        - BaseAbstractException을 기준으로 예외를 일괄 처리
+        - MessageSource를 사용해 메시지를 최종 조립
+        - HTTP 상태와 에러 정보를 포함한 응답을 생성
+
+6. 개선 방향 - messages.properties 도입의 설계적 의미
+   현재 구조는 이미 초기 설계 시 책임이 명확하지 않고 동일한 정보가 여러 군데 분산되어있기 때문에
+   메시지 관리 문제를 넘어선 구조의 문제가 있는 경우다.
+   이 때 messages.properties 도입의 목적은 국제화 등이 아닌
+   ***ErrorCode · Exception · Handler 간 책임을 명확히 분리하기 위한 구조적 개선***이다.
+   <br>
+   설계를 위한 설계가 되지 않도록 하기 위해 고민했다.
+   Validation 에러 메시지를 하드코딩에서 파일로 별도 분리하면서 서버 에러의 메시지도 관리 방식도 함께 검토하게 되었다.   
+   Validation 메시지는 수정 빈도와 일관성 측면에서 파일 분리는 명확한 이점이 있었다.
+   반면, 서버 에러 메시지의 경우는 Enum으로 관리하는 방식도 베스트는 아니지만 최악은 아니라고 생각해 현상 유지 계획이었다.
+   그럼에도 불구하고 이번 설계 변경은 ***책임 분리를 위한 설계 안정성 측면에서 의미가 있다.***
+    1) 메시지를 도메인 로직에서 분리   
+       책임이 명확하지 않고 동일한 정보가 여러 군데 분산되어 있는 구조를 정리할 수 있다.
+       기본 구조의 본질적인 문제는 ErrorCode가 메시지 자체를 보유하고,
+       Exception이 메시지 또는 메시지 조합 정보를 보유하고,
+       Handler가 이미 있는 메시지를 다시 조합해 응답한다는 것이다.
+       이는 메시지 책임이 여러 계층에 분산되어 메시지가 시스템 내부 로직을 오염시키게 된다.
+       messages.properties 구조를 이용해
+       ErrorCode는 에러 식별, Exception은 어떤 에러가 발생했고 어떤 값을 전달할지 상황전달 역할을 하고,
+       Handler는 표현을 위해 메시지를 생성하고, properties는 UI 문구 자체를 관리하므로서
+       각 계층의 관심사를 분리할 수 있도록 한다.
+    2) ErrorCode를 불변 식별자로 단순화      
+       messages.properties를 쓰지 않으면 ErrorCode는 필연적으로 문자열 포맷터 역할을 하게 된다.
+       그러면 ErrorCdoe는 정책, 표현 방식을 알고, 서비스 상수를 참조하면서 변경에 민감하게 된다.
+       하지만 메시지 외부로 분리하면 ErrorCode는 불변 식별자 역할에 집중할 수 있다.
+    3) 변경에 대한 최소한의 여지 확보   
+       현실에서는 여러 변경 사항이 발생하게 된다.
+       messages.properties 구조는 코드 변경 없이 수용할 여지를 남긴다.
+       이는 설계 관점에서 중요하다.
+
+   구조가 단순하고 책임이 명확하다면 messages.properties를 사용할 필요는 없다.
+   하지만 현재 구조는 이미 BaseAbstractException, CommonExceptionHandler, ErrorCode 추상화, 도메인별 Exception 분리 등
+   구조가 설계되어 있기 떄문에 messages.properties는 메시지 관리 목적을 넘어 책임 분리를 위한 선택이다.
+
+7. 개선된 예외 구조
+    1) 핵심 원칙   
+       ***예외는 상태를 전달하고, 표현은 Handler에서 결정한다.***   
+       ErrorCode는 식별자, Exception은 상황 전달, Handler는 메시지로 MessageSource를 결정하는 구조를 가지도록 한다.
+        - ErrorCode는 식별자 + HTTP 상태까지만 책임진다.
+        - 메시지는 Exception 또는 Handler 레벨에서 결정한다.
+            - Exception은 어떤 에러인지, 메시지 파라미터만 가진다.
+            - Handler는 메시지 해석과 응답 생성을 담당한다.
+        - messages는 UI 표현 문구만 담당한다.
+    2) CommonErrorCode 단순화   
+       메시지 호출을 위한 key를 갖는다.(메시지 문자열 자체를 갖지 않음)
+       ~~~
+       public interface CommonErrorCode {
+           HttpStatus getStatus();
+           String getCode(); // 메시지 키
+       }
+       ~~~
+       ~~~
+       public enum CartErrorCode implements CommonErrorCode {
+       LIMIT_CART_MAX_SIZE(HttpStatus.BAD_REQUEST, "cart.limit.exceeded");
+       
+           private final HttpStatus status;
+           private final String code;
+       }
+       ~~~
+    3) BaseAbstractException은 ErrorCode, messages 전달인자만 갖는다.   
+       getter를 강제하지 않고, 필드기반으로 단순, 명확하게 가져간다.
+        - Object...   
+          법적으로는 Object[] 배열이고, 사용성을 좋게 만든 자바의 가변 인자(varargs) 문법.   
+          컴파일 타임에 그냥 배열로 변환.
+        - 추상 클래스를 유지한다는 말은 경계를 유지한다는 뜻이다.
+          경계를 유지한다는 말은, BaseAbstractException이 직접 사용되는 예외가 아니라
+          도메인 예외들이 반드시 거쳐야 하는 기준선으로 유지한다는 뜻이다.
+          따라서 책임의 분리가 선명해진다.
+        - 추상 클래스가 아니지만 abstract를 유지하는 이유
+            1. 예외를 직접 던지지 말라는 설계 의도 표현 수단으로 사용   
+               BaseAbstractException은 직접 사용되는 예외가 아니라
+               도메인 예외들이 반드시 상속해야 하는 기반 계약(contract) 이다.
+               띠라서 abstract로 선언해 직접 예외를 던지는 경우를 막는다.
+            2. 도메인 경계 강제
+               로그를 통하면 어느 도메인에서 예외가 발생했는지 즉시 알 수 있음.
+            3. 추후 "공통 동작"을 추가할 확장의 여지를 남김
+        - abstract 없애도 되는 경우   
+          추상 클래스가 과한 경우에는 제거해 단순화하는 것이 좋다.
+          예를 들어 소규모 프로젝트인데 에러코드 10개 미만이고 도메인 구분 필요없는 경우가 있다.
+       ~~~
+       public abstract class BaseAbstractException extends RuntimeException {
+           private final CommonErrorCode errorCode;
+           private final Object[] messageArgs;
+ 
+           protected BaseAbstractException(CommonErrorCode errorCode, Object... messageArgs) {
+               this.errorCode = errorCode;
+               this.messageArgs = messageArgs;
+           }
+ 
+           public CommonErrorCode getErrorCode() {
+               return errorCode;
+           }
+ 
+           public Object[] getMessageArgs() {
+               return messageArgs;
+           }
+       }
+       ~~~ 
+    4) 커스텀 Exception
+       ~~~
+       public class CartException extends BaseAbstractException {
+           public CartException(CartErrorCode errorCode, Object... args) {
+               super(errorCode, args)
+ 
+           }
+     
+           public CartException(CartErrorCode errorCode) {
+               super(errorCode, null);
+           }
+       }
+       ~~~
+    5) ExceptionHandler
+       ~~~
+       @ExceptionHandler(BaseAbstractException.class)
+       public ResponseEntity<CommonErrorResponse> handle(BaseAbstractException e) {
+     
+           String message = messageSource.getMessage(
+               e.getErrorCode().getCode(),
+               e.getMessageArgs(),
+               LocaleContextHolder.getLocale()
+           );
+     
+           return ResponseEntity
+               .status(e.getErrorCode().getStatus())
+               .body(new CommonErrorResponse(e.getErrorCode(), message));
+       }       
+       ~~~
 
 
 ---
@@ -1540,4 +2140,299 @@ OOP 관점에서 봤을 때 인터페이스는 다형성 혹은 개방 폐쇄 �
       - 의미+계약(API스펙)의 일부이므로 Enum 유지.
    2) Validation 에러
       - 문구 변경시 코드를 수정하지 않도록 하기 위해 ValidationMessages.properties로 분리.
+
+
+### < 서버 에러 메시지 하드코딩 제거: placeholder 기반 메시지 분리 전략 >
+1. 해결해야 할 문제
+    1) 하드코딩 된 메시지 분리   
+       자바코드를 포함하는 하드코딩 된 에러 메시지를 properties 파일로 이동시키려고 한다.   
+       이 때, properties 파일 안에서 자바코드를 직접 사용할 수 없다.
+    2) 현재 코드 방식의 문제점
+        - 메시지와 로직의 강결합.   
+          메시지가 CartService에 의존.   
+          ErrorCode가 도메인 정책 값의 소유자처럼 동작하고 있다.
+          CartService 수정 시 ErrorCode까지 저장.
+        - 국제화 불가.
+        - 정책 변경 시 코드 수정 필요.   
+          메시지 문구 수정 시 배포 필요.
+   ~~~
+   @Getter
+   @AllArgsConstructor
+   public enum CartErrorCode implements CommonErrorCode {
+       // 장바구니 validation check
+       LIMIT_CART_MAX_SIZE(HttpStatus.BAD_REQUEST.value(), "장바구니에는 최대 " + CartService.CART_MAX_SIZE + "건만 추가 가능합니다.")
+       ;
+
+       private final int statusCode;
+       private final String errorMessage;
+   }
+   ~~~
+
+2. properties 파일의 역할과 한계    
+   properties 파일은 순수 리소스 파일로, 문자열만 저장 가능하다.
+   따라서 properties 파일이 자바 코드를 포함할 수 없다.
+   이 때 스프링은 MessageSource를 통해 '문자열+인자(Object[])'만 치환한다.
+
+3. 해결방법
+   위와 같은 방식 대신, 'placeholder + 런타임 인자 전달' 방식으로 동일한 효과를 낼 수 있다.
+    1) properties + placeholder 사용   
+       properties에 메시지를 하드코딩해 사용하면 자바코드와 properties 파일 모두 값을 수정해야한다.
+       따라서 정책 값이 메시지와 코드에 중복 정의되어 둘 다 관리가 필요하므로 정합성 붕괴와 실수 확률이 증가한다.   
+       따라서 properties 파일에서 메시지를 관리하되, placeholder를 이용해 인자를 전달해 사용한다.
+       전달인자는 런타임에 placeholder에 전달된다.
+       ~~~
+       error.cart.limit.max=장바구니에는 최대 {0}건만 추가 가능합니다.
+       ~~~
+    2) Enum에 하드코딩 메시지를 키로 변경
+       ~~~
+       @Getter
+       @AllArgsConstructor
+       public enum CartErrorCode implements CommonErrorCode {
+ 
+           LIMIT_CART_MAX_SIZE(
+               HttpStatus.BAD_REQUEST.value(),
+               "error.cart.limit.max"
+           );
+ 
+           private final int statusCode;
+           private final String messageKey;
+       }
+       ~~~
+    3) 예외 발생 시 값 주입   
+       예외 발생 시 값 주입해 해당 예외가 발생하면 에러 메시지를 출력한다.
+       ~~~
+       throw new CartException(
+           CartErrorCode.LIMIT_CART_MAX_SIZE,
+           new Object[]{ CartService.CART_MAX_SIZE }
+       );
+       ~~~
+
+4. 더 나은 확장 (선택)
+   메시지와 정책 값 모두 외부 설정으로 분리하면 환경별 정책 변경이 코드 수정 없이 가능하다.   
+   - 운영 환경별 설정 가능
+   - 메시지 구조는 그대로 유지
+   ~~~
+   //application.properties
+   cart:
+      max-size: 30 
+   ~~~
+   ~~~
+   // CartService
+   @Value("${cart.max-size}")
+   private int cartMaxSize;
+   ~~~
+
+
+### < 메시지 호출 테스트 문제해결 : Spring Validation과 ExceptionHandler에서 메시지 처리 >
+1. 발생에러
+   ~~~
+   2026-01-14T09:42:33.047+09:00  WARN 21560 --- [MyECommerce] [    Test worker] c.m.M.e.handler.CommonExceptionHandler   : error.default.invalid.value
+   
+   org.springframework.web.bind.MethodArgumentNotValidException: Validation failed for argument [0] in public org.springframework.http.ResponseEntity<com.myecommerce.MyECommerce.dto.production.ResponseProductionDto> com.myecommerce.MyECommerce.controller.ProductionController.registerProduction(com.myecommerce.MyECommerce.dto.production.RequestProductionDto,com.myecommerce.MyECommerce.entity.member.Member): [Field error in object 'requestProductionDto' on field 'code': rejected value [!!INVALID!!]; codes [Pattern.requestProductionDto.code,Pattern.code,Pattern.java.lang.String,Pattern]; arguments [org.springframework.context.support.DefaultMessageSourceResolvable: codes [requestProductionDto.code,code]; arguments []; default message [code],[Ljakarta.validation.constraints.Pattern$Flag;@687f62a5,^[a-zA-Z0-9][a-zA-Z0-9\-]*$]; default message [상품코드는 영문자, 숫자만 사용 가능합니다.
+   특수문자는 -만 허용하며 첫 글자로 사용 불가합니다.]]
+   // ... 생략
+   
+   MockHttpServletRequest:
+   HTTP Method = POST
+   Request URI = /production
+   Parameters = {}
+   Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"110"]
+   Body = {"code":"!!INVALID!!","name":"정상 상품명","category":"WOMEN_CLOTHING","description":null,"options":null}
+   Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.myecommerce.MyECommerce.entity.member.Member@1b26fac2, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[SELLER]]]}
+   
+   Handler:
+   Type = com.myecommerce.MyECommerce.controller.ProductionController
+   Method = com.myecommerce.MyECommerce.controller.ProductionController#registerProduction(RequestProductionDto, Member)
+   
+   Async:
+   Async started = false
+   Async result = null
+   
+   Resolved Exception:
+   Type = org.springframework.web.bind.MethodArgumentNotValidException
+   
+   // ... 생략
+   
+   MockHttpServletResponse:
+   Status = 400
+   Error message = null
+   Headers = [Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+   Content type = application/json
+   Body = {"errorCode":"INVALID_VALUE","errorMessage":"error.default.invalid.value\n상품코드는 영문자, 숫자만 사용 가능합니다.\n특수문자는 -만 허용하며 첫 글자로 사용 불가합니다."}
+   Forwarded URL = null
+   Redirected URL = null
+   Cookies = []
+   
+   JSON path "$.errorMessage"
+   <Click to see difference>
+   
+   java.lang.AssertionError: JSON path "$.errorMessage" expected:<유효하지 않은 값입니다.
+   상품코드는 영문자, 숫자만 사용 가능합니다.
+   특수문자는 -만 허용하며 첫 글자로 사용 불가합니다.> but was:<error.default.invalid.value
+   상품코드는 영문자, 숫자만 사용 가능합니다.
+   특수문자는 -만 허용하며 첫 글자로 사용 불가합니다.>
+   at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:61)
+   at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:128)
+   // ... 생략
+   at com.myecommerce.MyECommerce.controller.ProductionControllerTest.failRegisterProduction_invalidCode(ProductionControllerTest.java:157)
+   // ... 생략
+   ~~~
+2. 에러발생원인   
+   Validation관련 ExceptionHandler는 DefaultErrorCode.java에 존재하는 에러코드의 메시지를, Validation 메시지에 앞에 붙여 사용하고 있었다.
+   이 때 서버 비즈니스 메시지에 대해 하드코딩에서 messages.properties 파일로 관리하게 되면서 기존에 잘 수행되던 테스트가 깨지게 되었다.   
+   MockMvc 기반 컨트롤러 테스트에서는 MessageSource가 자동으로 메시지 key르 문자열로 변환해주지 않는다.
+   그래서 기존에 메시지가 출력되던 위치에 메시지 key 자체가 출력되고 테스트 예상값과 동일하지 않게 되어 테스트가 실패한 것이다.
+   에러 메시지를 파일로 관리하기로 결정한 순간, 메시지 생성 책임은 전부 Handler로 이동한다.
+   따라서 messages.properties를 사용하는 경우, 명시적인 MessageSource 설정 또는 메시지 해석 로직을 직접 호출해야 한다.   
+   결론적으로, ***메시지 관리 구조를 개선하면서 Exceptionhandelr에 메시지 생성 로직을 누락***해 에러가 발생했다.
+3. 해결방법
+   Exceptionhandelr에 messageSource를 이용해 메시지 생성 로직을 추가해, 생성된 메시지를 응답으로 전달한다.   
+   테스트코드 수정은 필요없다.
+   ~~~
+   public class CommonExceptionHandler{
+      /** DTO 유효성검사 예외처리 **/
+      @ExceptionHandler(MethodArgumentNotValidException.class)
+      @ResponseStatus(HttpStatus.BAD_REQUEST)
+      protected ResponseEntity<CommonErrorResponse> methodArgumentNotValidExceptionHandler(
+              MethodArgumentNotValidException e) {
+          // 서버에러객체생성
+          DefaultErrorCode errorCode = INVALID_VALUE;
+
+          // 서버 에러 메시지 생성
+          String errorCodeMessage = messageSource.getMessage(
+                  errorCode.getErrorMessage(),
+                  null,
+                  LocaleContextHolder.getLocale()
+          );
+
+         // Validation Bean 에러 메시지 (에러메시지 여러개일 수 있음, BindingResult에서 가져옴)
+         String defaultErrorMessage = e.getBindingResult().getFieldError().getDefaultMessage() == null ?
+                 "" : "\n" + e.getBindingResult().getFieldError().getDefaultMessage() ;
+
+          // 응답 객체 생성
+          CommonErrorResponse errorResponse = CommonErrorResponse.builder()
+                  .errorCode(errorCode) // DefaultErrorCode.INVALID_VALUE
+                  .errorMessage(errorCodeMessage + defaultErrorMessage)
+                  .build();
+
+          // 응답 객체 반환
+          // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
+          return new ResponseEntity<>(errorResponse,
+                  Objects.requireNonNull(HttpStatus.resolve(errorCode.getStatusCode())));
+   }
+   ~~~ 
+4. Validation 메시지는 자동으로 key에 대한 메시지 생성되는 이유   
+   Spring Validation은 내부적으로 MessageSource를 이미 사용하고 있다.   
+   Hibernate Validator가 동작하면 Spring MessageSource가 실행되어
+   ValidationMessages.properties에서 key에 대한 value 값을 가져온다.
+5. 메시지 key와 자동 변환   
+   Validation 메시지는 Spring이 대신 MessageSource를 호출해주지만
+   비즈니스 에러 메시지는 절대 자동 변환되지 않는다
+
+  
+### < 메시지 조회 Locale 문제 해결방법 >
+1. 발생에러   
+   Bean Validation에서 발생한 메시지를 MessageSource로 가져올 때 Locale이 엉뚱하게 잡히는 문제.
+   ~~~
+   No message found under code 'validation.product.id.positive' for locale 'en'
+   ~~~
+2. 해결방법    
+   글로벌 서비스가 아니라면, 메시지 조회 시 Locale을 고정해 해결 가능하다.   
+   LocaleContextHolder.setLocale(Locale.KOREAN)를 전역 상수를 만들어 MessageSource 조회 시 매번 Locale을 지정한다.
+   ExceptionHandler 전역상수로 고정해 메시지 생성 시마다 호출하는 경우, 테스트 환경에서도 Locale이 바뀌는 문제를 신경쓰지 않아도 된다. 
+   별도로 테스트에서 Locale 설정이 필요 없게된다.
+   ~~~
+    public class CommonExceptionHandler {
+    
+        private static final Locale DEFAULT_LOCALE = Locale.KOREAN;  // 전역 상수
+    
+        @Autowired
+        private MessageSource messageSource;
+    
+        private String createMessage(String key, Object... args) {
+            return messageSource.getMessage(key, args, DEFAULT_LOCALE);
+        }
+        // ...
+    }
+   ~~~
+
+
+### < MessageSource placeholder 규칙으로 인한 메시지 파싱 오류와 해결 >
+~~~
+// messages.properties
+error.cart.limit.max.size=장바구니에는 최대 {value}건만 추가 가능합니다.
+~~~
+1. 발생에러   
+   ~~~
+    can't parse argument number: value
+    java.lang.IllegalArgumentException: can't parse argument number: value
+    // ... 생략
+    Caused by: java.lang.NumberFormatException: For input string: "value"
+   ~~~
+2. 에러발생원인   
+   MessageSource는 이름 기반 바인딩을 지원하지 않는다.
+   순서 기반 placeholder만 사용 가능하다.
+3. 해결방법
+   ~~~
+    // messages.properties
+    error.cart.limit.max.size=장바구니에는 최대 {0}건만 추가 가능합니다.
+   ~~~
+
+
+## 16. HTTP 상태코드
+1. Bad Request(400)의 정확한 의미   
+   클라이언트가 ***봰 요청이 형식, 내용적으로 잘못되었을 때 발생***하는 HTTP 상태코드.
+    - 잘못된 요청 파라미터
+    - 요청 상태가 현재 서버 자원 상태와 논리적으로 맞지 않음.
+    - ***클라이언트가 요청을 수정하면 재시도 가능.***
+2. 400 또는 Conflict(409)    
+   현재 리소스 상태상 수정 불가하거나 요청 자체는 형식적으로 문제 없지만 ***비즈니스 규칙을 위반한 경우.***
+3. Forbidden(403)   
+   인증은 되었지만 권한없음.
+4. Not Found(404)   
+   요청한 리소스가 존재하지 않음.   
+   예를 들면 상품이 존재하지 않는 경우.
+5. 비즈니스 로직에 적절한 HTTP 상태코드
+    - 비즈니스 규칙 위반도 '요청이 잘못되었다'라고 해석 가능.
+    - 비즈니스 로직에서 발생했다고 400 상태코드가 틀린 것은 아니다.   
+      하지만 클라이언트가 무엇을 잘못했는지를 기준으로 상태 코드를 나누면 API 품질이 올라간다.
+    1) 비즈니스 에러는 전부 400 전략
+        - 에러 미시지 & 에러 코드로 충분히 표현 가능
+        - 상태 코드 분기 단순
+        - 내부 서비스나 B2C 프론트에서는 큰 문제 없음.
+        - API 소비자가 에러 의미를 상태코드로 판단 불가.
+        - REST 의미 약화
+        - 프론트/외부 API 연동 시 분기 처리 어려움
+
+
+## 17. null과 ObjectUtils.isEmpty()
+### < ObjectUtils.isEmpty() 남용 문제 >
+1. ObjectUtils.isEmpty() 사용 시 문제점   
+   내부적으로 null, Optional.empty, 빈 문자열, 빈 컬렉션, 배열 길이=0 을 검증한다.
+   ObjectUtils.isEmpty는 “범용 유틸”이고 도메인 코드에서는 의도가 흐려진다.
+   이 코드를 보면 'member가 null인가?', 'member 내부 필드가 비었나?', '빈 컬렉션인가?', 'Optional인가?'
+   질문하게 되므로 의도를 전혀 알 수 없음
+   즉, DTO 객체에 쓰면 의미가 모호해진다.
+   따라서 null 체크는 명시적으로 하는 게 더 좋다.
+   내가 누린 것은 범용성의 장점이지, 도메인 코드의 장점이 되지 않는다.
+   ~~~
+   if (ObjectUtils.isEmpty(member)) {
+      //... 
+   }
+   ~~~
+
+2. ObjectUtils.isEmpty() 사용을 권장하지 않는 경우
+    1) 도메인 객체
+    2) 비즈니스 규칙 검증
+    3) Bean Validation 로직
+
+3. ObjectUtils.isEmpty() 사용하는 경우   
+   타입과 의미가 불명확한 경계 계층에서 사용.
+    1) Controller / API 입구   
+       의미보다 방어가 중요한 지점.   
+       외부 입력에 대해 타입이 불명확하지만 어쨌든 비어있으면 안 되는 경우.
+    2) 유틸 / 공통 라이브러리 코드   
+       의미 표현보다 범용성이 더 중요한 경우.
+    3) Map / Collection 처리
+    4) Optional 처리
 

@@ -9,26 +9,31 @@ import org.springframework.http.HttpStatus;
 @AllArgsConstructor
 public enum MemberErrorCode implements CommonErrorCode {
 
-    // 회원 객체 validation check
-    EMPTY_MEMBER_INFO(HttpStatus.BAD_REQUEST.value(), "회원정보가 존재하지 않습니다."),
-
     // 회원ID validation check
-    ALREADY_REGISTERED_MEMBER(HttpStatus.BAD_REQUEST.value(), "이미 존재하는 회원입니다."),
-
-    // 사용자명 validation check
+    MEMBER_ALREADY_REGISTERED(HttpStatus.CONFLICT.value(),
+            "error.member.already.registered"),
 
     // 비밀번호 validation check
-    LIMIT_PASSWORD_CHARACTERS_FROM_8_TO_100(HttpStatus.BAD_REQUEST.value(), "비밀번호는 최소 8자 이상 최대 100자 이하입니다."),
+    PASSWORD_LENGTH_LIMITED(HttpStatus.BAD_REQUEST.value(),
+            "error.member.password.length.limited"),
 
     // 전화번호 validation check
-    ALREADY_REGISTERED_PHONE_NUMBER(HttpStatus.BAD_REQUEST.value(),  "이미 등록된 전화번호입니다."),
+    TELEPHONE_LENGTH_LIMITED(HttpStatus.BAD_REQUEST.value(),
+            "error.member.telephone.length.limited"),
+    TELEPHONE_PATTERN_INVALID(HttpStatus.BAD_REQUEST.value(),
+            "error.member.telephone.pattern.invalid"),
+    TELEPHONE_ALREADY_REGISTERED(HttpStatus.CONFLICT.value(),
+            "error.member.telephone.already.registered"),
 
     // login validation check
-    USER_NOT_FOUND(HttpStatus.BAD_REQUEST.value(), "존재하지 않는 사용자입니다."),
-    MISMATCH_PASSWORD(HttpStatus.BAD_REQUEST.value(), "비밀번호가 일치하지 않습니다."),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND.value(),
+            "error.member.user.not.found"),
+    PASSWORD_MISMATCHED(HttpStatus.BAD_REQUEST.value(),
+            "error.member.password.mismatched"),
 
     // logout validation check
-    ALREADY_SIGN_OUT_USER(HttpStatus.BAD_REQUEST.value(), "이미 로그아웃된 사용자입니다.")
+    USER_ALREADY_SIGNED_OUT(HttpStatus.CONFLICT.value(),
+            "error.member.user.already.signed.out")
     ;
 
 

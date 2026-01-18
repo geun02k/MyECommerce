@@ -6,7 +6,7 @@ import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.entity.product.Product;
-import com.myecommerce.MyECommerce.exception.ProductionException;
+import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -18,7 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.*;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.*;
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.*;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.DELETION;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
@@ -129,8 +129,8 @@ class ProductionPolicyTest {
 
         // when
         // then
-        ProductionException exception =
-                assertThrows(ProductionException.class, () ->
+        ProductException exception =
+                assertThrows(ProductException.class, () ->
                         productPolicy.validateRegister(production, seller));
         assertEquals(PRODUCT_CODE_ALREADY_REGISTERED, exception.getErrorCode());
     }
@@ -151,8 +151,8 @@ class ProductionPolicyTest {
 
         // when
         // then
-        ProductionException exception =
-                assertThrows(ProductionException.class, () ->
+        ProductException exception =
+                assertThrows(ProductException.class, () ->
                         productPolicy.validateRegister(production, seller));
         assertEquals(PRODUCT_OPTION_CODE_DUPLICATED, exception.getErrorCode());
     }
@@ -180,8 +180,8 @@ class ProductionPolicyTest {
 
         // when
         // then
-        ProductionException exception =
-                assertThrows(ProductionException.class, () ->
+        ProductException exception =
+                assertThrows(ProductException.class, () ->
                         productPolicy.validateRegister(production, seller));
         assertEquals(PRODUCT_OPTION_CODE_ALREADY_REGISTERED, exception.getErrorCode());
     }
@@ -223,7 +223,7 @@ class ProductionPolicyTest {
 
         // when
         // then
-        ProductionException e = assertThrows(ProductionException.class, () ->
+        ProductException e = assertThrows(ProductException.class, () ->
                 productPolicy.validateModify(
                         deletedProduction, Collections.emptyList()));
         assertEquals(PRODUCT_ALREADY_DELETED, e.getErrorCode());
@@ -242,7 +242,7 @@ class ProductionPolicyTest {
 
         // when
         // then
-        ProductionException e = assertThrows(ProductionException.class, () ->
+        ProductException e = assertThrows(ProductException.class, () ->
                 productPolicy.validateModify(production, invalidOptions));
         assertEquals(PRODUCT_OPTION_CODE_DUPLICATED, e.getErrorCode());
     }
@@ -271,7 +271,7 @@ class ProductionPolicyTest {
 
         // when
         // then
-        ProductionException e = assertThrows(ProductionException.class, () ->
+        ProductException e = assertThrows(ProductException.class, () ->
                 productPolicy.validateModify(
                         production, List.of(invalidOption)));
         assertEquals(PRODUCT_OPTION_CODE_ALREADY_REGISTERED, e.getErrorCode());

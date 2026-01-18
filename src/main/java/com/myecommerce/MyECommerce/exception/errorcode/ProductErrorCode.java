@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 @AllArgsConstructor
-public enum ProductionErrorCode implements CommonErrorCode {
+public enum ProductErrorCode implements CommonErrorCode {
 
     // 상품 validation check
     PRODUCT_CODE_ALREADY_REGISTERED(HttpStatus.CONFLICT.value(),

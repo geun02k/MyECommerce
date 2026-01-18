@@ -4,7 +4,7 @@ import com.myecommerce.MyECommerce.dto.production.*;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.entity.product.Product;
-import com.myecommerce.MyECommerce.exception.ProductionException;
+import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.*;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.*;
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.*;
 import static com.myecommerce.MyECommerce.type.ProductionOrderByStdType.*;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
 
@@ -110,7 +110,7 @@ public class ProductService {
         return serviceProductMapper.toSearchDetailDto(
                 productRepository.findById(id)
                         .orElseThrow(() ->
-                                new ProductionException(PRODUCT_NOT_EXIST)));
+                                new ProductException(PRODUCT_NOT_EXIST)));
     }
   
     /** 상품목록조회 **/
@@ -181,14 +181,14 @@ public class ProductService {
 
         // 3. 포함되지않는 경우에 대한 예외처리
         if (!isAllOriginOptionIds) {
-            throw new ProductionException(PRODUCT_OPTION_NOT_EXIST);
+            throw new ProductException(PRODUCT_OPTION_NOT_EXIST);
         }
     }
 
     // 상품ID, 셀러ID와 일치하는 상품 단건 조회
     private Product getProductionEntityByIdAndSeller(Long productionId, Long sellerId) {
         return productRepository.findByIdAndSeller(productionId, sellerId)
-                .orElseThrow(() -> new ProductionException(PRODUCT_EDIT_FORBIDDEN));
+                .orElseThrow(() -> new ProductException(PRODUCT_EDIT_FORBIDDEN));
     }
 
     // 상품 Entity 데이터 변경
@@ -213,7 +213,7 @@ public class ProductService {
             if (originOption != null) {
                 originOption.setQuantity(option.getQuantity());
             } else {
-                throw new ProductionException(PRODUCT_OPTION_NOT_EXIST);
+                throw new ProductException(PRODUCT_OPTION_NOT_EXIST);
             }
         }
     }

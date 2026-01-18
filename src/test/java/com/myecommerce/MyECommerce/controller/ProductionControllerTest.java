@@ -9,7 +9,7 @@ import com.myecommerce.MyECommerce.dto.production.RequestProductionOptionDto;
 import com.myecommerce.MyECommerce.dto.production.ResponseProductionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
-import com.myecommerce.MyECommerce.exception.ProductionException;
+import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.security.filter.JwtAuthenticationFilter;
 import com.myecommerce.MyECommerce.service.product.ProductService;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +27,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductionErrorCode.PRODUCT_CODE_ALREADY_REGISTERED;
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_CODE_ALREADY_REGISTERED;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
 import static com.myecommerce.MyECommerce.type.ProductionCategoryType.WOMEN_CLOTHING;
 import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
@@ -224,7 +224,7 @@ class ProductionControllerTest {
         RequestProductionDto request = validRequestProduction();
 
         given(productService.registerProduction(any(), any(Member.class)))
-                .willThrow(new ProductionException(PRODUCT_CODE_ALREADY_REGISTERED));
+                .willThrow(new ProductException(PRODUCT_CODE_ALREADY_REGISTERED));
 
         // when
         // then

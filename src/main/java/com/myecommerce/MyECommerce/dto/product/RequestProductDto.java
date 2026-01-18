@@ -13,7 +13,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RequestProductionDto {
+public class RequestProductDto {
 
     @NotBlank(message = "{validation.product.code.not.blank}")
     @Size(min=1, max=100, message ="{validation.product.code.size}")
@@ -37,6 +37,6 @@ public class RequestProductionDto {
 
     @Size(max = 100, message = "{validation.product.option.size}")
     @Valid
-    private List<RequestProductionOptionDto> options;
+    private List<RequestProductOptionDto> options;
 
 }

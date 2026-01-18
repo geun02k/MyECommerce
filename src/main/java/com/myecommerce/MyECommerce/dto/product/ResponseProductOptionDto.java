@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ResponseProductionOptionDto {
+public class ResponseProductOptionDto {
 
     private Long id;
 

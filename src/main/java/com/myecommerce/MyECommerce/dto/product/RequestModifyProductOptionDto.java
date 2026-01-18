@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RequestModifyProductionOptionDto {
+public class RequestModifyProductOptionDto {
 
     private Long id;
 

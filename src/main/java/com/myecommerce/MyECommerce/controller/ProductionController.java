@@ -1,10 +1,10 @@
 package com.myecommerce.MyECommerce.controller;
 
-import com.myecommerce.MyECommerce.dto.product.RequestModifyProductionDto;
-import com.myecommerce.MyECommerce.dto.product.RequestProductionDto;
-import com.myecommerce.MyECommerce.dto.product.RequestSearchProductionDto;
-import com.myecommerce.MyECommerce.dto.product.ResponseProductionDto;
-import com.myecommerce.MyECommerce.dto.product.ResponseSearchDetailProductionDto;
+import com.myecommerce.MyECommerce.dto.product.RequestModifyProductDto;
+import com.myecommerce.MyECommerce.dto.product.RequestProductDto;
+import com.myecommerce.MyECommerce.dto.product.RequestSearchProductDto;
+import com.myecommerce.MyECommerce.dto.product.ResponseProductDto;
+import com.myecommerce.MyECommerce.dto.product.ResponseSearchDetailProductDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.service.product.ProductService;
 import jakarta.validation.Valid;
@@ -30,8 +30,8 @@ public class ProductionController {
      **/
     @PostMapping
     @PreAuthorize("hasAuthority('SELLER')")
-    public ResponseEntity<ResponseProductionDto> registerProduction(
-            @RequestBody @Valid RequestProductionDto production,
+    public ResponseEntity<ResponseProductDto> registerProduction(
+            @RequestBody @Valid RequestProductDto production,
             @AuthenticationPrincipal Member member) {
 
         return ResponseEntity.ok(
@@ -43,8 +43,8 @@ public class ProductionController {
      **/
     @PutMapping
     @PreAuthorize("hasAuthority('SELLER')")
-    public ResponseEntity<ResponseProductionDto> modifyProduction(
-            @RequestBody @Valid RequestModifyProductionDto production,
+    public ResponseEntity<ResponseProductDto> modifyProduction(
+            @RequestBody @Valid RequestModifyProductDto production,
             @AuthenticationPrincipal Member member) {
 
         return ResponseEntity.ok(
@@ -59,7 +59,7 @@ public class ProductionController {
      * 상품상세 조회 get /production/{id}
      **/
     @GetMapping("/{id}")
-    public ResponseEntity<ResponseSearchDetailProductionDto> searchDetailProduction(
+    public ResponseEntity<ResponseSearchDetailProductDto> searchDetailProduction(
             @PathVariable @Positive(message = "{validation.product.id.positive}") Long id) {
         return ResponseEntity.ok(
                 productService.searchDetailProduct(id));
@@ -69,8 +69,8 @@ public class ProductionController {
      * 상품목록 조회 get /production
      **/
     @GetMapping
-    public ResponseEntity<Page<ResponseProductionDto>> searchProductionList(
-            @Valid RequestSearchProductionDto requestSearchProductionDto) {
+    public ResponseEntity<Page<ResponseProductDto>> searchProductionList(
+            @Valid RequestSearchProductDto requestSearchProductionDto) {
         return ResponseEntity.ok(
                 productService.searchProductList(requestSearchProductionDto));
     }

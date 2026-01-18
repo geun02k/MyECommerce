@@ -66,15 +66,15 @@ class ProductionServiceTest {
         Long memberId = 1L;
 
         // 요청 상품옵션 DTO 목록
-        RequestProductionOptionDto requestOptionDto = RequestProductionOptionDto.builder()
+        RequestProductOptionDto requestOptionDto = RequestProductOptionDto.builder()
                 .optionCode(optionCode)
                 .optionName(optionName)
                 .price(price)
                 .quantity(quantity)
                 .build();
         // 요청 상품 DTO
-        RequestProductionDto requestProductionDto =
-                RequestProductionDto.builder()
+        RequestProductDto requestProductionDto =
+                RequestProductDto.builder()
                         .code(productionCode)
                         .name(productionName)
                         .category(category)
@@ -155,7 +155,7 @@ class ProductionServiceTest {
                 .product(expectedProductionEntity)
                 .build();
         // response 상품 DTO
-        ResponseProductionDto expectedProductionDto = ResponseProductionDto.builder()
+        ResponseProductDto expectedProductionDto = ResponseProductDto.builder()
                 .id(1L)
                 .seller(member.getId())
                 .code(productionCode)
@@ -187,7 +187,7 @@ class ProductionServiceTest {
                 .willReturn(expectedProductionDto);
 
         // when
-        ResponseProductionDto response =
+        ResponseProductDto response =
                 productService.registerProduct(requestProductionDto, member);
 
         // then
@@ -221,7 +221,7 @@ class ProductionServiceTest {
         assertEquals(member.getId(), response.getSeller());
         assertEquals(productionEntity.getSaleStatus(), response.getSaleStatus());
         // 상품옵션검증
-        RequestProductionOptionDto reqOptFromReqProduction = requestProductionDto.getOptions().get(0);
+        RequestProductOptionDto reqOptFromReqProduction = requestProductionDto.getOptions().get(0);
         assertEquals(reqOptFromReqProduction.getOptionCode(), expectedOptionEntity.getOptionCode());
         assertEquals(reqOptFromReqProduction.getOptionName(), expectedOptionEntity.getOptionName());
         assertEquals(reqOptFromReqProduction.getPrice(), expectedOptionEntity.getPrice());
@@ -260,24 +260,24 @@ class ProductionServiceTest {
         int quantity = 30;
 
         // 요청 상품옵션 DTO 목록
-        RequestModifyProductionOptionDto requestUpdateOptionDto =
-                RequestModifyProductionOptionDto.builder()
+        RequestModifyProductOptionDto requestUpdateOptionDto =
+                RequestModifyProductOptionDto.builder()
                         .id(existingOptionId)
                         .quantity(updateQuantity)
                         .build();
-        RequestModifyProductionOptionDto requestInsertOptionDto =
-                RequestModifyProductionOptionDto.builder()
+        RequestModifyProductOptionDto requestInsertOptionDto =
+                RequestModifyProductOptionDto.builder()
                         .optionCode(optionCode)
                         .optionName(optionName)
                         .price(price)
                         .quantity(quantity)
                         .build();
-        List<RequestModifyProductionOptionDto> requestModifyOptionDtoList = new ArrayList<>();
+        List<RequestModifyProductOptionDto> requestModifyOptionDtoList = new ArrayList<>();
         requestModifyOptionDtoList.add(requestUpdateOptionDto);
         requestModifyOptionDtoList.add(requestInsertOptionDto);
         // 요청 상품 DTO
-        RequestModifyProductionDto requestProductionDto =
-                RequestModifyProductionDto.builder()
+        RequestModifyProductDto requestProductionDto =
+                RequestModifyProductDto.builder()
                         .id(productionId)
                         .description(updateDescription)
                         .saleStatus(updateSaleStatus)
@@ -325,7 +325,7 @@ class ProductionServiceTest {
                 .build();
         
         // 업데이트한 상품 결과 DTO
-        ResponseProductionDto expectedResultProductionDto = ResponseProductionDto.builder()
+        ResponseProductDto expectedResultProductionDto = ResponseProductDto.builder()
                 .id(originProductionEntity.getId())
                 .seller(originProductionEntity.getSeller())
                 .code(originProductionEntity.getCode())
@@ -391,7 +391,7 @@ class ProductionServiceTest {
                 .willReturn(expectedResultProductionDto);
 
         // when
-        ResponseProductionDto responseProductionDto =
+        ResponseProductDto responseProductionDto =
                 productService.modifyProduct(requestProductionDto, member);
 
         // then
@@ -412,12 +412,12 @@ class ProductionServiceTest {
         assertEquals(originProductionEntity.getName(), responseProductionDto.getName());
         assertEquals(originProductionEntity.getCategory(), responseProductionDto.getCategory());
         // 2. 상품옵션 수정 검증
-        RequestModifyProductionOptionDto requestUpdateOption = requestProductionDto.getOptions().get(0);
+        RequestModifyProductOptionDto requestUpdateOption = requestProductionDto.getOptions().get(0);
         ProductOption responseUpdatedOption = capturedProduction.getOptions().get(0);
         assertEquals(requestUpdateOption.getId(), responseUpdatedOption.getId());
         assertEquals(requestUpdateOption.getQuantity(), responseUpdatedOption.getQuantity());
         // 3. 상품옵션 신규등록 검증
-        RequestModifyProductionOptionDto requestInsertOption = requestProductionDto.getOptions().get(1);
+        RequestModifyProductOptionDto requestInsertOption = requestProductionDto.getOptions().get(1);
         ProductOption responseInsertedOption = capturedProduction.getOptions().get(1);
         assertNull(requestInsertOption.getId());
         assertNotNull(responseInsertedOption);

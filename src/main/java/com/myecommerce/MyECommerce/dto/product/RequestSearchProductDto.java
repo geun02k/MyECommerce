@@ -13,7 +13,7 @@ import org.springframework.data.domain.Pageable;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RequestSearchProductionDto {
+public class RequestSearchProductDto {
 
     @NotNull(message = "{validation.product.order.by.std.not.null}")
     @EnumValid(enumClass = ProductOrderByStdType.class,

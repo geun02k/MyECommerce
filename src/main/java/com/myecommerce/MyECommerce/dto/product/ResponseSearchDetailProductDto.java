@@ -5,13 +5,14 @@ import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ResponseProductionDto {
+public class ResponseSearchDetailProductDto {
 
     private Long id;
 
@@ -34,5 +35,7 @@ public class ResponseProductionDto {
     private Long updateId;
 
     private LocalDateTime updateDt;
+
+    private List<ResponseProductOptionDto> options;
 
 }

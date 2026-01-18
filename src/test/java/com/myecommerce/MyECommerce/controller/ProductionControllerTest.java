@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myecommerce.MyECommerce.config.JwtAuthenticationProvider;
 import com.myecommerce.MyECommerce.config.SecurityConfig;
 import com.myecommerce.MyECommerce.controller.config.TestSecurityConfig;
-import com.myecommerce.MyECommerce.dto.product.RequestProductionDto;
-import com.myecommerce.MyECommerce.dto.product.RequestProductionOptionDto;
-import com.myecommerce.MyECommerce.dto.product.ResponseProductionDto;
+import com.myecommerce.MyECommerce.dto.product.RequestProductDto;
+import com.myecommerce.MyECommerce.dto.product.RequestProductOptionDto;
+import com.myecommerce.MyECommerce.dto.product.ResponseProductDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.exception.ProductException;
@@ -78,13 +78,13 @@ class ProductionControllerTest {
                 .build();
     }
 
-    private RequestProductionDto validRequestProduction() {
-        return RequestProductionDto.builder()
+    private RequestProductDto validRequestProduction() {
+        return RequestProductDto.builder()
                 .code("productionCode")
                 .name("상 품 명")
                 .category(WOMEN_CLOTHING)
                 .options(Collections.singletonList(
-                        RequestProductionOptionDto.builder()
+                        RequestProductOptionDto.builder()
                                 .optionCode("optionCode")
                                 .optionName("상품 옵션명")
                                 .price(BigDecimal.valueOf(67900))
@@ -93,8 +93,8 @@ class ProductionControllerTest {
                 .build();
     }
 
-    private ResponseProductionDto serviceResponseProduction() {
-        return ResponseProductionDto.builder()
+    private ResponseProductDto serviceResponseProduction() {
+        return ResponseProductDto.builder()
                 .id(1L)
                 .seller(1L)
                 .code("productionCode")
@@ -114,12 +114,12 @@ class ProductionControllerTest {
         // 요청 회원 DTO
         Member member = seller();
         // 요청 상품 DTO
-        RequestProductionDto request = validRequestProduction();
+        RequestProductDto request = validRequestProduction();
         // 응답 상품 DTO
-        ResponseProductionDto response = serviceResponseProduction();
+        ResponseProductDto response = serviceResponseProduction();
 
         given(productService.registerProduct(
-                any(RequestProductionDto.class), any(Member.class)))
+                any(RequestProductDto.class), any(Member.class)))
                 .willReturn(response);
 
         // when
@@ -141,7 +141,7 @@ class ProductionControllerTest {
     public void failRegisterProduction_invalidCode() throws Exception {
         // given
         // 요청 상품 DTO
-        RequestProductionDto invalidRequest = RequestProductionDto.builder()
+        RequestProductDto invalidRequest = RequestProductDto.builder()
                 .code("!!INVALID!!") // @Pattern 위반
                 .name("정상 상품명")
                 .category(WOMEN_CLOTHING)
@@ -166,7 +166,7 @@ class ProductionControllerTest {
     public void failRegisterProduction_invalidEnum() throws Exception {
         // given
         // 요청 상품 DTO
-        RequestProductionDto invalidRequest = RequestProductionDto.builder()
+        RequestProductDto invalidRequest = RequestProductDto.builder()
                 .code("validCode")
                 .name("정상 상품명")
                 .category(null)
@@ -188,14 +188,14 @@ class ProductionControllerTest {
     @DisplayName("상품등록실패_옵션 유효성 미검증으로 DTO Validation 예외 발생 시 에러 응답 반환")
     public void failRegisterProduction_invalidOption() throws Exception {
         // given
-        RequestProductionOptionDto invalidOption =
-                RequestProductionOptionDto.builder()
+        RequestProductOptionDto invalidOption =
+                RequestProductOptionDto.builder()
                         .optionCode("optionCode")
                         .optionName("optionName")
                         .price(BigDecimal.valueOf(1000))
                         .quantity(0) // @Min 위반
                         .build();
-        RequestProductionDto request = RequestProductionDto.builder()
+        RequestProductDto request = RequestProductDto.builder()
                 .code("validCode")
                 .name("정상 상품명")
                 .category(WOMEN_CLOTHING)
@@ -221,7 +221,7 @@ class ProductionControllerTest {
     @DisplayName("상품등록실패_상품코드중복 비즈니스 예외 발생 시 에러 응답 반환")
     public void failRegisterProduction_whenAlreadyRegisteredProduction() throws Exception {
         // given
-        RequestProductionDto request = validRequestProduction();
+        RequestProductDto request = validRequestProduction();
 
         given(productService.registerProduct(any(), any(Member.class)))
                 .willThrow(new ProductException(PRODUCT_CODE_ALREADY_REGISTERED));

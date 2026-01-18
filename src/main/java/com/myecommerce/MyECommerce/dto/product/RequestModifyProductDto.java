@@ -13,7 +13,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RequestModifyProductionDto {
+public class RequestModifyProductDto {
 
     @NotNull(message = "{validation.product.id.not.null}")
     @Positive(message = "{validation.product.id.positive}")
@@ -29,6 +29,6 @@ public class RequestModifyProductionDto {
 
     @Size(max = 100, message = "{validation.product.option.size}")
     @Valid
-    private List<RequestModifyProductionOptionDto> options;
+    private List<RequestModifyProductOptionDto> options;
 
 }

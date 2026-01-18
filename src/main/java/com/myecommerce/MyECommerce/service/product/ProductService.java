@@ -38,8 +38,8 @@ public class ProductService {
 
     /** 상품등록 **/
     @Transactional
-    public ResponseProductionDto registerProduct(
-            RequestProductionDto requestProductDto, Member member) {
+    public ResponseProductDto registerProduct(
+            RequestProductDto requestProductDto, Member member) {
 
         // requestDto -> serviceDto 변환
         ServiceProductDto serviceProductDto =
@@ -61,8 +61,8 @@ public class ProductService {
 
     /** 상품수정 **/
     @Transactional
-    public ResponseProductionDto modifyProduct(
-            RequestModifyProductionDto requestProductDto, Member member) {
+    public ResponseProductDto modifyProduct(
+            RequestModifyProductDto requestProductDto, Member member) {
 
         // requestDto -> ServiceDto 변환
         ServiceProductDto serviceProductDto =
@@ -105,7 +105,7 @@ public class ProductService {
     }
 
     /** 상품상세조회 **/
-    public ResponseSearchDetailProductionDto searchDetailProduct(Long id) {
+    public ResponseSearchDetailProductDto searchDetailProduct(Long id) {
         return serviceProductMapper.toSearchDetailDto(
                 productRepository.findById(id)
                         .orElseThrow(() ->
@@ -113,8 +113,8 @@ public class ProductService {
     }
   
     /** 상품목록조회 **/
-    public Page<ResponseProductionDto> searchProductList(
-            RequestSearchProductionDto requestDto) {
+    public Page<ResponseProductDto> searchProductList(
+            RequestSearchProductDto requestDto) {
         // 정렬순서에 따른 상품목록조회 & entity -> dto로 변환
         return getSortedProducts(requestDto)
                         .map(serviceProductMapper::toDto);
@@ -229,7 +229,7 @@ public class ProductService {
     }
 
     // keyword를 포함하는 상품정보 페이지 조회
-    private Page<Product> getSortedProducts(RequestSearchProductionDto requestDto) {
+    private Page<Product> getSortedProducts(RequestSearchProductDto requestDto) {
         Page<Product> productPage;
         String keyword = requestDto.getKeyword();
         ProductOrderByStdType orderByStd = requestDto.getOrderByStd();

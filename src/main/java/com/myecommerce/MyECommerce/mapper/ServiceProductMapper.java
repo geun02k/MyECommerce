@@ -11,14 +11,14 @@ public interface ServiceProductMapper {
 
     ServiceProductMapper INSTANCE = Mappers.getMapper(ServiceProductMapper.class);
 
-    ServiceProductDto toServiceDto(RequestProductionDto productDto);
-    ServiceProductDto toServiceDto(RequestModifyProductionDto productDto);
+    ServiceProductDto toServiceDto(RequestProductDto productDto);
+    ServiceProductDto toServiceDto(RequestModifyProductDto productDto);
 
-    ResponseSearchDetailProductionDto toSearchDetailDto(Product product);
-    ResponseProductionDto toDto(Product product);
+    ResponseSearchDetailProductDto toSearchDetailDto(Product product);
+    ResponseProductDto toDto(Product product);
     Product toEntity(ServiceProductDto productDto);
 
-    ResponseProductionOptionDto toOptionDto(ProductOption option);
+    ResponseProductOptionDto toOptionDto(ProductOption option);
     ProductOption toOptionEntity(ServiceProductOptionDto optionDto);
 
 

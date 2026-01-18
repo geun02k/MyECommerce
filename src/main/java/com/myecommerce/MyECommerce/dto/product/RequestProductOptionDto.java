@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RequestProductionOptionDto {
+public class RequestProductOptionDto {
 
     @NotBlank(message = "{validation.product.option.code.not.blank}")
     @Size(min=1, max=100, message = "{validation.product.option.code.size}")

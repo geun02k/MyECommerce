@@ -1,8 +1,8 @@
 package com.myecommerce.MyECommerce.entity.product;
 
 import com.myecommerce.MyECommerce.entity.BaseEntity;
-import com.myecommerce.MyECommerce.type.ProductionCategoryType;
-import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
+import com.myecommerce.MyECommerce.type.ProductCategoryType;
+import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -33,14 +33,14 @@ public class Product extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    private ProductionCategoryType category;
+    private ProductCategoryType category;
 
     @Column(columnDefinition = "text")
     private String description;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private ProductionSaleStatusType saleStatus;
+    private ProductSaleStatusType saleStatus;
 
     // 상품:옵션 (1:N)
     // 상품의 옵션 데이터를 production_option 테이블 join해서 가져옴.

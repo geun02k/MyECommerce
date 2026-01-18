@@ -7,7 +7,7 @@ import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
-import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
+import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.*;
-import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.DELETION;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.DELETION;
 
 @Component
 @RequiredArgsConstructor
@@ -78,7 +78,7 @@ public class ProductPolicy {
     }
 
     // 상품 수정 시 판매상태 정책
-    private void enforceProductModifySaleStatusPolicy(ProductionSaleStatusType saleStatus) {
+    private void enforceProductModifySaleStatusPolicy(ProductSaleStatusType saleStatus) {
         if (saleStatus == DELETION) {
             throw new ProductException(PRODUCT_ALREADY_DELETED);
         }

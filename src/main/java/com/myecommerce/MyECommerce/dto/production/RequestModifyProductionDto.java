@@ -1,6 +1,6 @@
 package com.myecommerce.MyECommerce.dto.production;
 
-import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
+import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import com.myecommerce.MyECommerce.validation.EnumValid;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -23,9 +23,9 @@ public class RequestModifyProductionDto {
     private String description;
 
     @NotNull(message = "{validation.product.category.not.null}")
-    @EnumValid(enumClass = ProductionSaleStatusType.class,
+    @EnumValid(enumClass = ProductSaleStatusType.class,
             message = "{validation.product.sale.status.enum.invalid}")
-    private ProductionSaleStatusType saleStatus;
+    private ProductSaleStatusType saleStatus;
 
     @Size(max = 100, message = "{validation.product.option.size}")
     @Valid

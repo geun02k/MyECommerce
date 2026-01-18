@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 
 // 상품분류 도메인
 @AllArgsConstructor
-public enum ProductionCategoryType {
+public enum ProductCategoryType {
     WOMEN_CLOTHING("여성의류"),
     MANS_CLOTHING("남성의류"),
     FASHION_GOODS("패션잡화"),

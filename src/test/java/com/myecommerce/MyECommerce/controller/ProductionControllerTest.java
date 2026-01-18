@@ -29,8 +29,8 @@ import java.util.List;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_CODE_ALREADY_REGISTERED;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
-import static com.myecommerce.MyECommerce.type.ProductionCategoryType.WOMEN_CLOTHING;
-import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
+import static com.myecommerce.MyECommerce.type.ProductCategoryType.WOMEN_CLOTHING;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;

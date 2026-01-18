@@ -8,9 +8,8 @@ import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.*;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
-import com.myecommerce.MyECommerce.type.ProductionCategoryType;
-import com.myecommerce.MyECommerce.type.ProductionOrderByStdType;
-import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
+import com.myecommerce.MyECommerce.type.ProductCategoryType;
+import com.myecommerce.MyECommerce.type.ProductOrderByStdType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,8 +22,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.*;
-import static com.myecommerce.MyECommerce.type.ProductionOrderByStdType.*;
-import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
+import static com.myecommerce.MyECommerce.type.ProductOrderByStdType.*;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 
 @Service
 @RequiredArgsConstructor
@@ -233,8 +232,8 @@ public class ProductService {
     private Page<Product> getSortedProductions(RequestSearchProductionDto requestDto) {
         Page<Product> productionPage;
         String keyword = requestDto.getKeyword();
-        ProductionOrderByStdType orderByStd = requestDto.getOrderByStd();
-        ProductionCategoryType category = requestDto.getCategory();
+        ProductOrderByStdType orderByStd = requestDto.getOrderByStd();
+        ProductCategoryType category = requestDto.getCategory();
         Pageable pageable = requestDto.getPageable();
 
         if (orderByStd == ORDER_BY_LOWEST_PRICE) {

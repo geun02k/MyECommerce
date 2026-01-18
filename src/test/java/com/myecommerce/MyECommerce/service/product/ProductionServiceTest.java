@@ -7,8 +7,8 @@ import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.mapper.*;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
-import com.myecommerce.MyECommerce.type.ProductionCategoryType;
-import com.myecommerce.MyECommerce.type.ProductionSaleStatusType;
+import com.myecommerce.MyECommerce.type.ProductCategoryType;
+import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,9 +23,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.myecommerce.MyECommerce.type.ProductionCategoryType.WOMEN_CLOTHING;
-import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.DISCONTINUED;
-import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
+import static com.myecommerce.MyECommerce.type.ProductCategoryType.WOMEN_CLOTHING;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.DISCONTINUED;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -53,9 +53,9 @@ class ProductionServiceTest {
         // given
         String productionCode = "RM-JK-D11S51";
         String productionName = "제 품 명";
-        ProductionCategoryType category = WOMEN_CLOTHING;
+        ProductCategoryType category = WOMEN_CLOTHING;
         String description = "설명";
-        ProductionSaleStatusType saleStatus = ON_SALE;
+        ProductSaleStatusType saleStatus = ON_SALE;
 
         String optionCode = "S-BL";
         String optionName = "스몰사이즈 블루컬러";
@@ -238,12 +238,12 @@ class ProductionServiceTest {
         Long productionId = 1L;
         String productionCode = "RM-JK-D11S51";
         String productionName = "제 품 명";
-        ProductionCategoryType category = WOMEN_CLOTHING;
+        ProductCategoryType category = WOMEN_CLOTHING;
         String description = "설명";
-        ProductionSaleStatusType saleStatus = ON_SALE;
+        ProductSaleStatusType saleStatus = ON_SALE;
 
         String updateDescription = "수정한 설명입니다.";
-        ProductionSaleStatusType updateSaleStatus = DISCONTINUED;
+        ProductSaleStatusType updateSaleStatus = DISCONTINUED;
 
         Long existingOptionId = 2L;
         String existingOptionCode = "S-BL";

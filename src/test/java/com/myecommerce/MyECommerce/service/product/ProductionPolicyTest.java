@@ -20,8 +20,8 @@ import java.util.*;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.*;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
-import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.DELETION;
-import static com.myecommerce.MyECommerce.type.ProductionSaleStatusType.ON_SALE;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.DELETION;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;

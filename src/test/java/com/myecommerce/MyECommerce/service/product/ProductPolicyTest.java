@@ -62,7 +62,7 @@ class ProductPolicyTest {
     }
 
     /** 옵션 미포함 상품 */
-    ServiceProductDto createProductionWithoutOptionsForInsert() {
+    ServiceProductDto createProductWithoutOptionsForInsert() {
         return ServiceProductDto.builder()
                 .id(null)
                 .code("code")
@@ -136,10 +136,23 @@ class ProductPolicyTest {
     }
 
     @Test
+    @DisplayName("상품등록정책실패 - 상품 옵션 미입력 시 예외발생")
+    void validateRegister_shouldThrowException_whenProductWithoutOptionRegister() {
+        // given
+        ServiceProductDto product = createProductWithoutOptionsForInsert();
+
+        // when
+        // then
+        ProductException e = assertThrows(ProductException.class, () ->
+                productPolicy.validateRegister(product, seller()));
+        assertEquals(OPTION_AT_LEAST_ONE_REQUIRED, e.getErrorCode());
+    }
+
+    @Test
     @DisplayName("상품등록정책실패 - 중복된 옵션코드 입력 시 예외발생")
     void validateRegister_shouldThrowException_whenDuplicatedOptionCodeRequest() {
         // given
-        ServiceProductDto production = createProductionWithoutOptionsForInsert();
+        ServiceProductDto production = createProductWithoutOptionsForInsert();
         production.setOptions(List.of(
                 createOptionForInsert("optionCode01"),
                 createOptionForInsert("optionCode01"))); // 중복

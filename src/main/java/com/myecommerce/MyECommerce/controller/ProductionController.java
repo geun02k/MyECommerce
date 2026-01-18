@@ -1,10 +1,10 @@
 package com.myecommerce.MyECommerce.controller;
 
-import com.myecommerce.MyECommerce.dto.production.RequestModifyProductionDto;
-import com.myecommerce.MyECommerce.dto.production.RequestProductionDto;
-import com.myecommerce.MyECommerce.dto.production.RequestSearchProductionDto;
-import com.myecommerce.MyECommerce.dto.production.ResponseProductionDto;
-import com.myecommerce.MyECommerce.dto.production.ResponseSearchDetailProductionDto;
+import com.myecommerce.MyECommerce.dto.product.RequestModifyProductionDto;
+import com.myecommerce.MyECommerce.dto.product.RequestProductionDto;
+import com.myecommerce.MyECommerce.dto.product.RequestSearchProductionDto;
+import com.myecommerce.MyECommerce.dto.product.ResponseProductionDto;
+import com.myecommerce.MyECommerce.dto.product.ResponseSearchDetailProductionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.service.product.ProductService;
 import jakarta.validation.Valid;

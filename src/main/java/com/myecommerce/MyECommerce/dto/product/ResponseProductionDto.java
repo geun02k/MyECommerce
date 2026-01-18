@@ -1,11 +1,10 @@
-package com.myecommerce.MyECommerce.dto.production;
+package com.myecommerce.MyECommerce.dto.product;
 
 import com.myecommerce.MyECommerce.type.ProductCategoryType;
 import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Getter
 @Setter

@@ -1,6 +1,6 @@
 package com.myecommerce.MyECommerce.service.product;
 
-import com.myecommerce.MyECommerce.dto.production.*;
+import com.myecommerce.MyECommerce.dto.product.*;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.entity.product.Product;

@@ -1,4 +1,4 @@
-package com.myecommerce.MyECommerce.dto.production;
+package com.myecommerce.MyECommerce.dto.product;
 
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -10,7 +10,9 @@ import java.math.BigDecimal;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RequestProductionOptionDto {
+public class RequestModifyProductionOptionDto {
+
+    private Long id;
 
     @NotBlank(message = "{validation.product.option.code.not.blank}")
     @Size(min=1, max=100, message = "{validation.product.option.code.size}")

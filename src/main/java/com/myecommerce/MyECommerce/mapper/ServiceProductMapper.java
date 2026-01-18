@@ -1,6 +1,6 @@
 package com.myecommerce.MyECommerce.mapper;
 
-import com.myecommerce.MyECommerce.dto.production.*;
+import com.myecommerce.MyECommerce.dto.product.*;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import org.mapstruct.Mapper;

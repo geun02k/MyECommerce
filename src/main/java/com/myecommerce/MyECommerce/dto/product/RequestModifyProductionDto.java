@@ -1,4 +1,4 @@
-package com.myecommerce.MyECommerce.dto.production;
+package com.myecommerce.MyECommerce.dto.product;
 
 import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import com.myecommerce.MyECommerce.validation.EnumValid;

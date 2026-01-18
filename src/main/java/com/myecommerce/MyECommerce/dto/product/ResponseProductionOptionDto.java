@@ -1,6 +1,5 @@
-package com.myecommerce.MyECommerce.dto.production;
+package com.myecommerce.MyECommerce.dto.product;
 
-import com.myecommerce.MyECommerce.entity.member.Member;
 import lombok.*;
 
 import java.math.BigDecimal;

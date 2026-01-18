@@ -26,30 +26,30 @@ public class ProductPolicy {
     private final ProductOptionRepository productOptionRepository;
 
     /** 등록 정책 검증 **/
-    public void validateRegister(ServiceProductionDto productionDto,
+    public void validateRegister(ServiceProductionDto productDto,
                                  Member member) {
         // 판매자별 상품코드 중복체크 정책
-        enforceProductionCodeUniquenessPolicy(
-                member.getId(), productionDto.getCode());
+        enforceProductCodeUniquenessPolicy(
+                member.getId(), productDto.getCode());
         // 상품옵션목록 중복체크 정책
         enforceOptionCodeUniquenessPolicy(
-                productionDto.getCode(), productionDto.getOptions());
+                productDto.getCode(), productDto.getOptions());
     }
 
     /** 수정 정책 검증 **/
-    public void validateModify(Product production,
+    public void validateModify(Product product,
                                List<ServiceProductionOptionDto> insertOptionList) {
         // 판매상태 정책 검증
-        enforceProductModifySaleStatusPolicy(production.getSaleStatus());
+        enforceProductModifySaleStatusPolicy(product.getSaleStatus());
         // 신규 등록할 상품옵션 중복 검증
         enforceOptionCodeUniquenessPolicy(
-                production.getCode(), insertOptionList);
+                product.getCode(), insertOptionList);
     }
 
     // 상품코드 유일성 검증 정책 (판매자별 상품코드 중복체크)
-    private void enforceProductionCodeUniquenessPolicy(Long sellerId,
-                                                       String productionCode) {
-        productRepository.findBySellerAndCode(sellerId, productionCode)
+    private void enforceProductCodeUniquenessPolicy(Long sellerId,
+                                                    String productCode) {
+        productRepository.findBySellerAndCode(sellerId, productCode)
                 .ifPresent(existingProduction -> {
                     throw new ProductionException(PRODUCT_CODE_ALREADY_REGISTERED);
                 });
@@ -57,7 +57,7 @@ public class ProductPolicy {
 
     // 신규 옵션 코드 유일성 검증 정책 (상품옵션 중복체크)
     private void enforceOptionCodeUniquenessPolicy(
-            String productionCode, List<ServiceProductionOptionDto> optionDtoList) {
+            String productCode, List<ServiceProductionOptionDto> optionDtoList) {
         // 중복코드 제거된 옵션코드목록 set
         Set<String> deduplicatedOptionCodes = optionDtoList.stream()
                 .map(ServiceProductionOptionDto::getOptionCode)
@@ -71,7 +71,7 @@ public class ProductPolicy {
         // 2. 이미 등록된 옵션코드와 중복 체크
         List<Product> duplicatedOptions =
                 productOptionRepository.findByProductCodeAndOptionCodeIn(
-                        productionCode, deduplicatedOptionCodes.stream().toList());
+                        productCode, deduplicatedOptionCodes.stream().toList());
         if (!duplicatedOptions.isEmpty()) {
             throw new ProductionException(PRODUCT_OPTION_CODE_ALREADY_REGISTERED);
         }

@@ -18,15 +18,15 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/production")
+@RequestMapping("/product")
 @RequiredArgsConstructor
 @Validated
-public class ProductionController {
+public class ProductController {
 
     private final ProductService productService;
 
     /**
-     * 상품, 상품옵션목록 등록 post /production
+     * 상품, 상품옵션목록 등록 post /product
      **/
     @PostMapping
     @PreAuthorize("hasAuthority('SELLER')")
@@ -39,7 +39,7 @@ public class ProductionController {
     }
 
     /**
-     * 상품, 상품옵션 수정 put /production/{id}
+     * 상품, 상품옵션 수정 put /product/{id}
      **/
     @PutMapping
     @PreAuthorize("hasAuthority('SELLER')")
@@ -52,11 +52,11 @@ public class ProductionController {
     }
 
     /**
-     * 상품, 상품옵션 삭제 delete /production/{id}
+     * 상품, 상품옵션 삭제 delete /product/{id}
      **/
 
     /**
-     * 상품상세 조회 get /production/{id}
+     * 상품상세 조회 get /product/{id}
      **/
     @GetMapping("/{id}")
     public ResponseEntity<ResponseSearchDetailProductDto> searchDetailProduction(
@@ -66,7 +66,7 @@ public class ProductionController {
     }
 
     /**
-     * 상품목록 조회 get /production
+     * 상품목록 조회 get /product
      **/
     @GetMapping
     public ResponseEntity<Page<ResponseProductDto>> searchProductionList(

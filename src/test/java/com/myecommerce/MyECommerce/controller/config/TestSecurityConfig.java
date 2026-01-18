@@ -25,8 +25,8 @@ public class TestSecurityConfig {
                                 // 회원가입, 로그인 경로에 대해 모든인원 접근허용
                                 .requestMatchers("/member/signup/**",
                                         "/member/signin/**").permitAll()
-                                .requestMatchers(HttpMethod.GET,  "/production").permitAll()
-                                .requestMatchers(HttpMethod.GET,  "/production/*").permitAll()
+                                .requestMatchers(HttpMethod.GET,  "/product").permitAll()
+                                .requestMatchers(HttpMethod.GET,  "/product/*").permitAll()
                                 // 그 외 경로에 대해 인증필요
                                 .anyRequest().authenticated());
 

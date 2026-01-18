@@ -42,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(
-        controllers = ProductionController.class,
+        controllers = ProductController.class,
         excludeFilters = @ComponentScan.Filter(
                 type = FilterType.ASSIGNABLE_TYPE,
                 classes = {
@@ -53,7 +53,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         )
 )
 @Import(TestSecurityConfig.class)
-class ProductionControllerTest {
+class ProductControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -124,7 +124,7 @@ class ProductionControllerTest {
 
         // when
         // then
-        mockMvc.perform(post("/production")
+        mockMvc.perform(post("/product")
                         .with(user(member))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -150,7 +150,7 @@ class ProductionControllerTest {
         // when
         // then
         // 1. 400 에러 발생 & 호출 메시지 검증
-        mockMvc.perform(post("/production")
+        mockMvc.perform(post("/product")
                         .with(user(seller()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))
@@ -174,7 +174,7 @@ class ProductionControllerTest {
 
         // when
         // then
-        mockMvc.perform(post("/production")
+        mockMvc.perform(post("/product")
                         .with(user(seller()))
                         .contentType(MediaType.APPLICATION_JSON)
                        .content(objectMapper.writeValueAsString(invalidRequest)))
@@ -204,7 +204,7 @@ class ProductionControllerTest {
 
         // when
         // then
-        mockMvc.perform(post("/production")
+        mockMvc.perform(post("/product")
                         .with(user(seller()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -228,7 +228,7 @@ class ProductionControllerTest {
 
         // when
         // then
-        mockMvc.perform(post("/production")
+        mockMvc.perform(post("/product")
                         .with(user(seller()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -250,7 +250,7 @@ class ProductionControllerTest {
         Long invalidProductId = -1L;
         // when
         // then
-        mockMvc.perform(get("/production/{id}", invalidProductId))
+        mockMvc.perform(get("/product/{id}", invalidProductId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode")
                         .value("INVALID_VALUE"))

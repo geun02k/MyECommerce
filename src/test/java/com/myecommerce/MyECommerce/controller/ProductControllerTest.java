@@ -239,6 +239,28 @@ class ProductControllerTest {
                         .value("이미 등록된 상품코드입니다."));
     }
 
+    @Test
+    @DisplayName("상품등록 실패 - 상품옵션 최소 1건 미포함 오류")
+    public void failRegisterProduct_whenProductWithoutOptionRegister()
+            throws Exception {
+        // given
+        RequestProductDto request = RequestProductDto.builder()
+                .code("code")
+                .name("상품명")
+                .category(WOMEN_CLOTHING)
+                .options(null)
+                .build();
+        // when
+        // then
+        mockMvc.perform(post("/product")
+                        .with(user(seller()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("INVALID_VALUE"));
+    }
+
     /* ----------------------
         상품상세조회 Tests
        ---------------------- */

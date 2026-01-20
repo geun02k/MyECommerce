@@ -42,9 +42,9 @@ class ProductPolicyTest {
        ------------------ */
 
     /** 신규옵션 포함 상품 */
-    ServiceProductDto createProductionForInsert() {
+    ServiceProductDto productForInsert() {
         ServiceProductOptionDto option =
-                createOptionForInsert("optionCode");
+                optionForInsert("optionCode");
         return ServiceProductDto.builder()
                         .id(null)
                         .code("code")
@@ -54,7 +54,7 @@ class ProductPolicyTest {
     }
 
     /** 신규옵션 */
-    ServiceProductOptionDto createOptionForInsert(String optionCode) {
+    ServiceProductOptionDto optionForInsert(String optionCode) {
         return ServiceProductOptionDto.builder()
                 .id(null)
                 .optionCode(optionCode)
@@ -62,7 +62,7 @@ class ProductPolicyTest {
     }
 
     /** 옵션 미포함 상품 */
-    ServiceProductDto createProductWithoutOptionsForInsert() {
+    ServiceProductDto productWithoutOptionsForInsert() {
         return ServiceProductDto.builder()
                 .id(null)
                 .code("code")
@@ -86,7 +86,7 @@ class ProductPolicyTest {
        ---------------------- */
 
     @Test
-    @DisplayName("상품등록정책통과")
+    @DisplayName("상품등록정책 통과")
     void validateRegister_shouldPass_WhenAllValid() {
         // given
         ServiceProductOptionDto option = ServiceProductOptionDto.builder()
@@ -113,33 +113,33 @@ class ProductPolicyTest {
     }
 
     @Test
-    @DisplayName("상품등록정책실패 - 판매자별 상품코드 중복 발생 시 예외발생")
-    void validationRegister_shouldThrowException_whenDuplicatedProductionCode() {
+    @DisplayName("상품등록정책 실패 - 판매자별 상품코드 중복 발생 시 예외발생")
+    void validationRegister_shouldFail_whenDuplicatedProductCode() {
         // given
-        ServiceProductDto production = createProductionForInsert();
+        ServiceProductDto product = productForInsert();
         Member seller = seller();
 
         // 이미 등록된 동일 상품코드 존재
         given(productRepository
-                .findBySellerAndCode(seller.getId(), production.getCode()))
+                .findBySellerAndCode(seller.getId(), product.getCode()))
                 .willReturn(Optional.of(Product.builder()
                                 .id(1L)
-                                .code(production.getCode())
+                                .code(product.getCode())
                                 .build()));
 
         // when
         // then
         ProductException exception =
                 assertThrows(ProductException.class, () ->
-                        productPolicy.validateRegister(production, seller));
+                        productPolicy.validateRegister(product, seller));
         assertEquals(PRODUCT_CODE_ALREADY_REGISTERED, exception.getErrorCode());
     }
 
     @Test
     @DisplayName("상품등록정책실패 - 상품 옵션 미입력 시 예외발생")
-    void validateRegister_shouldThrowException_whenProductWithoutOptionRegister() {
+    void validateRegister_shouldFail_whenProductWithoutOptionRegister() {
         // given
-        ServiceProductDto product = createProductWithoutOptionsForInsert();
+        ServiceProductDto product = productWithoutOptionsForInsert();
 
         // when
         // then
@@ -150,12 +150,12 @@ class ProductPolicyTest {
 
     @Test
     @DisplayName("상품등록정책실패 - 중복된 옵션코드 입력 시 예외발생")
-    void validateRegister_shouldThrowException_whenDuplicatedOptionCodeRequest() {
+    void validateRegister_shouldFail_whenDuplicatedOptionCodeRequest() {
         // given
-        ServiceProductDto production = createProductWithoutOptionsForInsert();
+        ServiceProductDto production = productWithoutOptionsForInsert();
         production.setOptions(List.of(
-                createOptionForInsert("optionCode01"),
-                createOptionForInsert("optionCode01"))); // 중복
+                optionForInsert("optionCode01"),
+                optionForInsert("optionCode01"))); // 중복
         Member seller = seller();
 
         given(productRepository.
@@ -172,9 +172,9 @@ class ProductPolicyTest {
 
     @Test
     @DisplayName("상품등록정책실패 - 이미 등록된 옵션코드 입력 시 예외발생")
-    void validateRegister_shouldThrowException_whenAlreadyRegisteredOptionCode() {
+    void validateRegister_shouldFail_whenAlreadyRegisteredOptionCode() {
        // given
-        ServiceProductDto production = createProductionForInsert();
+        ServiceProductDto production = productForInsert();
         Member seller = seller();
 
         given(productRepository.
@@ -250,8 +250,8 @@ class ProductPolicyTest {
                 .saleStatus(ON_SALE)
                 .build();
         List<ServiceProductOptionDto> invalidOptions = List.of(
-                createOptionForInsert("optionCode01"),
-                 createOptionForInsert("optionCode01")); // 중복
+                optionForInsert("optionCode01"),
+                optionForInsert("optionCode01")); // 중복
 
         // when
         // then
@@ -269,7 +269,7 @@ class ProductPolicyTest {
                 .saleStatus(ON_SALE)
                 .build();
         ServiceProductOptionDto invalidOption =
-                createOptionForInsert("insertOptionCode");
+                optionForInsert("insertOptionCode");
 
         // 이미 등록된 기존 동일 옵션코드 존재
         given(productOptionRepository.

@@ -1,13 +1,13 @@
 package com.myecommerce.MyECommerce.service.cart;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myecommerce.MyECommerce.dto.cart.RedisCartDto;
 import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
-import com.myecommerce.MyECommerce.dto.cart.ServiceCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
-import com.myecommerce.MyECommerce.mapper.ServiceCartMapper;
+import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
@@ -37,7 +37,7 @@ class CartServiceTest {
     @Mock
     private ObjectMapper objectMapper;
     @Mock
-    private ServiceCartMapper serviceCartMapper;
+    private RedisCartMapper redisCartMapper;
 
     @Mock
     private RedisSingleDataService redisSingleDataService;
@@ -76,7 +76,7 @@ class CartServiceTest {
                         .name("상품명")
                         .build())
                 .build();
-        ServiceCartDto foundOptionDto = ServiceCartDto.builder()
+        RedisCartDto foundOptionDto = RedisCartDto.builder()
                 .optionId(foundOption.getId())
                 .optionName(foundOption.getOptionName())
                 .price(foundOption.getPrice())
@@ -113,8 +113,8 @@ class CartServiceTest {
                 .willReturn(userCart);
 
         // stub(가설) : objectMapper.convertValue() 실행 시 object를 dto로 반환 예상.
-        given(objectMapper.convertValue(eq(userCart.get(orgOption.get("optionId"))), eq(ServiceCartDto.class)))
-                .willReturn(ServiceCartDto.builder()
+        given(objectMapper.convertValue(eq(userCart.get(orgOption.get("optionId"))), eq(RedisCartDto.class)))
+                .willReturn(RedisCartDto.builder()
                         .optionId((Long) orgOption.get("optionId"))
                         .optionName((String) orgOption.get("optionName"))
                         .price((BigDecimal) orgOption.get("price"))
@@ -134,12 +134,12 @@ class CartServiceTest {
                 .willReturn(orgOption);
 
         // stub(가설) : serviceCartMapper.toDto() 실행 시 entity에 해당하는 dto 반환 예상.
-        given(serviceCartMapper.toDto(foundOption))
+        given(redisCartMapper.toRedisDto(foundOption))
                 .willReturn(foundOptionDto);
 
         // stub(가설) : objectMapper.convertValue() 실행 시 object를 dto로 반환 예상.
-        given(objectMapper.convertValue(orgOption, ServiceCartDto.class))
-                .willReturn(ServiceCartDto.builder()
+        given(objectMapper.convertValue(orgOption, RedisCartDto.class))
+                .willReturn(RedisCartDto.builder()
                         .optionId((Long) orgOption.get("optionId"))
                         .optionName((String) orgOption.get("optionName"))
                         .price((BigDecimal) orgOption.get("price"))
@@ -149,11 +149,11 @@ class CartServiceTest {
                         .build());
 
         // ArgumentCaptor 생성
-        ArgumentCaptor<ServiceCartDto> foundOptionDtoCaptor =
-                ArgumentCaptor.forClass(ServiceCartDto.class);
+        ArgumentCaptor<RedisCartDto> foundOptionDtoCaptor =
+                ArgumentCaptor.forClass(RedisCartDto.class);
 
         // stub(가설) : serviceCartMapper.toDto() 실행 시 entity에 해당하는 dto 반환 예상.
-        given(serviceCartMapper.toResponseDto(foundOptionDtoCaptor.capture()))
+        given(redisCartMapper.toResponseDto(foundOptionDtoCaptor.capture()))
                 .willReturn(expectedResponseCartDto);
 
         // when
@@ -161,7 +161,7 @@ class CartServiceTest {
 
         // then
         // toResponseDto에 전달된 인자 캡처 후 검증
-        ServiceCartDto capturedFoundOptionDto = foundOptionDtoCaptor.getValue();
+        RedisCartDto capturedFoundOptionDto = foundOptionDtoCaptor.getValue();
         assertEquals(requestCartDto.getOptionId(), capturedFoundOptionDto.getOptionId());
         assertEquals(2, capturedFoundOptionDto.getQuantity());
         // redis 저장 실행여부 검증

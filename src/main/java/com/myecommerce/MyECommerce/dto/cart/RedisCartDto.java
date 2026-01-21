@@ -10,7 +10,7 @@ import java.time.LocalDate;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ServiceCartDto {
+public class RedisCartDto {
 
     private Long productId;
 

@@ -1,7 +1,7 @@
 package com.myecommerce.MyECommerce.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.myecommerce.MyECommerce.dto.cart.ServiceCartDto;
+import com.myecommerce.MyECommerce.dto.cart.RedisCartDto;
 import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import com.myecommerce.MyECommerce.type.RedisNamespaceType;
@@ -79,8 +79,8 @@ public class CartScheduler {
                                               Map<Object, Object> hashEntries) {
         hashEntries.forEach((productId, product) -> {
             // object -> dto로 변환
-            ServiceCartDto optionDto =
-                    objectMapper.convertValue(product, ServiceCartDto.class);
+            RedisCartDto optionDto =
+                    objectMapper.convertValue(product, RedisCartDto.class);
             // 만료일자 지나면 삭제
             if (optionDto.getExpiryDate().isBefore(expireDate)) {
                 redisSingleDataService.deleteSingleHashValueData(

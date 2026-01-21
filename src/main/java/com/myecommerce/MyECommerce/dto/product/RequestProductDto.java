@@ -35,6 +35,7 @@ public class RequestProductDto {
     @Size(max = 4000, message = "{validation.product.description.size}")
     private String description;
 
+    @NotEmpty(message = "{validation.product.option.not.empty}")
     @Size(max = 100, message = "{validation.product.option.size}")
     @Valid
     private List<RequestProductOptionDto> options;

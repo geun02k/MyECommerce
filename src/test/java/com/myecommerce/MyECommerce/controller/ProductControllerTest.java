@@ -68,19 +68,20 @@ class ProductControllerTest {
         Test Fixtures
        ------------------ */
 
+    /** 판매자 권한 사용자 */
     private Member seller() {
         return Member.builder()
                 .id(1L)
                 .roles(List.of(MemberAuthority.builder()
-                        .id(1L)
                         .authority(SELLER)
                         .build()))
                 .build();
     }
 
-    private RequestProductDto validRequestProduction() {
+    /** 유효한 상품 요청 */
+    private RequestProductDto validRequestProduct() {
         return RequestProductDto.builder()
-                .code("productionCode")
+                .code("productCode")
                 .name("상 품 명")
                 .category(WOMEN_CLOTHING)
                 .options(Collections.singletonList(
@@ -93,11 +94,12 @@ class ProductControllerTest {
                 .build();
     }
 
-    private ResponseProductDto serviceResponseProduction() {
+    /** 상품 얘상 응답 */
+    private ResponseProductDto serviceResponseProduct() {
         return ResponseProductDto.builder()
                 .id(1L)
                 .seller(1L)
-                .code("productionCode")
+                .code("productCode")
                 .category(WOMEN_CLOTHING)
                 .saleStatus(ON_SALE)
                 .build();
@@ -109,14 +111,14 @@ class ProductControllerTest {
 
     @Test
     @DisplayName("상품등록 성공")
-    void successRegisterProduction() throws Exception {
+    void registerProduct_shouldReturnOk_WhenValidProduct() throws Exception {
         // given
         // 요청 회원 DTO
         Member member = seller();
         // 요청 상품 DTO
-        RequestProductDto request = validRequestProduction();
+        RequestProductDto request = validRequestProduct();
         // 응답 상품 DTO
-        ResponseProductDto response = serviceResponseProduction();
+        ResponseProductDto response = serviceResponseProduct();
 
         given(productService.registerProduct(
                 any(RequestProductDto.class), any(Member.class)))
@@ -137,8 +139,8 @@ class ProductControllerTest {
     }
 
     @Test
-    @DisplayName("상품등록실패_상품코드 형식오류")
-    public void failRegisterProduction_invalidCode() throws Exception {
+    @DisplayName("상품상세조회 실패 - 상품코드 형식오류 발생 시 예외발생")
+    public void registerProduct_shouldReturnBadRequest_WhenInvalidCode() throws Exception {
         // given
         // 요청 상품 DTO
         RequestProductDto invalidRequest = RequestProductDto.builder()
@@ -162,8 +164,8 @@ class ProductControllerTest {
     }
 
     @Test
-    @DisplayName("상품등록실패_유효하지않은 Enum 값 오류")
-    public void failRegisterProduction_invalidEnum() throws Exception {
+    @DisplayName("상품상세조회 실패 - 유효하지않은 Enum 값 입력 시 예외발생")
+    public void registerProduct_shouldReturnBadRequest_whenInvalidEnumType() throws Exception {
         // given
         // 요청 상품 DTO
         RequestProductDto invalidRequest = RequestProductDto.builder()
@@ -185,8 +187,9 @@ class ProductControllerTest {
     }
 
     @Test
-    @DisplayName("상품등록실패_옵션 유효성 미검증으로 DTO Validation 예외 발생 시 에러 응답 반환")
-    public void failRegisterProduction_invalidOption() throws Exception {
+    @DisplayName("상품상세조회 실패 - 옵션 유효성 미검증으로 DTO Validation 예외 발생 시 에러 응답 반환")
+    public void registerProduct_shouldReturnBadRequest_whenInvalidOption()
+            throws Exception {
         // given
         RequestProductOptionDto invalidOption =
                 RequestProductOptionDto.builder()
@@ -218,10 +221,11 @@ class ProductControllerTest {
     }
 
     @Test
-    @DisplayName("상품등록실패_상품코드중복 비즈니스 예외 발생 시 에러 응답 반환")
-    public void failRegisterProduction_whenAlreadyRegisteredProduction() throws Exception {
+    @DisplayName("상품상세조회 실패 - 상품코드중복 비즈니스 예외 발생 시 에러 응답 반환")
+    public void registerProduct_shouldReturnConflict_whenAlreadyRegisteredProduct()
+            throws Exception {
         // given
-        RequestProductDto request = validRequestProduction();
+        RequestProductDto request = validRequestProduct();
 
         given(productService.registerProduct(any(), any(Member.class)))
                 .willThrow(new ProductException(PRODUCT_CODE_ALREADY_REGISTERED));
@@ -239,13 +243,35 @@ class ProductControllerTest {
                         .value("이미 등록된 상품코드입니다."));
     }
 
+    @Test
+    @DisplayName("상품등록 실패 - 상품에 대해 상품옵션 최소 1건 미포함 시 예외발생")
+    public void registerProduct_shouldReturnBadRequest_whenProductWithoutOptionRegister()
+            throws Exception {
+        // given
+        RequestProductDto request = RequestProductDto.builder()
+                .code("code")
+                .name("상품명")
+                .category(WOMEN_CLOTHING)
+                .options(null)
+                .build();
+        // when
+        // then
+        mockMvc.perform(post("/product")
+                        .with(user(seller()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("INVALID_VALUE"));
+    }
+
     /* ----------------------
         상품상세조회 Tests
        ---------------------- */
 
     @Test
-    @DisplayName("상품상세조회실패_음수 pathVariable Validation 예외 발생 시 에러 응답 반환")
-    public void searchProductDetail_whenNegativeId_thenBadRequest() throws Exception {
+    @DisplayName("상품상세조회 실패 - 음수 pathVariable Validation 예외 발생 시 에러 응답 반환")
+    public void searchProductDetail_shouldReturnBadRequest_whenNegativeId() throws Exception {
         // given
         Long invalidProductId = -1L;
         // when

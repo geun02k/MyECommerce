@@ -31,6 +31,8 @@ public class ProductPolicy {
         // 판매자별 상품코드 중복체크 정책
         enforceProductCodeUniquenessPolicy(
                 member.getId(), productDto.getCode());
+        // 옵션 최소 1건 필수 검증
+        enforceAtLeastOneOptionPolicy(productDto.getOptions());
         // 상품옵션목록 중복체크 정책
         enforceOptionCodeUniquenessPolicy(
                 productDto.getCode(), productDto.getOptions());
@@ -53,6 +55,14 @@ public class ProductPolicy {
                 .ifPresent(existingProduction -> {
                     throw new ProductException(PRODUCT_CODE_ALREADY_REGISTERED);
                 });
+    }
+
+    // 옵션 최소 1건 필수 입력 검증 정책
+    private void enforceAtLeastOneOptionPolicy(
+            List<ServiceProductOptionDto> options) {
+        if(options == null || options.isEmpty()) {
+            throw new ProductException(OPTION_AT_LEAST_ONE_REQUIRED);
+        }
     }
 
     // 신규 옵션 코드 유일성 검증 정책 (상품옵션 중복체크)

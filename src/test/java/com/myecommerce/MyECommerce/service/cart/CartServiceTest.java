@@ -5,7 +5,9 @@ import com.myecommerce.MyECommerce.dto.cart.RedisCartDto;
 import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
+import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.entity.product.Product;
+import com.myecommerce.MyECommerce.exception.CartException;
 import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
@@ -22,11 +24,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_CUSTOMER_ONLY;
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_ON_SALE;
-import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.DISCONTINUED;
+import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
+import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 import static org.junit.jupiter.api.Assertions.*;
@@ -60,10 +65,13 @@ class CartServiceTest {
         Test Fixtures
        ------------------ */
 
-    /** 회원가입된 사용자 */
+    /** 고객권한 사용자 */
     Member member() {
         return Member.builder()
                 .userId("tester")
+                .roles(List.of(MemberAuthority.builder()
+                                .authority(CUSTOMER)
+                                .build()))
                 .build();
     }
 
@@ -221,5 +229,21 @@ class CartServiceTest {
         // 판매상태 조회 실행여부 검증
         verify(productRepository, times(1))
                 .findByCodeAndSaleStatus(requestCartDto.getProductCode(), ON_SALE);
+    }
+
+    @Test
+    @DisplayName("장바구니추가 실패 - 고객 외 장바구니 접근 시 예외발생")
+    void addCart_shouldReturnCartCustomerOnly_whenAccessNotCustomer() {
+        // given
+        RequestCartDto requestCartDto = requestCartDto();
+        Member member = Member.builder()
+                .roles(List.of(MemberAuthority.builder()
+                        .authority(SELLER).build())).build();; // 회원아님
+
+        // when
+        // then
+        CartException e = assertThrows(CartException.class, () ->
+                cartService.addCart(requestCartDto, member));
+        assertEquals(CART_CUSTOMER_ONLY, e.getErrorCode());
     }
 }

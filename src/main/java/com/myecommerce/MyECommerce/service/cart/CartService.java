@@ -5,6 +5,7 @@ import com.myecommerce.MyECommerce.dto.cart.RedisCartDto;
 import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
+import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.exception.CartException;
 import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
@@ -19,8 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Map;
 
+import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_CUSTOMER_ONLY;
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_SIZE_EXCEEDED;
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_ON_SALE;
+import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 
@@ -50,6 +53,8 @@ public class CartService {
         //       - hashValue = 등록할 상품옵션 정보
 
         // 0. 정책검증
+        // 고객 한정 장바구니 접근 제한
+        validateCartAccessPolicy(member);
         // 장바구니 물품 100건 제한
         checkUserCartSizePolicy(member.getUserId());
         // 장바구니에 추가 가능한 상품은 판매중인 경우로 제한
@@ -100,6 +105,21 @@ public class CartService {
     private void validateOnSaleProductPolicy(String productCode) {
         productRepository.findByCodeAndSaleStatus(productCode, ON_SALE)
                 .orElseThrow(() -> new ProductException(PRODUCT_NOT_ON_SALE));
+    }
+
+    // 고객 한정 장바구니 접근 제한 정책
+    private void validateCartAccessPolicy(Member member) {
+        boolean hasCustomerRole = false;
+
+        if (member != null) {
+            hasCustomerRole = member.getRoles().stream()
+                    .map(MemberAuthority::getAuthority)
+                    .anyMatch(authority -> authority.equals(CUSTOMER));
+        }
+
+        if (!hasCustomerRole) {
+            throw new CartException(CART_CUSTOMER_ONLY);
+        }
     }
 
     // 상품옵션수량 셋팅

@@ -6,6 +6,7 @@ import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.product.Product;
+import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
@@ -24,6 +25,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_ON_SALE;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.DISCONTINUED;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 import static org.junit.jupiter.api.Assertions.*;
@@ -53,8 +56,32 @@ class CartServiceTest {
     @InjectMocks
     private CartService cartService;
 
+    /* ------------------
+        Test Fixtures
+       ------------------ */
+
+    /** 회원가입된 사용자 */
+    Member member() {
+        return Member.builder()
+                .userId("tester")
+                .build();
+    }
+
+    /** 유효한 장바구니 요청 */
+    RequestCartDto requestCartDto() {
+        return RequestCartDto.builder()
+                .productCode("productCode")
+                .optionCode("optionCode")
+                .quantity(1)
+                .build();
+    }
+
+    /* ----------------------
+        장바구니추가 Tests
+       ---------------------- */
+
     @Test
-    @DisplayName("장바구니에 동일 상품 존재하는 경우 장바구니 상품추가 성공")
+    @DisplayName("장바구니추가 성공 - 장바구니에 동일 상품 존재하는 경우")
     void successAddCartIfTheSameProductExists() {
         // given
         // 요청 장바구니 상품 정보
@@ -64,9 +91,7 @@ class CartServiceTest {
                 .quantity(1)
                 .build();
         // 요청 사용자 정보
-        Member member = Member.builder()
-                .userId("tester")
-                .build();
+        Member member = member();
 
         // Redis key
         String redisKey = member.getUserId();
@@ -162,7 +187,7 @@ class CartServiceTest {
         assertEquals(requestCartDto.getProductCode(), capturedFoundOptionDto.getProductCode());
         assertEquals(requestCartDto.getOptionCode(), capturedFoundOptionDto.getOptionCode());
         assertEquals(2, capturedFoundOptionDto.getQuantity());
-        //
+        // 판매상태 조회 실행여부 검증
         verify(productRepository, times(1))
                 .findByCodeAndSaleStatus(requestCartDto.getProductCode(), ON_SALE);
         // redis 저장 실행여부 검증
@@ -174,5 +199,27 @@ class CartServiceTest {
         assertEquals(requestCartDto.getOptionCode(), responseCartDto.getOptionCode());
         assertEquals(foundOptionDto.getPrice(), responseCartDto.getPrice());
         assertEquals(2, responseCartDto.getQuantity());
+    }
+
+    @Test
+    @DisplayName("장바구니추가 실패 - 판매중인 상품이 아니면 예외발생")
+    void addCart_shouldReturnProductNotOnSale_when() {
+        // given
+        RequestCartDto requestCartDto = requestCartDto();
+        Member member = member();
+
+        // 판매중단된 상품으로 조회되지 않음
+        given(productRepository.findByCodeAndSaleStatus(
+                eq(requestCartDto.getProductCode()), eq(ON_SALE)))
+                .willReturn(Optional.empty());
+
+        // when
+        // then
+        ProductException e =assertThrows(ProductException.class, () ->
+                cartService.addCart(requestCartDto, member));
+        assertEquals(PRODUCT_NOT_ON_SALE, e.getErrorCode());
+        // 판매상태 조회 실행여부 검증
+        verify(productRepository, times(1))
+                .findByCodeAndSaleStatus(requestCartDto.getProductCode(), ON_SALE);
     }
 }

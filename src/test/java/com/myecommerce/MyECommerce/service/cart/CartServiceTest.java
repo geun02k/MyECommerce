@@ -6,9 +6,9 @@ import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.product.Product;
-import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
@@ -46,6 +47,8 @@ class CartServiceTest {
 
     @Mock
     private ProductOptionRepository productOptionRepository;
+    @Mock
+    private ProductRepository productRepository;
 
     @InjectMocks
     private CartService cartService;
@@ -119,6 +122,11 @@ class CartServiceTest {
                 .quantity(2)
                 .build();
 
+        given(productRepository.findByCodeAndSaleStatus(eq(requestCartDto.getProductCode()), eq(ON_SALE)))
+                .willReturn(Optional.of(Product.builder()
+                                .code("productCode")
+                                .saleStatus(ON_SALE).build()));
+
         given(redisSingleDataService.getSingleHashValueData(eq(CART), eq(redisKey), eq(redisHashKey)))
                 .willReturn(redisCartObj);
         given(objectMapper.convertValue(redisCartObj, RedisCartDto.class))
@@ -154,6 +162,9 @@ class CartServiceTest {
         assertEquals(requestCartDto.getProductCode(), capturedFoundOptionDto.getProductCode());
         assertEquals(requestCartDto.getOptionCode(), capturedFoundOptionDto.getOptionCode());
         assertEquals(2, capturedFoundOptionDto.getQuantity());
+        //
+        verify(productRepository, times(1))
+                .findByCodeAndSaleStatus(requestCartDto.getProductCode(), ON_SALE);
         // redis 저장 실행여부 검증
         verify(redisSingleDataService, times(1))
                 .saveSingleHashValueData(

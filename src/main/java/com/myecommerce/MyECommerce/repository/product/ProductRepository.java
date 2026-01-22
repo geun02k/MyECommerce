@@ -19,6 +19,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // 판매자, 상품ID에 일치하는 상품 조회
     Optional<Product> findByIdAndSeller(Long id, Long sellerId);
 
+    // 상품코드에 일치하는 판매중인 상품 조회
+    Optional<Product> findByCodeAndSaleStatus(String code, ProductSaleStatusType status);
+
     // keyword를 포함하는 상품목록조회 - 최신등록순
     Page<Product> findByNameLikeAndSaleStatusAndCategoryOrderByCreateDt(
             String name, ProductSaleStatusType saleStatus,

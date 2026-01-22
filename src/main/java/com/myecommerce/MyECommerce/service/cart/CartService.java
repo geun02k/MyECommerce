@@ -5,11 +5,11 @@ import com.myecommerce.MyECommerce.dto.cart.RedisCartDto;
 import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
-import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.exception.CartException;
 import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,8 @@ import java.time.LocalDate;
 import java.util.Map;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_SIZE_EXCEEDED;
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_EXIST;
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_ON_SALE;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 
 @Service
@@ -37,6 +38,7 @@ public class CartService {
     private final RedisMultiDataService redisMultiDataService;
 
     private final ProductOptionRepository productOptionRepository;
+    private final ProductRepository productRepository;
 
     /** 장바구니 상품 등록 **/
     @Transactional
@@ -46,6 +48,12 @@ public class CartService {
         // value = 상품목록(해시,같은 필드명에 대해서는 새로운 값으로 덮어씌움)
         //       - hashKey = 등록할 상품옵션ID
         //       - hashValue = 등록할 상품옵션 정보
+
+        // 0. 정책검증
+        // 장바구니 물품 100건 제한
+        checkUserCartSizePolicy(member.getUserId());
+        // 장바구니에 추가 가능한 상품은 판매중인 경우로 제한
+        validateOnSaleProductPolicy(requestCartDto.getProductCode());
 
         // 요청 상품옵션에 대한 장바구니 조회
         //getOptionFromRedisCart();
@@ -59,9 +67,6 @@ public class CartService {
         // object -> redisCartDto로 변환
         RedisCartDto targetRedisCartDto =
                 objectMapper.convertValue(redisCartObj, RedisCartDto.class);
-
-        // 0. 장바구니 물품 100건 제한
-        checkUserCartSizePolicy(member.getUserId());
 
         // 1. 상품옵션조회 (DB)
         RedisCartDto foundOptionDto = findOptionDtoById(
@@ -91,6 +96,12 @@ public class CartService {
         }
     }
 
+    // 상품 판매상태(ON_SALE) 검증 정책
+    private void validateOnSaleProductPolicy(String productCode) {
+        productRepository.findByCodeAndSaleStatus(productCode, ON_SALE)
+                .orElseThrow(() -> new ProductException(PRODUCT_NOT_ON_SALE));
+    }
+
     // 상품옵션수량 셋팅
     private void setAddCartData(RedisCartDto targetRedisCartDto,
                                 RedisCartDto foundOptionDto,
@@ -114,7 +125,7 @@ public class CartService {
     private RedisCartDto findOptionDtoById(String productCode, String optionCode) {
         // 상품옵션조회
         return productOptionRepository
-                .findByProductCodeAndOptionCode(productCode, optionCode)
+                .findByProductCodeAndOptionCodeOfOnSale(productCode, optionCode)
                 .orElseThrow(() ->
                         new ProductException(PRODUCT_NOT_EXIST));
     }

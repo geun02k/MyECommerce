@@ -56,7 +56,8 @@ class CartServiceTest {
         // given
         // 요청 장바구니 상품 정보
         RequestCartDto requestCartDto = RequestCartDto.builder()
-                .optionId(10L)
+                .productCode("productCode")
+                .optionCode("optionCode")
                 .quantity(1)
                 .build();
         // 요청 사용자 정보
@@ -64,89 +65,77 @@ class CartServiceTest {
                 .userId("tester")
                 .build();
 
-        // DB 상품정보
-        ProductOption foundOption = ProductOption.builder()
-                .id(10L)
+        // Redis key
+        String redisKey = member.getUserId();
+        String redisHashKey = requestCartDto.getProductCode()
+                + ":" + requestCartDto.getOptionCode();
+
+
+        // 요청 상품옵션에 대한 장바구니 조회 정보
+        Object redisCartObj = new Object() {
+            String productCode = "productCode";
+            String optionCode = "optionCode";
+            BigDecimal price = new BigDecimal("10000");
+            int quantity = 1;
+        };
+        RedisCartDto targetRedisCartDto = RedisCartDto.builder()
+                .productCode("productCode")
                 .optionCode("optionCode")
-                .optionName("상품옵션명")
+                .price(new BigDecimal("10000"))
+                .quantity(1)
+                .build();
+
+        // DB 상품정보
+        RedisCartDto foundOptionDto = RedisCartDto.builder()
+                .productCode("productCode")
+                .optionCode("optionCode")
                 .price(new BigDecimal(10000))
                 .quantity(500)
-                .product(Product.builder()
-                        .id(1L)
-                        .name("상품명")
-                        .build())
                 .build();
-        RedisCartDto foundOptionDto = RedisCartDto.builder()
-                .optionId(foundOption.getId())
-                .optionName(foundOption.getOptionName())
-                .price(foundOption.getPrice())
-                .quantity(foundOption.getQuantity())
-                .productId(foundOption.getProduct().getId())
-                .productName(foundOption.getProduct().getName())
-                .build();
+
         // Redis 장바구니 상품정보 단건
-        Map<Object, Object> orgOption = new HashMap<>();
-        orgOption.put("optionId", foundOptionDto.getOptionId());
-        orgOption.put("optionName", foundOptionDto.getOptionName());
-        orgOption.put("price", foundOptionDto.getPrice());
-        orgOption.put("quantity", 1);
-        orgOption.put("productId", foundOptionDto.getProductId());
-        orgOption.put("productName", foundOptionDto.getProductName());
+        Object cartItemOfUserCart = new Object() {
+            String productCode = "productCode";
+            String optionCode = "optionCode";
+            BigDecimal price = new BigDecimal("10000");
+            int quantity = 1;
+        };
         // Redis 장바구니 상품목록
         Map<Object, Object> userCart = new HashMap<>();
-        userCart.put(orgOption.get("optionId"), orgOption);
+        userCart.put(redisHashKey, cartItemOfUserCart);
+        // Redis 장바구니 상품정보 단건 변환 결과
+        RedisCartDto cartItemDtoOfUserCart = RedisCartDto.builder()
+                .productCode("productCode")
+                .optionCode("optionCode")
+                .price(new BigDecimal(10000))
+                .quantity(1)
+                .build();
 
         // 반환 상품정보
         ResponseCartDto expectedResponseCartDto = ResponseCartDto.builder()
-                .optionId(foundOptionDto.getOptionId())
-                .optionName(foundOptionDto.getOptionName())
+                .productCode(foundOptionDto.getProductCode())
+                .optionCode(foundOptionDto.getOptionCode())
                 .price(foundOptionDto.getPrice())
-                .quantity(requestCartDto.getQuantity() +
-                          (Integer) orgOption.get("quantity"))
-                .productId(foundOptionDto.getProductId())
-                .productName(foundOptionDto.getProductName())
+                .quantity(2)
                 .build();
+
+        given(redisSingleDataService.getSingleHashValueData(eq(CART), eq(redisKey), eq(redisHashKey)))
+                .willReturn(redisCartObj);
+        given(objectMapper.convertValue(redisCartObj, RedisCartDto.class))
+                .willReturn(targetRedisCartDto);
 
         // stub(가설) : redisMultiDataService.getHashEntries() 실행 시
         //             Redis에서 기존 유저 장바구니의 상품옵션목록 Map<Object, Object> 반환 예상.
-        given(redisMultiDataService.getHashEntries(eq(CART), eq(member.getUserId())))
+        given(redisMultiDataService.getHashEntries(eq(CART), eq(redisKey)))
                 .willReturn(userCart);
-
         // stub(가설) : objectMapper.convertValue() 실행 시 object를 dto로 반환 예상.
-        given(objectMapper.convertValue(eq(userCart.get(orgOption.get("optionId"))), eq(RedisCartDto.class)))
-                .willReturn(RedisCartDto.builder()
-                        .optionId((Long) orgOption.get("optionId"))
-                        .optionName((String) orgOption.get("optionName"))
-                        .price((BigDecimal) orgOption.get("price"))
-                        .quantity((Integer) orgOption.get("quantity"))
-                        .productId((Long) orgOption.get("productId"))
-                        .optionName((String) orgOption.get("productName"))
-                        .build());
-
-        // stub(가설) : productionOptionRepository.findById() 실행 시 DB에서 상품옵션ID에 해당하는 상품옵션 반환 예상.
-        given(productOptionRepository.findById(eq(requestCartDto.getOptionId())))
-                .willReturn(Optional.of(foundOption));
-
-        // stub(가설) : redisSingleDataService.getSingleHashValueData() 실행 시
-        //             Redis에서 기존 장바구니에 저장한 key에 해당하는 상품옵션 Object 반환 예상.
-        given(redisSingleDataService.getSingleHashValueData(
-                eq(CART), eq(member.getUserId()), eq(requestCartDto.getOptionId().toString())))
-                .willReturn(orgOption);
-
-        // stub(가설) : serviceCartMapper.toDto() 실행 시 entity에 해당하는 dto 반환 예상.
-        given(redisCartMapper.toRedisDto(foundOption))
-                .willReturn(foundOptionDto);
-
-        // stub(가설) : objectMapper.convertValue() 실행 시 object를 dto로 반환 예상.
-        given(objectMapper.convertValue(orgOption, RedisCartDto.class))
-                .willReturn(RedisCartDto.builder()
-                        .optionId((Long) orgOption.get("optionId"))
-                        .optionName((String) orgOption.get("optionName"))
-                        .price((BigDecimal) orgOption.get("price"))
-                        .quantity((Integer) orgOption.get("quantity"))
-                        .productId((Long) orgOption.get("productId"))
-                        .optionName((String) orgOption.get("productName"))
-                        .build());
+        given(objectMapper.convertValue(
+                eq(cartItemOfUserCart), eq(RedisCartDto.class)))
+                .willReturn(cartItemDtoOfUserCart);
+        // stub(가설) : productionOptionRepository.findByProductIdAndIdOfOnSale() 실행 시 DB에서 상품옵션ID에 해당하는 상품옵션 반환 예상.
+        given(productOptionRepository.findByProductCodeAndOptionCodeOfOnSale(
+                eq(requestCartDto.getProductCode()), eq(requestCartDto.getOptionCode())))
+                .willReturn(Optional.of(foundOptionDto));
 
         // ArgumentCaptor 생성
         ArgumentCaptor<RedisCartDto> foundOptionDtoCaptor =
@@ -162,18 +151,17 @@ class CartServiceTest {
         // then
         // toResponseDto에 전달된 인자 캡처 후 검증
         RedisCartDto capturedFoundOptionDto = foundOptionDtoCaptor.getValue();
-        assertEquals(requestCartDto.getOptionId(), capturedFoundOptionDto.getOptionId());
+        assertEquals(requestCartDto.getProductCode(), capturedFoundOptionDto.getProductCode());
+        assertEquals(requestCartDto.getOptionCode(), capturedFoundOptionDto.getOptionCode());
         assertEquals(2, capturedFoundOptionDto.getQuantity());
         // redis 저장 실행여부 검증
         verify(redisSingleDataService, times(1))
                 .saveSingleHashValueData(
-                        CART, member.getUserId(), requestCartDto.getOptionId().toString(), foundOptionDto);
+                        CART, redisKey, redisHashKey, targetRedisCartDto);
         // 반환 결과 검증
-        assertEquals(requestCartDto.getOptionId(), responseCartDto.getOptionId());
-        assertEquals(foundOption.getOptionName(), responseCartDto.getOptionName());
-        assertEquals(foundOption.getPrice(), responseCartDto.getPrice());
+        assertEquals(requestCartDto.getProductCode(), responseCartDto.getProductCode());
+        assertEquals(requestCartDto.getOptionCode(), responseCartDto.getOptionCode());
+        assertEquals(foundOptionDto.getPrice(), responseCartDto.getPrice());
         assertEquals(2, responseCartDto.getQuantity());
-        assertEquals(foundOption.getProduct().getId(), responseCartDto.getProductId());
-        assertEquals(foundOption.getProduct().getName(), responseCartDto.getProductName());
     }
 }

@@ -2,6 +2,7 @@ package com.myecommerce.MyECommerce.service.cart;
 
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
+import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.exception.CartException;
 import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
@@ -69,6 +70,27 @@ class CartPolicyTest {
     /* ----------------------
         장바구니추가정책 Tests
        ---------------------- */
+
+    @Test
+    @DisplayName("장바구니추가정책 통과")
+    void validateAdd_shouldPass_whenAllValid() {
+        // given
+        Member customer = customer();
+        // 사용자 장바구니 현재 사이즈 반환
+        given(redisMultiDataService.getSizeOfHashData(CART, customer.getUserId()))
+                .willReturn(1L);
+        // 요청한 상품은 판매중인 상품으로 반환
+        given(productRepository.findByCodeAndSaleStatus(eq("productCode"), eq(ON_SALE)))
+                .willReturn(Optional.of(Product.builder()
+                        .code("productCode")
+                        .saleStatus(ON_SALE).build()));
+
+        // when
+        // then
+        assertDoesNotThrow(() ->
+                cartPolicy.validateAdd("productCode", customer));
+
+    }
 
     @Test
     @DisplayName("장바구니추가정책 실패 - 이미 장바구니에 허용된 최대 사이즈 도달 시 예외발생")

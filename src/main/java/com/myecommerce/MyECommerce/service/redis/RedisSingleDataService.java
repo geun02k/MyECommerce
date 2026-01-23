@@ -35,8 +35,8 @@ public class RedisSingleDataService {
     }
 
     /** Redis Key에 대한 만료일자 설정 **/
-    public Object setExpire(String key, Duration duration) {
-        return redisTemplate.expire(key, duration);
+    public Object setExpire(RedisNamespaceType nameSpace, String key, Duration duration) {
+        return redisTemplate.expire(setKey(nameSpace, key), duration);
     }
 
     /** Redis 단일 해시 테이터 등록 **/

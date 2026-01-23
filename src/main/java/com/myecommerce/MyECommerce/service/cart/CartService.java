@@ -93,10 +93,6 @@ public class CartService {
         result.setQuantity(
                 result.getQuantity() + requestCartDto.getQuantity());
 
-        // 2. 만료일자 셋팅
-        redisSingleDataService.setExpire(
-                redisKey, Duration.ofDays(EXPIRATION_PERIOD));
-
         return result;
     }
 
@@ -113,7 +109,11 @@ public class CartService {
     private void saveServiceCartInRedis(String key,
                                         String hashKey,
                                         RedisCartDto hashValue) {
+        // 장바구니에 상품옵션 단건등록
         redisSingleDataService.saveSingleHashValueData(
                 CART, key, hashKey, hashValue);
+        // 만료기간 설정
+        redisSingleDataService.setExpire(
+                CART, key, Duration.ofDays(EXPIRATION_PERIOD));
     }
 }

@@ -54,39 +54,50 @@ public class CartService {
                 redisSingleDataService.getSingleHashValueData(
                         CART, redisKey, redisHashKey);
 
-        // object -> redisCartDto로 변환
-        RedisCartDto targetRedisCartDto =
-                objectMapper.convertValue(redisCartObj, RedisCartDto.class);
+        RedisCartDto targetRedisCartDto = null;
+        if(redisCartObj != null) {
+            // object -> redisCartDto로 변환
+            targetRedisCartDto =
+                    objectMapper.convertValue(redisCartObj, RedisCartDto.class);
+        }
 
         // 2. 상품수량, 만료일자 셋팅
-        setAddCartData(targetRedisCartDto, requestCartDto, redisKey);
+        RedisCartDto saveCartItem =
+                setAddCartData(targetRedisCartDto, requestCartDto, redisKey);
         // 3. Redis에 상품 등록
-        saveServiceCartInRedis(redisKey, redisHashKey, targetRedisCartDto);
+        saveServiceCartInRedis(redisKey, redisHashKey, saveCartItem);
 
         // 4. 장바구니 상품 단건 반환
-        return redisCartMapper.toResponseDto(targetRedisCartDto);
+        return redisCartMapper.toResponseDto(saveCartItem);
     }
 
     // 상품옵션수량 셋팅
-    private void setAddCartData(RedisCartDto targetRedisCartDto,
+    private RedisCartDto setAddCartData(RedisCartDto targetRedisCartDto,
                                 RequestCartDto requestCartDto,
                                 String redisKey) {
+        RedisCartDto result;
+
         // 1. 요청 상품이 장바구니에 미존재 시 상품옵션조회 (DB)
         if (targetRedisCartDto == null) {
-            targetRedisCartDto = findOptionDtoById(
+            result = findOptionDtoById(
                     requestCartDto.getProductCode(),
                     requestCartDto.getOptionCode());
             // 장바구니 신규 등록이므로 수량 0으로 초기화
-            targetRedisCartDto.setQuantity(0);
+            result.setQuantity(0);
+
+        } else {
+            result = targetRedisCartDto;
         }
 
         // 2. 상품수량 셋팅 (기존수량 + 신규수량)
-        targetRedisCartDto.setQuantity(
-                targetRedisCartDto.getQuantity() + requestCartDto.getQuantity());
+        result.setQuantity(
+                result.getQuantity() + requestCartDto.getQuantity());
 
         // 2. 만료일자 셋팅
         redisSingleDataService.setExpire(
                 redisKey, Duration.ofDays(EXPIRATION_PERIOD));
+
+        return result;
     }
 
     // 상품옵션ID에 해당하는 상품옵션 Entity 조회해 ServiceCartDto로 변환해 반환

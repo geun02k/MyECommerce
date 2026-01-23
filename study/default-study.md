@@ -64,6 +64,8 @@
 16. HTTP 상태코드
 17. null과 ObjectUtils.isEmpty()
     - ObjectUtils.isEmpty() 남용 문제
+18. 자바 참조 전달
+
 
 ---
 ## 1. Spring
@@ -2435,4 +2437,49 @@ error.cart.limit.max.size=장바구니에는 최대 {value}건만 추가 가능�
        의미 표현보다 범용성이 더 중요한 경우.
     3) Map / Collection 처리
     4) Optional 처리
+
+
+---
+## 18. 자바 참조 전달 
+1. 문제점   
+   재할당은 호출자에게 반영되지 않으므로, targetRedisCartDto는 재할당이 외부에 반영되지 않는다.
+   즉, 호출부에서 targetRedisCartDto = null 상태였다면 호출한 메서드 실행 후에도 여전히 null일 수 있다.  
+   이는 논리 버그로 꼭 수정해야하는 부분이다. (신규 상품 장바구니에 추가하는 정상 시나리오 테스트케이스 작성 시 발견)
+   ~~~
+        // 상품옵션수량 셋팅
+        private void setAddCartData(RedisCartDto targetRedisCartDto,
+                                    RedisCartDto foundOptionDto,
+                                    RequestCartDto requestCartDto) {
+                // ...
+                // 상품수량 (신규수량으로 초기화)
+                targetRedisCartDto = foundOptionDto;
+                targetRedisCartDto.setQuantity(requestCartDto.getQuantity());
+        }
+   ~~~
+   - 위 코드에서 targetRedisCartDto는 지역 변수로 재할당되며, 이 변경은 호출자에게 전혀 전달되지 않는다.
+
+2. 자바에서 객체 전달   
+   > 객체 필드 변경은 호출자에 반영되지만, 객체 참조 재할당은 호출자에게 반영되지 않는다.
+   > 따라서 값을 만들 수도 있는 메서드는 반드시 반환해야 한다
+
+   ***자바는 참조 자체를 전달하지 않고 참조값(주소값)을 복사해 전달한다.***
+   따라서 targetRedisCartDto을 setAddCartData()에 전달하면, 
+   이때는 참조값의 복사본을 전달하는 것이다.
+   즉, target은 객체를 가리키는 주소값이고 메서드로 전달될 때는 주소값이 복사되어 전달되는 것이다.     
+   이 떄, ***값의 변경과 참조 재할당은 완전히 다르다.***
+   따라서 객체 내부 값 변경은 문제가 없다. 같은 객체를 가리키고 있고, 내부 필드만 바뀌기 때문이다.
+   그렇기 때문에 targetRedisCartDto을 setAddCartData()를 사용하면 값은 정상적으로 저장된다.   
+   반면, ***참조 객체를 새 객체로 바꾸는 경우엔 문제가 발생한다.***
+   같은 targetRedisCartDto이지만 호출한 곳에서는 null, setAddCartData()에서는 새 객체를 가리킨다.   
+   null에 새 객체를 대입한 경우엔 저장이 안된다.
+   따라서 targetRedisCartDto.setProductCode()가 저장되는 경우는, 애초에 targetRedisCartDto는 null이 아니었기 때문이다.
+
+3. 해결방법
+   setAddCartData() 구조상 두 가지 책임을 동시에 갖고 있어 반환값을 가지는 메서드여야 한다.
+   기존 객체를 수정할 수도 있고, 새 객체를 만들어야할 수도 있기 때문이다. 
+   (Redis에 이미 있으면 수정, Redis에 없으면 새로 생성)    
+   만약 void 타입으로 반환, 참조 재할당으로 처리하면 자바 특성상 반드시 버그가 생긴다.   
+   따라서 setAddCartData()가 수정된 값을 반환하도록 수정한다.
+   가장 안전하고 의도가 명확한 구조이다.
+
 

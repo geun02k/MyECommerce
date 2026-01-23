@@ -103,8 +103,6 @@ class CartServiceTest {
 
         // 저장 대상 장바구니 옵션
         RedisCartDto targetRedisCartDto = existingCartItem();
-        // DB 요청 상품옵션 정보 조회
-        RedisCartDto foundOptionDto = requestedItemNotInCart();
 
         // Redis key
         String redisKey = member.getUserId();
@@ -125,11 +123,6 @@ class CartServiceTest {
         given(objectMapper.convertValue(targetRedisCartDto, RedisCartDto.class))
                 .willReturn(targetRedisCartDto);
 
-        // 판매중인 상품옵션 DB에서 조회.
-        given(productOptionRepository.findByProductCodeAndOptionCodeOfOnSale(
-                eq(requestCartDto.getProductCode()), eq(requestCartDto.getOptionCode())))
-                .willReturn(Optional.of(foundOptionDto));
-
         // RedisCartDto -> 응답DTO 변환.
         given(redisCartMapper.toResponseDto(targetRedisCartDto))
                 .willReturn(expectedResponseCartDto);
@@ -143,6 +136,8 @@ class CartServiceTest {
         // 정책 실행여부 검증
         verify(cartPolicy, times(1))
                 .validateAdd(requestCartDto.getProductCode(), member);
+        verify(productOptionRepository, never())
+                .findByProductCodeAndOptionCodeOfOnSale(any(), any());
         // redis 저장 실행여부 검증
         verify(redisSingleDataService, times(1))
                 .saveSingleHashValueData(
@@ -153,7 +148,7 @@ class CartServiceTest {
         // 반환 결과 검증
         assertEquals(requestCartDto.getProductCode(), responseCartDto.getProductCode());
         assertEquals(requestCartDto.getOptionCode(), responseCartDto.getOptionCode());
-        assertEquals(foundOptionDto.getPrice(), responseCartDto.getPrice());
+        assertEquals(targetRedisCartDto.getPrice(), responseCartDto.getPrice());
         assertEquals(2, responseCartDto.getQuantity());
     }
 

@@ -58,11 +58,8 @@ public class CartService {
         RedisCartDto targetRedisCartDto =
                 objectMapper.convertValue(redisCartObj, RedisCartDto.class);
 
-        // 1. 상품옵션조회 (DB)
-        RedisCartDto foundOptionDto = findOptionDtoById(
-                requestCartDto.getProductCode(),requestCartDto.getOptionCode());
         // 2. 상품수량, 만료일자 셋팅
-        setAddCartData(targetRedisCartDto, foundOptionDto, requestCartDto, redisKey);
+        setAddCartData(targetRedisCartDto, requestCartDto, redisKey);
         // 3. Redis에 상품 등록
         saveServiceCartInRedis(redisKey, redisHashKey, targetRedisCartDto);
 
@@ -72,19 +69,20 @@ public class CartService {
 
     // 상품옵션수량 셋팅
     private void setAddCartData(RedisCartDto targetRedisCartDto,
-                                RedisCartDto foundOptionDto,
                                 RequestCartDto requestCartDto,
                                 String redisKey) {
-        // 1. 상품수량 셋팅
-        if (targetRedisCartDto != null) {
-            // 상품수량 (기존수량 + 신규수량)
-            targetRedisCartDto.setQuantity(
-                    targetRedisCartDto.getQuantity() + requestCartDto.getQuantity());
-        } else {
-            // 상품수량 (신규수량으로 초기화)
-            targetRedisCartDto = foundOptionDto;
-            targetRedisCartDto.setQuantity(requestCartDto.getQuantity());
+        // 1. 요청 상품이 장바구니에 미존재 시 상품옵션조회 (DB)
+        if (targetRedisCartDto == null) {
+            targetRedisCartDto = findOptionDtoById(
+                    requestCartDto.getProductCode(),
+                    requestCartDto.getOptionCode());
+            // 장바구니 신규 등록이므로 수량 0으로 초기화
+            targetRedisCartDto.setQuantity(0);
         }
+
+        // 2. 상품수량 셋팅 (기존수량 + 신규수량)
+        targetRedisCartDto.setQuantity(
+                targetRedisCartDto.getQuantity() + requestCartDto.getQuantity());
 
         // 2. 만료일자 셋팅
         redisSingleDataService.setExpire(

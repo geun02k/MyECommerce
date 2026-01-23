@@ -64,6 +64,26 @@ class CartServiceTest {
                 .build();
     }
 
+    /** 장바구니에 존재하는 상품옵션 단건  */
+    RedisCartDto existingCartItem() {
+        return RedisCartDto.builder()
+                .productCode("productCode")
+                .optionCode("optionCode")
+                .price(new BigDecimal("10000"))
+                .quantity(1)
+                .build();
+    }
+
+    /** 판매중인 상품옵션 단건  */
+    RedisCartDto requestedItemNotInCart() {
+        return RedisCartDto.builder()
+                .productCode("productCode")
+                .optionCode("optionCode")
+                .price(new BigDecimal("10000"))
+                .build();
+    }
+
+
     /* ----------------------
         장바구니추가 Tests
        ---------------------- */
@@ -81,25 +101,15 @@ class CartServiceTest {
         // 요청 사용자 정보
         Member member = member();
 
+        // 저장 대상 장바구니 옵션
+        RedisCartDto targetRedisCartDto = existingCartItem();
+        // DB 요청 상품옵션 정보 조회
+        RedisCartDto foundOptionDto = requestedItemNotInCart();
+
         // Redis key
         String redisKey = member.getUserId();
         String redisHashKey = requestCartDto.getProductCode()
                 + ":" + requestCartDto.getOptionCode();
-
-        // 저장 대상 장바구니 옵션
-        RedisCartDto targetRedisCartDto = RedisCartDto.builder()
-                .productCode("productCode")
-                .optionCode("optionCode")
-                .price(new BigDecimal("10000"))
-                .quantity(1)
-                .build();
-
-        // DB 요청 상품옵션 정보 조회
-        RedisCartDto foundOptionDto = RedisCartDto.builder()
-                .productCode("productCode")
-                .optionCode("optionCode")
-                .price(new BigDecimal("10000"))
-                .build();
 
         // 반환 상품정보
         ResponseCartDto expectedResponseCartDto = ResponseCartDto.builder()

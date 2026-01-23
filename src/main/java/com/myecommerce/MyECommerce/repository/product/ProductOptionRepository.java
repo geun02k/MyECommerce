@@ -24,7 +24,7 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
     @Query(" SELECT new com.myecommerce.MyECommerce.dto.cart.RedisCartDto( " +
             "       PRD.id, PRD.code, PRD.name, " +
             "       OPTION.id, OPTION.optionCode, OPTION.optionName, " +
-            "       OPTION.price, OPTION.quantity, null" +
+            "       OPTION.price, OPTION.quantity" +
             ")" +
             " FROM Product PRD" +
             " INNER JOIN PRD.options OPTION" +

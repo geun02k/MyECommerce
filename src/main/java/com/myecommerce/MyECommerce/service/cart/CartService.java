@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
+import java.time.Duration;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_EXIST;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
@@ -62,7 +62,7 @@ public class CartService {
         RedisCartDto foundOptionDto = findOptionDtoById(
                 requestCartDto.getProductCode(),requestCartDto.getOptionCode());
         // 2. 상품수량, 만료일자 셋팅
-        setAddCartData(targetRedisCartDto, foundOptionDto, requestCartDto);
+        setAddCartData(targetRedisCartDto, foundOptionDto, requestCartDto, redisKey);
         // 3. Redis에 상품 등록
         saveServiceCartInRedis(redisKey, redisHashKey, targetRedisCartDto);
 
@@ -73,7 +73,8 @@ public class CartService {
     // 상품옵션수량 셋팅
     private void setAddCartData(RedisCartDto targetRedisCartDto,
                                 RedisCartDto foundOptionDto,
-                                RequestCartDto requestCartDto) {
+                                RequestCartDto requestCartDto,
+                                String redisKey) {
         // 1. 상품수량 셋팅
         if (targetRedisCartDto != null) {
             // 상품수량 (기존수량 + 신규수량)
@@ -86,7 +87,8 @@ public class CartService {
         }
 
         // 2. 만료일자 셋팅
-        targetRedisCartDto.setExpiryDate(LocalDate.now().plusDays(EXPIRATION_PERIOD));
+        redisSingleDataService.setExpire(
+                redisKey, Duration.ofDays(EXPIRATION_PERIOD));
     }
 
     // 상품옵션ID에 해당하는 상품옵션 Entity 조회해 ServiceCartDto로 변환해 반환

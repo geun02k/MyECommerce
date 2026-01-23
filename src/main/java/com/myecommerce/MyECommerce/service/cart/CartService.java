@@ -5,43 +5,33 @@ import com.myecommerce.MyECommerce.dto.cart.RedisCartDto;
 import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
-import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
-import com.myecommerce.MyECommerce.exception.CartException;
 import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
-import com.myecommerce.MyECommerce.repository.product.ProductRepository;
-import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.Map;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_CUSTOMER_ONLY;
-import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_SIZE_EXCEEDED;
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_ON_SALE;
-import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
-import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_EXIST;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 
 @Service
 @RequiredArgsConstructor
 public class CartService {
     // 장바구니 최대 데이터 수
-    public static final int CART_MAX_SIZE = 100;
     public static final Long EXPIRATION_PERIOD = 30L;
+
+    private final CartPolicy cartPolicy;
 
     private final ObjectMapper objectMapper;
     private final RedisCartMapper redisCartMapper;
 
     private final RedisSingleDataService redisSingleDataService;
-    private final RedisMultiDataService redisMultiDataService;
 
     private final ProductOptionRepository productOptionRepository;
-    private final ProductRepository productRepository;
 
     /** 장바구니 상품 등록 **/
     @Transactional
@@ -53,12 +43,7 @@ public class CartService {
         //       - hashValue = 등록할 상품옵션 정보
 
         // 0. 정책검증
-        // 고객 한정 장바구니 접근 제한
-        validateCartAccessPolicy(member);
-        // 장바구니 물품 100건 제한
-        checkUserCartSizePolicy(member.getUserId());
-        // 장바구니에 추가 가능한 상품은 판매중인 경우로 제한
-        validateOnSaleProductPolicy(requestCartDto.getProductCode());
+        cartPolicy.validateAdd(requestCartDto.getProductCode(), member);
 
         // 요청 상품옵션에 대한 장바구니 조회
         //getOptionFromRedisCart();
@@ -83,43 +68,6 @@ public class CartService {
 
         // 4. 장바구니 상품 단건 반환
         return redisCartMapper.toResponseDto(targetRedisCartDto);
-    }
-
-    // 장바구니 제품 수량 체크 정책
-    private void checkUserCartSizePolicy(String userId) {
-        Map<Object, Object> optionsInCart =
-                redisMultiDataService.getHashEntries(CART, userId);
-
-        Integer cartItemCount = optionsInCart.values().stream()
-                .map(object ->
-                        objectMapper.convertValue(object, RedisCartDto.class)
-                                    .getQuantity())
-                .reduce(0, Integer::sum);
-
-        if (cartItemCount >= CART_MAX_SIZE) {
-            throw new CartException(CART_SIZE_EXCEEDED, CART_MAX_SIZE);
-        }
-    }
-
-    // 상품 판매상태(ON_SALE) 검증 정책
-    private void validateOnSaleProductPolicy(String productCode) {
-        productRepository.findByCodeAndSaleStatus(productCode, ON_SALE)
-                .orElseThrow(() -> new ProductException(PRODUCT_NOT_ON_SALE));
-    }
-
-    // 고객 한정 장바구니 접근 제한 정책
-    private void validateCartAccessPolicy(Member member) {
-        boolean hasCustomerRole = false;
-
-        if (member != null) {
-            hasCustomerRole = member.getRoles().stream()
-                    .map(MemberAuthority::getAuthority)
-                    .anyMatch(authority -> authority.equals(CUSTOMER));
-        }
-
-        if (!hasCustomerRole) {
-            throw new CartException(CART_CUSTOMER_ONLY);
-        }
     }
 
     // 상품옵션수량 셋팅

@@ -36,6 +36,8 @@
    - 테스트코드 검증
    - 테스트코드 검증과 ArgumentCaptor
    - 테스트코드 전달인자 검증
+   - Captor 사용이 필요한 경우
+   - Captor로 검증해야하는 값
 8. 테스트코드에서 필드주입
 9. Reflection - private 메서드 테스트코드 작성
 10. JPA의 Dirty Checking을 사용 시 테스트코드 작성
@@ -1155,6 +1157,15 @@ Controller에 주입하려면 @MockBean을 사용해야 한다.
    productionService.modifyProduction()에서 인자들이 올바르게 처리되는지도 중요한 검증 대상.
    requestProductionDto의 값들이 제대로 전달되었는지,
    productionService.modifyProduction() 내부에서 originProductionEntity에 대한 수정이 예상대로 이루어졌는지 검증.
+
+### < Captor 사용이 필요한 경우 >
+1. 저장 직전 값 검증
+2. 외부 시스템으로 나가는 요청 파라미터 검증
+3. 반환값으로는 확인할 수 없는 부수효과 검증
+
+### < Captor로 검증해야하는 값 >
+Captor는 “이 메서드가 계산해서 만들어낸 값”만 잡는다.
+이미 메서드 인자나 key로 보장된 값은 잡지 않는다.
 
 
 ---

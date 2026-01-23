@@ -69,8 +69,8 @@ class CartServiceTest {
        ---------------------- */
 
     @Test
-    @DisplayName("장바구니추가 성공 - 장바구니에 동일 상품 존재하는 경우")
-    void successAddCartIfTheSameProductExists() {
+    @DisplayName("장바구니추가 성공 - 장바구니에 동일 상품 존재하는 경우 장바구니 수량 증가")
+    void addCart_shouldIncreaseQuantity_whenTheSameProductExists() {
         // given
         // 요청 장바구니 상품 정보
         RequestCartDto requestCartDto = RequestCartDto.builder()
@@ -86,14 +86,7 @@ class CartServiceTest {
         String redisHashKey = requestCartDto.getProductCode()
                 + ":" + requestCartDto.getOptionCode();
 
-
-        // 요청 상품옵션에 대한 장바구니 조회 정보
-        Object redisCartObj = new Object() {
-            String productCode = "productCode";
-            String optionCode = "optionCode";
-            BigDecimal price = new BigDecimal("10000");
-            int quantity = 1;
-        };
+        // 저장 대상 장바구니 옵션
         RedisCartDto targetRedisCartDto = RedisCartDto.builder()
                 .productCode("productCode")
                 .optionCode("optionCode")
@@ -101,56 +94,52 @@ class CartServiceTest {
                 .quantity(1)
                 .build();
 
-        // DB 상품정보
+        // DB 요청 상품옵션 정보 조회
         RedisCartDto foundOptionDto = RedisCartDto.builder()
                 .productCode("productCode")
                 .optionCode("optionCode")
-                .price(new BigDecimal(10000))
-                .quantity(500)
+                .price(new BigDecimal("10000"))
                 .build();
 
         // 반환 상품정보
         ResponseCartDto expectedResponseCartDto = ResponseCartDto.builder()
-                .productCode(foundOptionDto.getProductCode())
-                .optionCode(foundOptionDto.getOptionCode())
-                .price(foundOptionDto.getPrice())
+                .productCode(targetRedisCartDto.getProductCode())
+                .optionCode(targetRedisCartDto.getOptionCode())
+                .price(targetRedisCartDto.getPrice())
                 .quantity(2)
                 .build();
 
+        // 요청 상품 Redis 장바구니에서 조회
         given(redisSingleDataService.getSingleHashValueData(eq(CART), eq(redisKey), eq(redisHashKey)))
-                .willReturn(redisCartObj);
-        given(objectMapper.convertValue(redisCartObj, RedisCartDto.class))
+                .willReturn(targetRedisCartDto);
+        given(objectMapper.convertValue(targetRedisCartDto, RedisCartDto.class))
                 .willReturn(targetRedisCartDto);
 
-        // stub(가설) : productionOptionRepository.findByProductIdAndIdOfOnSale() 실행 시 DB에서 상품옵션ID에 해당하는 상품옵션 반환 예상.
+        // 판매중인 상품옵션 DB에서 조회.
         given(productOptionRepository.findByProductCodeAndOptionCodeOfOnSale(
                 eq(requestCartDto.getProductCode()), eq(requestCartDto.getOptionCode())))
                 .willReturn(Optional.of(foundOptionDto));
 
-        // ArgumentCaptor 생성
-        ArgumentCaptor<RedisCartDto> foundOptionDtoCaptor =
-                ArgumentCaptor.forClass(RedisCartDto.class);
-
-        // stub(가설) : serviceCartMapper.toDto() 실행 시 entity에 해당하는 dto 반환 예상.
-        given(redisCartMapper.toResponseDto(foundOptionDtoCaptor.capture()))
+        // RedisCartDto -> 응답DTO 변환.
+        given(redisCartMapper.toResponseDto(targetRedisCartDto))
                 .willReturn(expectedResponseCartDto);
 
         // when
         ResponseCartDto responseCartDto = cartService.addCart(requestCartDto, member);
 
+        ArgumentCaptor<RedisCartDto> redisCartDtoCaptor =
+                ArgumentCaptor.forClass(RedisCartDto.class);
         // then
-        // toResponseDto에 전달된 인자 캡처 후 검증
-        RedisCartDto capturedFoundOptionDto = foundOptionDtoCaptor.getValue();
-        assertEquals(requestCartDto.getProductCode(), capturedFoundOptionDto.getProductCode());
-        assertEquals(requestCartDto.getOptionCode(), capturedFoundOptionDto.getOptionCode());
-        assertEquals(2, capturedFoundOptionDto.getQuantity());
-        // 판매상태 조회 실행여부 검증
+        // 정책 실행여부 검증
         verify(cartPolicy, times(1))
                 .validateAdd(requestCartDto.getProductCode(), member);
         // redis 저장 실행여부 검증
         verify(redisSingleDataService, times(1))
                 .saveSingleHashValueData(
-                        CART, redisKey, redisHashKey, targetRedisCartDto);
+                        eq(CART), eq(redisKey), eq(redisHashKey), redisCartDtoCaptor.capture());
+        // 캡쳐 결과 검증
+        RedisCartDto capturedRedisCartDto = redisCartDtoCaptor.getValue();
+        assertEquals(2, capturedRedisCartDto.getQuantity());
         // 반환 결과 검증
         assertEquals(requestCartDto.getProductCode(), responseCartDto.getProductCode());
         assertEquals(requestCartDto.getOptionCode(), responseCartDto.getOptionCode());

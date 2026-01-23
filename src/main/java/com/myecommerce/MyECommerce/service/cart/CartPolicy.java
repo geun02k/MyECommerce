@@ -11,7 +11,6 @@ import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_CUSTOMER_ONLY;
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_SIZE_EXCEEDED;
@@ -45,14 +44,7 @@ public class CartPolicy {
 
     // 장바구니 제품 수량 체크 정책
     private void checkUserCartSizePolicy(String userId) {
-        Map<Object, Object> optionsInCart =
-                redisMultiDataService.getHashEntries(CART, userId);
-
-        Integer cartItemCount = optionsInCart.values().stream()
-                .map(object ->
-                        objectMapper.convertValue(object, RedisCartDto.class)
-                                .getQuantity())
-                .reduce(0, Integer::sum);
+        Long cartItemCount = redisMultiDataService.getSizeOfHashData(CART, userId);
 
         if (cartItemCount >= CART_MAX_SIZE) {
             throw new CartException(CART_SIZE_EXCEEDED, CART_MAX_SIZE);

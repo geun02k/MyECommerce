@@ -1,8 +1,5 @@
 package com.myecommerce.MyECommerce.service.cart;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.myecommerce.MyECommerce.dto.cart.RedisCartDto;
-import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.exception.CartException;
@@ -16,10 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_CUSTOMER_ONLY;
@@ -43,9 +37,6 @@ class CartPolicyTest {
     @Mock
     private ProductRepository productRepository;
 
-    @Mock
-    private ObjectMapper objectMapper;
-
     @InjectMocks
     private CartPolicy cartPolicy;
 
@@ -63,55 +54,15 @@ class CartPolicyTest {
                 .build();
     }
 
-    /** 유효한 장바구니 요청 */
-    RequestCartDto requestCartDto() {
-        return RequestCartDto.builder()
-                .productCode("productCode")
-                .optionCode("optionCode")
-                .quantity(1)
-                .build();
-    }
-
-    /** 사용자 장바구니 전체 조회 **/
-    Map<Object, Object> userCartOfOneItem(Object cartItem) {
-        // Redis 장바구니 상품목록
-        Map<Object, Object> userCart = new HashMap<>();
-        userCart.put("tester", cartItem);
-
-        return userCart;
-    }
-
-    /** 장바구니 상품 단건 */
-    Object cartItem() {
-        // Redis 장바구니 상품정보 단건
-        return new Object() {
-            String productCode = "productCode";
-            String optionCode = "optionCode";
-            BigDecimal price = new BigDecimal("10000");
-            int quantity = 1;
-        };
-    }
 
     /* ----------------------
         Helper Method
        ---------------------- */
 
-    /** 사용자 장바구니 전체 조회 given절 */
-    void givenUserCart(Member member) {
-        Object cartItem = cartItem();
-
-        // Redis 장바구니의 상품옵션목록 Map<Object, Object> 반환
-        given(redisMultiDataService.getHashEntries(eq(CART), eq(member.getUserId())))
-                .willReturn(userCartOfOneItem(cartItem));
-        // Redis 장바구니 상품정보 단건 변환
-        given(objectMapper.convertValue(
-                eq(cartItem), eq(RedisCartDto.class)))
-                .willReturn(RedisCartDto.builder()
-                        .productCode("productCode")
-                        .optionCode("optionCode")
-                        .price(new BigDecimal(10000))
-                        .quantity(1)
-                        .build());
+    /** 사용자 장바구니 사이즈 조회 given절 */
+    void givenUserCartSize(Member member) {
+        given(redisMultiDataService.getSizeOfHashData(CART, member.getUserId()))
+                .willReturn(1L);
     }
 
     /* ----------------------
@@ -123,8 +74,8 @@ class CartPolicyTest {
     void addCart_shouldReturnProductNotOnSale_whenProductNotOnSale() {
         // given
         Member customer = customer();
-        // 장바구니에 이미 담긴 상품 (타정책 통과용)
-        givenUserCart(customer);
+        // 사용자 장바구니 사이즈 (타정책 통과용)
+        givenUserCartSize(customer);
         // 판매중단된 상품으로 조회되지 않음
         given(productRepository.findByCodeAndSaleStatus(eq("productCode"), eq(ON_SALE)))
                 .willReturn(Optional.empty());

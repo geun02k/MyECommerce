@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_CUSTOMER_ONLY;
+import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_SIZE_EXCEEDED;
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_ON_SALE;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
@@ -68,6 +69,22 @@ class CartPolicyTest {
     /* ----------------------
         장바구니추가정책 Tests
        ---------------------- */
+
+    @Test
+    @DisplayName("장바구니추가정책 실패 - 이미 장바구니에 허용된 최대 사이즈 도달 시 예외발생")
+    void validateAdd_shouldReturnCartSizeExceeded_whenCartItemCountExceed() {
+        // given
+        Member customer = customer();
+
+        given(redisMultiDataService.getSizeOfHashData(CART, customer.getUserId()))
+                .willReturn((long)CartPolicy.CART_MAX_SIZE);
+        // when
+        // then
+        CartException e = assertThrows(CartException.class, () ->
+                cartPolicy.validateAdd("productCode", customer()));
+        assertEquals(CART_SIZE_EXCEEDED, e.getErrorCode());
+
+    }
 
     @Test
     @DisplayName("장바구니추가 실패 - 판매중인 상품이 아니면 예외발생")

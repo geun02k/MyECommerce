@@ -19,9 +19,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
+import static com.myecommerce.MyECommerce.service.cart.CartService.EXPIRATION_PERIOD;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 import static org.junit.jupiter.api.Assertions.*;
@@ -141,6 +143,9 @@ class CartServiceTest {
         verify(redisSingleDataService, times(1))
                 .saveSingleHashValueData(
                         eq(CART), eq(redisKey), eq(redisHashKey), redisCartDtoCaptor.capture());
+        // redis 만료 기간 갱신 검증
+        verify(redisSingleDataService, times(1))
+                .setExpire(eq(CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
         // 캡쳐 결과 검증
         RedisCartDto capturedRedisCartDto = redisCartDtoCaptor.getValue();
         assertEquals(2, capturedRedisCartDto.getQuantity());
@@ -212,6 +217,9 @@ class CartServiceTest {
                 .saveSingleHashValueData(
                         eq(CART), eq(redisKey), eq(redisHashKey),
                         redisCartDtoCaptor.capture());
+        // redis 만료 기간 셋팅 검증
+        verify(redisSingleDataService, times(1))
+                .setExpire(eq(CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
         // 캡쳐 결과 검증
         assertEquals(5, redisCartDtoCaptor.getValue().getQuantity());
         // 반환 결과 검증

@@ -39,31 +39,22 @@ public class CartService {
         // redis 장바구니에 상품 단건 등록
         // key = 사용자아이디(토큰값을 사용하게되면 만료 시 장바구니내역 사용불가로)
         // value = 상품목록(해시,같은 필드명에 대해서는 새로운 값으로 덮어씌움)
-        //       - hashKey = 등록할 상품옵션ID
+        //       - hashKey = 등록할 상품코드:상품옵션코드
         //       - hashValue = 등록할 상품옵션 정보
 
         // 0. 정책검증
         cartPolicy.validateAdd(requestCartDto.getProductCode(), member);
 
-        // 요청 상품옵션에 대한 장바구니 조회
-        //getOptionFromRedisCart();
         String redisKey = member.getUserId();
-        String redisHashKey = requestCartDto.getProductCode().toString()
-                + ":" + requestCartDto.getOptionCode().toString();
-        Object redisCartObj =
-                redisSingleDataService.getSingleHashValueData(
-                        CART, redisKey, redisHashKey);
+        String redisHashKey = createCartRedisHashKey(
+                requestCartDto.getProductCode(), requestCartDto.getOptionCode());
 
-        RedisCartDto targetRedisCartDto = null;
-        if(redisCartObj != null) {
-            // object -> redisCartDto로 변환
-            targetRedisCartDto =
-                    objectMapper.convertValue(redisCartObj, RedisCartDto.class);
-        }
+        // 1. 요청 상품옵션에 대한 장바구니 조회
+        RedisCartDto cartItem = getCartItem(redisKey, redisHashKey);
 
         // 2. 상품수량, 만료일자 셋팅
         RedisCartDto saveCartItem =
-                setAddCartData(targetRedisCartDto, requestCartDto, redisKey);
+                setAddCartData(cartItem, requestCartDto);
         // 3. Redis에 상품 등록
         saveServiceCartInRedis(redisKey, redisHashKey, saveCartItem);
 
@@ -71,10 +62,31 @@ public class CartService {
         return redisCartMapper.toResponseDto(saveCartItem);
     }
 
+    // 장바구니 조회 Redis Hash Key 생성
+    private String createCartRedisHashKey(String productCode, String optionCode) {
+        return productCode + ":" + optionCode;
+    }
+
+    // 장바구니 상품옵션 단건 조회
+    private RedisCartDto getCartItem(String redisKey, String redisHashKey) {
+        // 1. redis 조회
+        Object redisCartObj =
+                redisSingleDataService.getSingleHashValueData(
+                        CART, redisKey, redisHashKey);
+
+        RedisCartDto targetRedisCartDto = null;
+        // 2. object -> redisCartDto로 변환
+        if(redisCartObj != null) {
+            targetRedisCartDto =
+                    objectMapper.convertValue(redisCartObj, RedisCartDto.class);
+        }
+
+        return targetRedisCartDto;
+    }
+
     // 상품옵션수량 셋팅
     private RedisCartDto setAddCartData(RedisCartDto targetRedisCartDto,
-                                RequestCartDto requestCartDto,
-                                String redisKey) {
+                                RequestCartDto requestCartDto) {
         RedisCartDto result;
 
         // 1. 요청 상품이 장바구니에 미존재 시 상품옵션조회 (DB)
@@ -96,7 +108,7 @@ public class CartService {
         return result;
     }
 
-    // 상품옵션ID에 해당하는 상품옵션 Entity 조회해 ServiceCartDto로 변환해 반환
+    // 상품옵션에 해당하는 상품옵션 조회
     private RedisCartDto findOptionDtoById(String productCode, String optionCode) {
         // 상품옵션조회
         return productOptionRepository

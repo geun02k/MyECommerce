@@ -24,9 +24,9 @@ public class RedisSingleDataService {
     }
 
     /** Redis 단일 데이터 삭제&조회 **/
-    public Object getAndDeleteSingleData(RedisNamespaceType nameSpace,
+    public Object deleteSingleData(RedisNamespaceType nameSpace,
                                          String key) {
-        return redisTemplate.opsForValue().getAndDelete(setKey(nameSpace, key));
+        return redisTemplate.delete(setKey(nameSpace, key));
     }
 
     /** Redis 단일 테이터 조회 **/

@@ -102,7 +102,7 @@ public class MemberService {
         String token = jwtAuthenticationProvider.parseToken(authorization);
 
         // 2. Redis에서 유효한 토큰 삭제
-        if (ObjectUtils.isEmpty(redisSingleDataService.getAndDeleteSingleData(LOGIN, token))) {
+        if (ObjectUtils.isEmpty(redisSingleDataService.deleteSingleData(LOGIN, token))) {
             throw new MemberException(USER_ALREADY_SIGNED_OUT);
         }
     }

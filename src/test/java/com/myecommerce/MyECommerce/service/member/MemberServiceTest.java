@@ -239,7 +239,7 @@ class MemberServiceTest {
 
         // stub(가설) : redisSingleDataService.getAndDeleteSingleData() 실행 시
         // key값인 token의 value값인 "LOGIN" 반환 예상
-        given(redisSingleDataService.getAndDeleteSingleData(eq(LOGIN), eq(token)))
+        given(redisSingleDataService.deleteSingleData(eq(LOGIN), eq(token)))
                 .willReturn("LOGIN");
 
         // when
@@ -248,6 +248,6 @@ class MemberServiceTest {
         // then
         // redis에 등록된 토큰 삭제 후 조회 1번 수행됨
         verify(redisSingleDataService, times(1))
-                .getAndDeleteSingleData(eq(LOGIN), eq(token));
+                .deleteSingleData(eq(LOGIN), eq(token));
     }
 }

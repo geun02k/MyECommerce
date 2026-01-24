@@ -12,6 +12,8 @@ public enum ProductErrorCode implements CommonErrorCode {
     // 상품 validation check
     PRODUCT_CODE_ALREADY_REGISTERED(HttpStatus.CONFLICT.value(),
             "error.product.code.already.registered"),
+    PRODUCT_NOT_ON_SALE(HttpStatus.BAD_REQUEST.value(),
+            "error.product.not.on.sale"),
 
     // 상품옵션 validation check
     OPTION_AT_LEAST_ONE_REQUIRED(HttpStatus.BAD_REQUEST.value(),

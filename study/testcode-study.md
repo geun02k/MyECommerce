@@ -36,6 +36,8 @@
    - 테스트코드 검증
    - 테스트코드 검증과 ArgumentCaptor
    - 테스트코드 전달인자 검증
+   - Captor 사용이 필요한 경우
+   - Captor로 검증해야하는 값
 8. 테스트코드에서 필드주입
 9. Reflection - private 메서드 테스트코드 작성
 10. JPA의 Dirty Checking을 사용 시 테스트코드 작성
@@ -54,6 +56,7 @@
 15. Exception 테스트코드
     - Validation, 비즈니스 예외 메시지 테스트
 16. 읽기 쉬운 테스트와 신뢰 가능한 단위 테스트 작성 원칙
+17. verify()를 이용한 메서드 호출 검증
 
 --- 
 ## 1. 테스트코드
@@ -1156,6 +1159,15 @@ Controller에 주입하려면 @MockBean을 사용해야 한다.
    requestProductionDto의 값들이 제대로 전달되었는지,
    productionService.modifyProduction() 내부에서 originProductionEntity에 대한 수정이 예상대로 이루어졌는지 검증.
 
+### < Captor 사용이 필요한 경우 >
+1. 저장 직전 값 검증
+2. 외부 시스템으로 나가는 요청 파라미터 검증
+3. 반환값으로는 확인할 수 없는 부수효과 검증
+
+### < Captor로 검증해야하는 값 >
+Captor는 “이 메서드가 계산해서 만들어낸 값”만 잡는다.
+이미 메서드 인자나 key로 보장된 값은 잡지 않는다.
+
 
 ---
 ## 8. 테스트코드에서 필드주입
@@ -2065,4 +2077,17 @@ Validation 메시지를 키로 관리하는 설계를 제대로 했는지 검증
    id(pk)가 정책 판단에 사용되지 않는다면 굳이 넣지 않는 것이 더 좋은 테스트다.
    불필요한 필드를 넣으면 테스트 의도가 흐려지고 리팩토링 저항만 커진다.
    id가 필요한 경우는 식별·비교·상태 전이 로직을 검증할 때뿐이다.
+
+
+--- 
+## 17. verify()를 이용한 메서드 호출 검증
+1. Redis 만료기간 설정 메서드 호출 검증    
+   Redis 만료기간 설정 메서드 검증은 Hash 저장 이후, 올바른 Redis Key(namespace:userId)에 TTL을 설정한다는 계약을 고정한다.   
+   eq() 같은 전달인자 검증을 통해 정확한 키를, times(), never()를 통해 정확한 시점에 항상 실행을 보장한다.   
+   단위 테스트의 책임은 “우리 코드가 Redis에 올바른 명령을 보냈는가”이므로 경계선을 정확히 지키게 해준다.   
+   ~~~
+        // redis 만료 기간 갱신 검증
+        verify(redisSingleDataService, times(1))
+                .setExpire(eq(CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
+   ~~~
 

@@ -21,7 +21,7 @@ public class MessageSourceTest {
         // given
         // when
         String message = messageSource.getMessage(
-                "error.cart.cart.size.exceeded",
+                "error.cart.size.exceeded",
                 new Object[]{50},
                 Locale.getDefault()
         );

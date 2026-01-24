@@ -35,6 +35,7 @@
     - JPA 인덱스 생성
     - LIKE 검색과 인덱스
     - 클러스티드 인덱스와 넌클러스티드 인덱스
+15. Spring Data JPA에서 DTO Projection + FETCH JOIN으로 인한 QueryCreationException 해결
 
 
 ---
@@ -1171,4 +1172,61 @@ FETCH는 연관된 엔티티를 함께 로드할 때 사용되며, 집계 함수
    ~~~ 
    CREATE INDEX idx_username ON Users (username);   -- 비클러스터드 인덱스
    ~~~
+
+
+---
+## 15. Spring Data JPA에서 DTO Projection + FETCH JOIN으로 인한 QueryCreationException 해결
+1. 발생오류
+   ~~~
+    Caused by: org.springframework.beans.factory.BeanCreationException: 
+        Error creating bean with name 'productOptionRepository' defined in com.myecommerce.MyECommerce.repository.product.ProductOptionRepository defined in @EnableJpaRepositories declared on JpaRepositoriesRegistrar.EnableJpaRepositoriesConfiguration: Could not create query for public abstract java.util.Optional com.myecommerce.MyECommerce.repository.product.ProductOptionRepository.findByProductCodeAndOptionCodeOfOnSale(java.lang.String,java.lang.String); 
+        Reason: Validation failed for query for method public abstract java.util.Optional com.myecommerce.MyECommerce.repository.product.ProductOptionRepository.findByProductCodeAndOptionCodeOfOnSale(java.lang.String,java.lang.String) at app//org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1808) at app//org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:601) at app//org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:523) at app//org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:336) at app//org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:289) at app//org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:334) at app//org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199) at app//org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1573) at app//org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1519) at app//org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:913) at app//org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:791) ... 58 more    
+    Caused by: org.springframework.data.repository.query.QueryCreationException: Could not create query for public abstract java.util.Optional com.myecommerce.MyECommerce.repository.product.ProductOptionRepository.findByProductCodeAndOptionCodeOfOnSale(java.lang.String,java.lang.String); Reason: Validation failed for query for method public abstract java.util.Optional com.myecommerce.MyECommerce.repository.product.ProductOptionRepository.findByProductCodeAndOptionCodeOfOnSale(java.lang.String,java.lang.String) at app//org.springframework.data.repository.query.QueryCreationException.create(QueryCreationException.java:101) at app//org.springframework.data.repository.core.support.QueryExecutorMethodInterceptor.lookupQuery(QueryExecutorMethodInterceptor.java:120) at app//org.springframework.data.repository.core.support.QueryExecutorMethodInterceptor.mapMethodsToQuery(QueryExecutorMethodInterceptor.java:104) at app//org.springframework.data.repository.core.support.QueryExecutorMethodInterceptor.lambda$new$0(QueryExecutorMethodInterceptor.java:92)
+   ~~~
+
+2. 발생원인
+   - JPQL과 반환 타입이 서로 맞지 않아서 Repository 빈 생성 단계에서 실패
+   1) JPQL 반환타입
+      - 엔티티 반환
+      - constructor expression (new)
+      - 인터페이스 기반 Projection
+   1) FETCH JOIN + DTO Projection은 같이 쓰면 안 됨   
+      FETCH JOIN은 엔티티 그래프 로딩용.
+      그런데 지금은 DTO Projection을 하고 있음.
+      FETCH JOIN + DTO Projection은 JPQL 문법적으로 허용되지 않아,
+      이 조합만으로도 Query validation 실패.
+
+3. 해결방법
+   1) 에러 발생 코드   
+      JPQL에서 엔티티가 아닌 개별 컬럼들을 SELECT 하고 있는데
+      반환 타입은 Optional<RedisCartDto> 입니다.
+      JPA는 이걸 어떻게 RedisCartDto로 매핑해야 할지 모릅니다.
+      ~~~
+      @Query(" SELECT PRD.id as productId, PRD.code as productCode, PRD.name as productName, " +
+           "        OPTION.id as optionId, OPTION.optionCode, OPTION.optionName, " +
+           "        OPTION.price, OPTION.quantity " +
+           " FROM Product PRD" +
+           " INNER JOIN FETCH PRD.options OPTION" +
+           " WHERE PRD.code = ?1" +
+           " AND OPTION.optionCode = ?2" +
+           " AND PRD.saleStatus = 'ON_SALE'")
+      Optional<RedisCartDto> findByProductCodeAndOptionCodeOfOnSale(String productId, String optionId);
+      ~~~
+   2) 반영 코드
+      ~~~
+        // 상품ID에 해당하는 상품옵션 단건 조회
+        @Query(" SELECT new com.myecommerce.MyECommerce.dto.cart.RedisCartDto( " +
+                "       PRD.id, PRD.code, PRD.name, " +
+                "       OPTION.id, OPTION.optionCode, OPTION.optionName, " +
+                "       OPTION.price, OPTION.quantity, null" +
+                ")" +
+                " FROM Product PRD" +
+                " INNER JOIN PRD.options OPTION" +
+                " WHERE PRD.code = ?1" +
+                " AND OPTION.optionCode = ?2" +
+                " AND PRD.saleStatus = 'ON_SALE'")
+        Optional<RedisCartDto> findByProductCodeAndOptionCodeOfOnSale(
+                String productCdoe, String optionCode);
+      ~~~
+
 

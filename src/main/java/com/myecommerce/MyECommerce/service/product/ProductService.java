@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.*;
 import static com.myecommerce.MyECommerce.type.ProductOrderByStdType.*;
-import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.*;
 
 @Service
 @RequiredArgsConstructor
@@ -88,22 +88,12 @@ public class ProductService {
         productPolicy.validateModify(
                 targetProduct, serviceOptionDtoListForInsert);
 
-        // 수정, 신규 등록 옵션 목록 dto -> entity 변환
-        List<ProductOption> updateTargetOptions =
-                serviceOptionDtoListForUpdate.stream()
-                        .map(serviceProductMapper::toOptionEntity)
-                        .toList();
-        List<ProductOption> insertTargetOptions =
-                serviceOptionDtoListForInsert.stream()
-                        .map(serviceProductMapper::toOptionEntity)
-                        .toList();
-
         // 상품 설명, 판매상태 변경
         updateProduct(targetProduct, serviceProductDto);
-        // 기존 상품옵션 수량 변경
-        updateOptions(targetProduct, updateTargetOptions);
-        // 신규 상품옵션 추가
-        insertOptions(targetProduct, insertTargetOptions);
+        // 상품 옵션 목록 등록 및 수정
+        applyOptionsModificationPolicy(targetProduct,
+                                       serviceOptionDtoListForUpdate,
+                                       serviceOptionDtoListForInsert);
         // 상품 재고 캐시 데이터 관리
         syncStockBySaleStatus(targetProduct);
 
@@ -200,8 +190,10 @@ public class ProductService {
     // 상품 Entity 데이터 변경
     private void updateProduct(Product product,
                                ServiceProductDto serviceProductDto) {
-        product.setDescription(serviceProductDto.getDescription());
         product.setSaleStatus(serviceProductDto.getSaleStatus());
+        if (product.getSaleStatus() != DELETION) {
+            product.setDescription(serviceProductDto.getDescription());
+        }
     }
 
     // 상품 Entity의 필드인 상품옵션 Entity의 수량 변경
@@ -243,6 +235,29 @@ public class ProductService {
         } else {
             // 판매중단, 판매종료 시 재고 삭제
             stockCacheService.deleteProductStock(targetProduct);
+        }
+    }
+
+    // 옵션 수정 지원 정책
+    private void applyOptionsModificationPolicy(Product targetProduct,
+                                                List<ServiceProductOptionDto> updateOptionDtoList,
+                                                List<ServiceProductOptionDto> insertOptionDtoList) {
+        // 수정, 신규 등록 옵션 목록 dto -> entity 변환
+        List<ProductOption> updateTargetOptions =
+                updateOptionDtoList.stream()
+                        .map(serviceProductMapper::toOptionEntity)
+                        .toList();
+        List<ProductOption> insertTargetOptions =
+                insertOptionDtoList.stream()
+                        .map(serviceProductMapper::toOptionEntity)
+                        .toList();
+
+        // 판매중, 판매중단인 경우 옵션 수정 / 등록
+        if (targetProduct.getSaleStatus() != DELETION) {
+            // 기존 상품옵션 수량 변경
+            updateOptions(targetProduct, updateTargetOptions);
+            // 신규 상품옵션 추가
+            insertOptions(targetProduct, insertTargetOptions);
         }
     }
 

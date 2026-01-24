@@ -109,8 +109,8 @@ class CartPolicyTest {
     }
 
     @Test
-    @DisplayName("장바구니추가 실패 - 판매중인 상품이 아니면 예외발생")
-    void addCart_shouldReturnProductNotOnSale_whenProductNotOnSale() {
+    @DisplayName("장바구니추가정책 실패 - 판매중인 상품이 아니면 예외발생")
+    void validateAdd_shouldReturnProductNotOnSale_whenProductNotOnSale() {
         // given
         Member customer = customer();
         // 사용자 장바구니 사이즈 (타정책 통과용)
@@ -130,8 +130,8 @@ class CartPolicyTest {
     }
 
     @Test
-    @DisplayName("장바구니추가 실패 - 고객 외 장바구니 접근 시 예외발생")
-    void addCart_shouldReturnCartCustomerOnly_whenAccessNotCustomer() {
+    @DisplayName("장바구니추가정책 실패 - 고객 외 장바구니 접근 시 예외발생")
+    void validateAdd_shouldReturnCartCustomerOnly_whenAccessNotCustomer() {
         // given
         Member invalidMember = Member.builder()
                 .roles(List.of(MemberAuthority.builder()

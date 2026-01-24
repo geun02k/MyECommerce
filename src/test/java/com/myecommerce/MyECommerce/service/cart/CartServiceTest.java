@@ -8,7 +8,6 @@ import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
-import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -91,7 +90,7 @@ class CartServiceTest {
 
     @Test
     @DisplayName("장바구니추가 성공 - 장바구니에 동일 상품 존재하는 경우 장바구니 수량 증가")
-    void addCart_shouldIncreaseQuantity_whenTheSameProductExists() {
+    void addCart_shouldIncreaseQuantity_whenProductAlreadyExistsInCart() {
         // given
         // 요청 장바구니 상품 정보
         RequestCartDto requestCartDto = RequestCartDto.builder()

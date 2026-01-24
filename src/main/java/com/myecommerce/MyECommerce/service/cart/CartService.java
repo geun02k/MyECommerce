@@ -15,13 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_EXIST;
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_OPTION_NOT_EXIST;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 
 @Service
 @RequiredArgsConstructor
 public class CartService {
-    // 장바구니 최대 데이터 수
+
     public static final Long EXPIRATION_PERIOD = 30L;
 
     private final CartPolicy cartPolicy;
@@ -102,7 +102,7 @@ public class CartService {
         return productOptionRepository
                 .findByProductCodeAndOptionCodeOfOnSale(productCode, optionCode)
                 .orElseThrow(() ->
-                        new ProductException(PRODUCT_NOT_EXIST));
+                        new ProductException(PRODUCT_OPTION_NOT_EXIST));
     }
 
     // 장바구니에 상품옵션 단건등록

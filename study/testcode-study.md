@@ -57,6 +57,8 @@
     - Validation, 비즈니스 예외 메시지 테스트
 16. 읽기 쉬운 테스트와 신뢰 가능한 단위 테스트 작성 원칙
 17. verify()를 이용한 메서드 호출 검증
+18. 단위 테스트 작성 가치
+
 
 --- 
 ## 1. 테스트코드
@@ -2091,3 +2093,39 @@ Validation 메시지를 키로 관리하는 설계를 제대로 했는지 검증
                 .setExpire(eq(CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
    ~~~
 
+
+--- 
+## 18. 단위 테스트 작성 가치
+1. 단위 테스트 작성 가치가 없는 경우   
+   비즈니스 판단, 조건 분기, 계산 로직, 정책이 없는 경우, 단위 테스트의 가치가 낮다.
+   테스트가 결국 Mock 검증 밖에 안되기 때문이다.
+   이는 로직 검증이 아니라 구현 검증에 가깝다.
+
+2. 단위 테스트 작성 가치가 있는 경우   
+   - 정책이 포함될 때
+   - 판단/계산이 수행될 때
+   - Redis Key 생성 규칙이 중요할 때   
+     여러 곳에서 쓰이고 포맷이 바뀌면 장애가 나거나 외부 시스템과 약속된 규칙인 경우라면 Key 생성 로직만 빼서 테스트 권장.
+   - 실수하면 장애 나는 코드일 때
+   - 
+
+1. 재고 등록 메서드
+   조회해 그대로 Redis에 데이터를 저장하는 경우이다.
+   아래 코드의 경우 productOptionRepository.findByProductId() 가 호출되었는지, 몇 번 호출 되었는지, key/value가 맞는지 구현에 대한 검증밖에 수행할 게 없다.
+   그리고 실패해도 얻는 신뢰도가 낮다.
+   테스트가 통과해도 Redis에 실제도 잘 들어가는지, 직렬화 문제는 없는지 등 확인이 불가하므로 결국 통합테스트에서만 의미가 있다. 
+   ~~~
+    public void saveProductStock(Product product) {
+        // 옵션목록조회
+        List<ProductOption> options =
+                productOptionRepository.findByProductId(product.getId());
+
+        // 상품옵션 재고등록
+        options.forEach(option -> {
+            redisSingleDataService.saveSingleData(
+                    STOCK,
+                    createStockRedisKey(product.getCode(), option.getOptionCode()),
+                    option.getQuantity());
+        });
+    }
+   ~~~

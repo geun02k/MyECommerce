@@ -23,6 +23,14 @@ public class RedisSingleDataService {
                 .set(setKey(nameSpace, key), setObjectValue(value), duration);
     }
 
+    /** Redis 단일 데이터 등록 **/
+    public void saveSingleData(RedisNamespaceType nameSpace,
+                               String key,
+                               Object value) {
+        redisTemplate.opsForValue()
+                .set(setKey(nameSpace, key), setObjectValue(value));
+    }
+
     /** Redis 단일 데이터 삭제&조회 **/
     public Object deleteSingleData(RedisNamespaceType nameSpace,
                                          String key) {

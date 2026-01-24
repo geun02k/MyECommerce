@@ -33,4 +33,7 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
             " AND PRD.saleStatus = 'ON_SALE'")
     Optional<RedisCartDto> findByProductCodeAndOptionCodeOfOnSale(
             String productCode, String optionCode);
+
+    // 상품ID에 해당하는 옵션 목록 조회
+    List<ProductOption> findByProductId(Long productId);
 }

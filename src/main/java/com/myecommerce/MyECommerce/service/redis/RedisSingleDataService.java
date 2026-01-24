@@ -14,8 +14,8 @@ public class RedisSingleDataService {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
-    /** Redis 단일 데이터 등록 **/
-    public void saveSingleData(RedisNamespaceType nameSpace,
+    /** Redis 단일 데이터 등록 (만료시간포함) **/
+    public void saveSingleDataWithDuration(RedisNamespaceType nameSpace,
                                String key,
                                Object value,
                                Duration duration) {

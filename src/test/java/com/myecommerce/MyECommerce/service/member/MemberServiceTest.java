@@ -216,8 +216,9 @@ class MemberServiceTest {
         // then
         // 토큰이 redis에 1번 등록됨.(1번 수행됨)
         verify(redisSingleDataService, times(1))
-                .saveSingleData(eq(LOGIN), eq(token), eq(null), argThat(duration ->
-                        duration.compareTo(Duration.ofMillis(validTimeMs)) <= 0));
+                .saveSingleDataWithDuration(eq(LOGIN), eq(token), eq(null),
+                        argThat(duration ->
+                                duration.compareTo(Duration.ofMillis(validTimeMs)) <= 0));
         // 생성된 토큰이 반환 토큰값과 동일.
         assertEquals(token, returnToken);
 

@@ -128,7 +128,7 @@ public class MemberService {
         long validTime = expirationDate.getTime() - now.getTime();
 
         // Token을 LOGIN value를 가지도록 저장
-        redisSingleDataService.saveSingleData(
+        redisSingleDataService.saveSingleDataWithDuration(
                 LOGIN, token, null, Duration.ofMillis(validTime));
     }
 

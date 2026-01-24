@@ -8,6 +8,7 @@ import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.*;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.service.stock.StockCacheService;
 import com.myecommerce.MyECommerce.type.ProductCategoryType;
 import com.myecommerce.MyECommerce.type.ProductOrderByStdType;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,8 @@ import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 public class ProductService {
 
     private final ProductPolicy productPolicy;
+
+    private final StockCacheService stockCacheService;
 
     private final ProductRepository productRepository;
     private final ProductOptionRepository productOptionRepository;
@@ -54,6 +57,8 @@ public class ProductService {
         // 상품, 옵션 등록
         Product savedProduct = saveProduct(product, member);
         saveProductOptions(savedProduct, product.getOptions());
+        // 상품 재고 캐시 데이터 등록
+        stockCacheService.saveProductStock(savedProduct); // 기존 재고 업데이트되는지 확인
 
         // 상품, 상품옵션목록 반환
         return serviceProductMapper.toDto(savedProduct);
@@ -99,6 +104,8 @@ public class ProductService {
         updateOptions(targetProduct, updateTargetOptions);
         // 신규 상품옵션 추가
         insertOptions(targetProduct, insertTargetOptions);
+        // 상품 재고 캐시 데이터 관리
+        syncStockBySaleStatus(targetProduct);
 
         // 상품, 상품옵션목록 반환
         return serviceProductMapper.toDto(targetProduct);
@@ -226,6 +233,17 @@ public class ProductService {
             // 조회한 상품옵션목록에 신규옵션 추가
             product.getOptions().add(option);
         });
+    }
+
+    // 판매 상태에 따른 재고 캐시 데이터 동기화
+    private void syncStockBySaleStatus(Product targetProduct) {
+        if (targetProduct.getSaleStatus() == ON_SALE) {
+            // 판매중인 경우 재고 등록
+            stockCacheService.saveProductStock(targetProduct);
+        } else {
+            // 판매중단, 판매종료 시 재고 삭제
+            stockCacheService.deleteProductStock(targetProduct);
+        }
     }
 
     // keyword를 포함하는 상품정보 페이지 조회

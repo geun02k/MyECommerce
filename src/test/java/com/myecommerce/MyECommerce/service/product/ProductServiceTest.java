@@ -7,6 +7,7 @@ import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.mapper.*;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
+import com.myecommerce.MyECommerce.service.stock.StockCacheService;
 import com.myecommerce.MyECommerce.type.ProductCategoryType;
 import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +44,8 @@ class ProductServiceTest {
     private ProductOptionRepository productOptionRepository;
     @Mock
     private ServiceProductMapper serviceProductMapper;
+    @Mock
+    private StockCacheService stockCacheService;
 
     @InjectMocks
     private ProductService productService;
@@ -197,6 +200,9 @@ class ProductServiceTest {
                 .save(productionCaptor.capture());
         verify(productOptionRepository, times(1))
                 .save(optionCaptor.capture());
+        // 상품 재고 등록 여부 검증
+        verify(stockCacheService, times(1))
+                .saveProductStock(eq(expectedProductionEntity));
         // 상품 전달인자 검증
         Product capturedProduction = productionCaptor.getValue();
         assertNull(capturedProduction.getId());
@@ -231,7 +237,7 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("상품수정 성공")
+    @DisplayName("상품수정 성공 - 상품 판매종료로 변경 및 옵션 1건씩 수정,등록")
     @Transactional
     void successModifyProduction() {
         // given
@@ -397,6 +403,10 @@ class ProductServiceTest {
         // then
         verify(productionPolicy, times(1))
                 .validateModify(any(), any());
+        // 상품 재고 등록 여부 검증
+        verify(stockCacheService, times(1))
+                .deleteProductStock(eq(originProductionEntity));
+
         // 0. toDto에 전달된 인자 캡처 후 검증
         Product capturedProduction = productionCaptor.getValue();
         assertEquals(requestProductionDto.getId(), capturedProduction.getId());

@@ -18,7 +18,7 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
             " INNER JOIN FETCH PRD.options OPTION" +
             " WHERE PRD.code = ?1" +
             " AND OPTION.optionCode IN (?2)")
-    List<Product> findByProductCodeAndOptionCodeIn(String productionCode, List<String> optionCodes);
+    List<Product> findByProductCodeAndOptionCodeIn(String productCode, List<String> optionCodes);
 
     // 상품ID에 해당하는 상품옵션 단건 조회
     @Query(" SELECT new com.myecommerce.MyECommerce.dto.cart.RedisCartDto( " +

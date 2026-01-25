@@ -4,6 +4,7 @@ import com.myecommerce.MyECommerce.dto.product.*;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.entity.product.Product;
+import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.*;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
@@ -24,9 +25,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_ALREADY_DELETED;
 import static com.myecommerce.MyECommerce.type.ProductCategoryType.WOMEN_CLOTHING;
-import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.DISCONTINUED;
-import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -37,7 +38,7 @@ import static org.mockito.Mockito.*;
 class ProductServiceTest {
 
     @Mock
-    private ProductPolicy productionPolicy;
+    private ProductPolicy productPolicy;
     @Mock
     private ProductRepository productRepository;
     @Mock
@@ -93,6 +94,11 @@ class ProductServiceTest {
                 .saleStatus(saleStatus)
                 .options(serviceOptions)
                 .build();
+    }
+
+    /** Service 전용 상품 DTO (판매중 상태 유지 ) */
+    ServiceProductDto serviceProductDto(List<RequestModifyProductOptionDto> options) {
+        return this.serviceProductDto(ON_SALE, options);
     }
 
     /** 수정할 상품 Entity */
@@ -294,7 +300,7 @@ class ProductServiceTest {
                 productService.registerProduct(requestProductionDto, member);
 
         // then
-        verify(productionPolicy, times(1))
+        verify(productPolicy, times(1))
                 .validateRegister(serviceProductionDto, member);
         verify(productRepository, times(1))
                 .save(productionCaptor.capture());
@@ -384,7 +390,7 @@ class ProductServiceTest {
 
         // then
         // 정책 검증 여부 검증
-        verify(productionPolicy, times(1))
+        verify(productPolicy, times(1))
                 .validateModify(any(Product.class), anyList());
         // 상품 재고 등록 여부 검증
         verify(stockCacheService, times(1))
@@ -448,7 +454,8 @@ class ProductServiceTest {
         productService.modifyProduct(requestProduct, member);
 
         // then
-        verify(productionPolicy, times(1))
+        // 정책 검증 여부 검증
+        verify(productPolicy, times(1))
                 .validateModify(any(Product.class), anyList());
         // 상품 재고 등록 여부 검증
         verify(stockCacheService, times(1)).deleteProductStock(targetProduct);
@@ -464,6 +471,45 @@ class ProductServiceTest {
         // 3. 상품옵션 신규등록 검증 (JPA 더티체킹으로, 신규 생성되어야하는 아이디는 미검증)
         ProductOption responseInsertedOption = filterOption(targetProduct, null);
         assertEquals(requestInsertOption.getQuantity(), responseInsertedOption.getQuantity());
+    }
+
+    @Test
+    @DisplayName("상품수정 실패 - 이미 상품 판매종료인 경우 수정 불가")
+    void modifyProduct_shouldFail_whenAlreadyProductDeleted() {
+        // given
+        RequestModifyProductDto requestProduct =
+                RequestModifyProductDto.builder()
+                        .id(5L)
+                        .options(List.of(requestUpdateOption()))
+                        .build();
+        Member member = seller();
+
+        ServiceProductDto serviceProductDto =
+                serviceProductDto(requestProduct.getOptions());
+        // 요청 상품의 기존 상태 (이미 판매 종료된 상품)
+        Product targetProduct = Product.builder()
+                .saleStatus(DELETION) // 이미 판매종료
+                .options(new ArrayList<>(List.of(
+                        ProductOption.builder().id(1L).build())))
+                .build();
+
+        // requestDto -> ServiceDto 변환
+        given(serviceProductMapper.toServiceDto(requestProduct))
+                .willReturn(serviceProductDto);
+        // 요청한 셀러 상품 단건 조회
+        given(productRepository.findByIdAndSeller(
+                requestProduct.getId(), member.getId()))
+                .willReturn(Optional.of(targetProduct));
+        // 정책에서 예외 발생
+        doThrow(new ProductException(PRODUCT_ALREADY_DELETED))
+                .when(productPolicy)
+                .validateModify(eq(targetProduct), anyList());
+
+        // when
+        // then
+        ProductException e = assertThrows(ProductException.class, () ->
+                productService.modifyProduct(requestProduct, member));
+        assertEquals(PRODUCT_ALREADY_DELETED, e.getErrorCode());
     }
 
 }

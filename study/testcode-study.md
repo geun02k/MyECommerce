@@ -59,6 +59,7 @@
 17. verify()를 이용한 메서드 호출 검증
 18. 단위 테스트 작성 가치
 19. 모든 것을 검증하는 정상 시나리오의 문제점
+20. 정상 시나리오 테스트에서 given 중복은 제거 대상이 아니라 설계 정보
 
 
 --- 
@@ -2342,4 +2343,30 @@ Validation 메시지를 키로 관리하는 설계를 제대로 했는지 검증
    6) 판매 상태에 따른 재고 캐시 처리(save/delete)를 명확히 구분해 상태 전이에 따른 부수 효과 검증을 분리했다.
    7) 테스트 Fixture와 Helper 메서드를 정리해 테스트 의도를 빠르게 파악할 수 있도록 가독성을 개선했다.
    8) 정상 시나리오 테스트를 “결과 검증” 중심으로 재정의하고, 세부 동작 및 전달 인자 검증은 별도 단위 테스트로 분리 가능한 구조로 개선했다.
+
+
+---
+## 20. 정상 시나리오 테스트에서 given 중복은 제거 대상이 아니라 설계 정보
+테스트를 처음 읽는 사람에게 아래 코드는 단순한 반복이 아닌, 정보이다.
+서비스 설계 전제를 드러내고 있는 것이다.
+- 수정 로직은 Service DTO를 기준으로 동작한다.
+- 수정 대상은 셀러 소유 상품만 조회한다.
+- 더티체킹 대상 엔티티를 직접 수정한다.
+~~~
+// requestDto -> ServiceDto 변환
+given(serviceProductMapper.toServiceDto(requestProduct))
+        .willReturn(serviceProductDto);
+
+// 요청한 셀러 상품 단건 조회
+given(productRepository.findByIdAndSeller(...))
+        .willReturn(Optional.of(targetProduct));
+
+// 옵션 DTO -> Entity 변환
+given(serviceProductMapper.toOptionEntity(...))
+        .willReturn(...);
+~~~
+위 given() 절 구조는 수정 시나리오의 공통 흐름을 설명하는 역할을 한다.
+이는 정상 시나리오 내에서 반복적으로 작성하게 되더라도 테스트 내 유지하는 게 맞다.
+두 정상 시나리오가 거의 동일해도 괜찮다. given이 거의 같은 것은 오히려 좋은 신호다.
+같은 흐름에 상태값 하나만 달라진다는 것을 정확히 보여줄 수 있기 때문이다.
 

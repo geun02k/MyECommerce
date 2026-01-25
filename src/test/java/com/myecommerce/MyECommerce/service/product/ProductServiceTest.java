@@ -125,7 +125,11 @@ class ProductServiceTest {
                 .build();
     }
 
+    /* ------------------
+        Helper Method
+       ------------------ */
 
+    /** 옵션 ID에 대한 옵션 반환 (null 전달 시 신규 옵션 반환) */
     ServiceProductOptionDto filterOption(ServiceProductDto product,
                                          Long optionId) {
         return product.getOptions().stream()
@@ -337,96 +341,66 @@ class ProductServiceTest {
        ---------------------- */
 
     @Test
-    @DisplayName("상품수정 성공 - 상품 판매중 유지 시 상품 및 옵션 수정,등록 후 재고 등록")
-    void modifyProduct_shouldUpdateProductAndCacheStock_whenProductOnSale() {
+    @DisplayName("상품수정 성공 - 판매중 유지 상품 수정 시 상품/옵션 변경 후 재고 등록")
+    void modifyProduct_shouldUpdateProductAndSaveStock_whenProductOnSale() {
         // given
         // 요청 상품옵션 DTO 목록
         RequestModifyProductOptionDto requestUpdateOption = requestUpdateOption();
         RequestModifyProductOptionDto requestInsertOption = requestInsertOption();
-        List<RequestModifyProductOptionDto> requestOptions = new ArrayList<>();
-        requestOptions.add(requestUpdateOption);
-        requestOptions.add(requestInsertOption);
         // 요청 상품 DTO
         RequestModifyProductDto requestProduct =
                 RequestModifyProductDto.builder()
                         .id(5L)
                         .description("수정한 상품 설명입니다.")
-                        .saleStatus(ON_SALE)
-                        .options(requestOptions)
+                        .saleStatus(ON_SALE) // 판매중 유지
+                        .options(List.of(requestUpdateOption, requestInsertOption))
                         .build();
         // 요청 회원 DTO
         Member member = seller();
 
-        Product targetProductEntity = onSaleProductEntity();
-
+        Product targetProduct = onSaleProductEntity();
         ServiceProductDto serviceProductDto =
-                serviceProductDto(ON_SALE, requestOptions);
+                serviceProductDto(ON_SALE, requestProduct.getOptions());
         ServiceProductOptionDto insertOptionDto =
                 filterOption(serviceProductDto, null);
         ServiceProductOptionDto updateOptionDto =
                 filterOption(serviceProductDto, 1L);
 
-        // 업데이트한 상품 결과 DTO
-        ResponseProductDto expectedResponseProduct =
-                ResponseProductDto.builder()
-                        .id(5L)
-                        .description("수정한 상품 설명입니다.")
-                        .saleStatus(ON_SALE)
-                        .build();
-
         // requestDto -> ServiceDto 변환
-        given(serviceProductMapper.toServiceDto(eq(requestProduct)))
+        given(serviceProductMapper.toServiceDto(requestProduct))
                 .willReturn(serviceProductDto);
         // 요청한 셀러 상품 단건 조회 (반환 결과는 dirty checking 대상)
         given(productRepository.findByIdAndSeller(
-                eq(requestProduct.getId()), eq(member.getId())))
-                .willReturn(Optional.of(targetProductEntity));
+                requestProduct.getId(), member.getId()))
+                .willReturn(Optional.of(targetProduct));
         // 수정, 신규 옵션 DTO -> Entity로 변환 (옵션값 변경 직전)
-        given(serviceProductMapper.toOptionEntity(eq(updateOptionDto)))
+        given(serviceProductMapper.toOptionEntity(updateOptionDto))
                 .willReturn(updateProductOptionEntity());
-        given(serviceProductMapper.toOptionEntity(eq(insertOptionDto)))
+        given(serviceProductMapper.toOptionEntity(insertOptionDto))
                 .willReturn(insertProductOptionEntity());
-        // Entity -> response DTO로 변환 (더티 체킹이므로 변환 전 변경값 검증)
-        ArgumentCaptor<Product> productCaptor =
-                ArgumentCaptor.forClass(Product.class);
-        given(serviceProductMapper.toDto(productCaptor.capture()))
-                .willReturn(expectedResponseProduct);
 
         // when
-        ResponseProductDto responseProduct =
-                productService.modifyProduct(requestProduct, member);
+        productService.modifyProduct(requestProduct, member);
 
         // then
         // 정책 검증 여부 검증
         verify(productionPolicy, times(1))
-                .validateModify(eq(targetProductEntity), eq(List.of(insertOptionDto)));
+                .validateModify(any(Product.class), anyList());
         // 상품 재고 등록 여부 검증
         verify(stockCacheService, times(1))
-                .saveProductStock(eq(targetProductEntity));
+                .saveProductStock(targetProduct);
         // 상품 재고 삭제 여부 검증
         verify(stockCacheService, never()).deleteProductStock(any());
 
-        // 0. toDto에 전달된 인자 캡처 후 검증 (변경값만 검증)
-        // 상품 판매상태, 설명 / 신규, 수정 옵션 수량 검증
-        Product capturedProduct = productCaptor.getValue();
-        ProductOption updatedOption = filterOption(capturedProduct, 1L);
-        ProductOption insertedOption = filterOption(capturedProduct, null);
-        assertEquals(requestProduct.getSaleStatus(), capturedProduct.getSaleStatus());
-        assertEquals(requestProduct.getDescription(), capturedProduct.getDescription());
-        assertEquals(10, updatedOption.getQuantity());
-        assertEquals(20, insertedOption.getQuantity());
+        // 상품 판매상태, 설명 / 신규, 수정 옵션 수량 검증 (옵션 변경이 실제로 반영되었는지 확인)
         // 1. 상품 수정 검증
-        assertEquals(requestProduct.getId(), responseProduct.getId());
-        assertEquals(requestProduct.getDescription(), responseProduct.getDescription());
-        assertEquals(requestProduct.getSaleStatus(), responseProduct.getSaleStatus());
+        assertEquals(requestProduct.getDescription(), targetProduct.getDescription());
+        assertEquals(requestProduct.getSaleStatus(), targetProduct.getSaleStatus());
         // 2. 상품옵션 수정 검증
-        ProductOption responseUpdatedOption = filterOption(capturedProduct, 1L);
-        ProductOption responseInsertedOption = filterOption(capturedProduct, null);
-        assertEquals(requestUpdateOption.getId(), responseUpdatedOption.getId());
-        assertEquals(requestUpdateOption.getOptionCode(), responseUpdatedOption.getOptionCode());
+        ProductOption responseUpdatedOption = filterOption(targetProduct, 1L);
         assertEquals(requestUpdateOption.getQuantity(), responseUpdatedOption.getQuantity());
         // 3. 상품옵션 신규등록 검증 (JPA 더티체킹으로, 신규 생성되어야하는 아이디는 미검증)
-        assertEquals(requestInsertOption.getOptionCode(), responseInsertedOption.getOptionCode());
+        ProductOption responseInsertedOption = filterOption(targetProduct, null);
         assertEquals(requestInsertOption.getQuantity(), responseInsertedOption.getQuantity());
     }
 

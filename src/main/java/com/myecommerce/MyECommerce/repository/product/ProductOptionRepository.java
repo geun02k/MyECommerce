@@ -12,7 +12,7 @@ import java.util.Optional;
 
 @Repository
 public interface ProductOptionRepository extends JpaRepository<ProductOption, Long> {
-    // 판매자 상품의 동일 상품옵션코드 조회
+    // 상품의 옵션코드목록에 대한 옵션 목록 조회
     @Query(" SELECT PRD " +
             " FROM Product PRD" +
             " INNER JOIN FETCH PRD.options OPTION" +
@@ -20,7 +20,7 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
             " AND OPTION.optionCode IN (?2)")
     List<Product> findByProductCodeAndOptionCodeIn(String productCode, List<String> optionCodes);
 
-    // 상품ID에 해당하는 상품옵션 단건 조회
+    // 판매중인 상품옵션 상품옵션 단건 조회
     @Query(" SELECT new com.myecommerce.MyECommerce.dto.cart.RedisCartDto( " +
             "       PRD.id, PRD.code, PRD.name, " +
             "       OPTION.id, OPTION.optionCode, OPTION.optionName, " +

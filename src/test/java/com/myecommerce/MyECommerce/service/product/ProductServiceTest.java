@@ -22,8 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_ALREADY_DELETED;
 import static com.myecommerce.MyECommerce.type.ProductCategoryType.WOMEN_CLOTHING;
@@ -76,9 +74,14 @@ class ProductServiceTest {
                 .build();
     }
 
-    /** Service 전용 상품 DTO */
+    /**
+     * Service DTO 생성
+     * - 옵션 분기 (수정/신규) 판단용
+     * - 상품 상태 변경 로직 진입용
+     */
     ServiceProductDto serviceProductDto(ProductSaleStatusType saleStatus,
                                         List<RequestModifyProductOptionDto> options) {
+        // 옵션 타입 변환
         List<ServiceProductOptionDto> serviceOptions = new ArrayList<>();
         for (RequestModifyProductOptionDto option : options) {
             serviceOptions.add(ServiceProductOptionDto.builder()

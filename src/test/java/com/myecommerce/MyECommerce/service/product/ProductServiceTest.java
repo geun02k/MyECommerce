@@ -50,6 +50,102 @@ class ProductServiceTest {
     @InjectMocks
     private ProductService productService;
 
+    /* ------------------
+        Test Fixtures
+       ------------------ */
+
+    /** 회원 */
+    Member seller() {
+        return Member.builder().id(1L).build();
+    }
+
+    /** 유효한 수정할 상품 옵션 요청 */
+    RequestModifyProductOptionDto requestUpdateOption() {
+        return RequestModifyProductOptionDto.builder()
+                .id(1L)
+                .optionCode("existingOptionCode")
+                .quantity(10)
+                .build();
+    }
+    /** 유효한 등록할 상품 옵션 요청 */
+    RequestModifyProductOptionDto requestInsertOption() {
+        return RequestModifyProductOptionDto.builder()
+                .optionCode("optionCode")
+                .quantity(20)
+                .build();
+    }
+
+    /** Service 전용 상품 DTO */
+    ServiceProductDto serviceProductDto(ProductSaleStatusType saleStatus,
+                                        List<RequestModifyProductOptionDto> options) {
+        List<ServiceProductOptionDto> serviceOptions = new ArrayList<>();
+        for (RequestModifyProductOptionDto option : options) {
+            serviceOptions.add(ServiceProductOptionDto.builder()
+                    .id(option.getId())
+                    .optionCode(option.getOptionCode())
+                    .quantity(option.getQuantity())
+                    .build());
+        }
+
+        return ServiceProductDto.builder()
+                .id(5L)
+                .description("수정한 상품 설명입니다.")
+                .saleStatus(saleStatus)
+                .options(serviceOptions)
+                .build();
+    }
+
+    /** 수정할 상품 Entity */
+    Product onSaleProductEntity() {
+        return Product.builder()
+                .id(5L)
+                .code("productCode")
+                .description("description")
+                .saleStatus(ON_SALE)
+                .options(new ArrayList<>(List.of(
+                        ProductOption.builder()
+                                .id(1L)
+                                .optionCode("existingOptionCode")
+                                .quantity(1)
+                                .build())))
+                .build();
+    }
+    /** 수정할 상품옵션 Entity */
+    ProductOption updateProductOptionEntity() {
+        return ProductOption.builder()
+                .id(1L)
+                .quantity(10)
+                .build();
+    }
+    /** 등록할 상품옵션 Entity */
+    ProductOption insertProductOptionEntity() {
+        return ProductOption.builder()
+                .optionCode("optionCode")
+                .quantity(20)
+                .build();
+    }
+
+
+    ServiceProductOptionDto filterOption(ServiceProductDto product,
+                                         Long optionId) {
+        return product.getOptions().stream()
+                .filter(option ->
+                        Objects.equals(option.getId(), optionId))
+                .findFirst()
+                .orElseThrow();
+    }
+    ProductOption filterOption(Product product, Long optionId) {
+        return product.getOptions().stream()
+                .filter(option ->
+                        Objects.equals(option.getId(), optionId))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    /* ----------------------
+        상품등록 Tests
+       ---------------------- */
+
     @Test
     @DisplayName("상품등록 성공")
     void successSaveProduction() {
@@ -234,6 +330,104 @@ class ProductServiceTest {
         assertEquals(reqOptFromReqProduction.getQuantity(), expectedOptionEntity.getQuantity());
         assertEquals(expectedProductionEntity, expectedOptionEntity.getProduct());
         assertEquals(expectedOptionEntity.getId(), expectedOptionEntity.getProduct().getId());
+    }
+
+    /* ----------------------
+        상품수정 Tests
+       ---------------------- */
+
+    @Test
+    @DisplayName("상품수정 성공 - 상품 판매중 유지 시 상품 및 옵션 수정,등록 후 재고 등록")
+    void modifyProduct_shouldUpdateProductAndCacheStock_whenProductOnSale() {
+        // given
+        // 요청 상품옵션 DTO 목록
+        RequestModifyProductOptionDto requestUpdateOption = requestUpdateOption();
+        RequestModifyProductOptionDto requestInsertOption = requestInsertOption();
+        List<RequestModifyProductOptionDto> requestOptions = new ArrayList<>();
+        requestOptions.add(requestUpdateOption);
+        requestOptions.add(requestInsertOption);
+        // 요청 상품 DTO
+        RequestModifyProductDto requestProduct =
+                RequestModifyProductDto.builder()
+                        .id(5L)
+                        .description("수정한 상품 설명입니다.")
+                        .saleStatus(ON_SALE)
+                        .options(requestOptions)
+                        .build();
+        // 요청 회원 DTO
+        Member member = seller();
+
+        Product targetProductEntity = onSaleProductEntity();
+
+        ServiceProductDto serviceProductDto =
+                serviceProductDto(ON_SALE, requestOptions);
+        ServiceProductOptionDto insertOptionDto =
+                filterOption(serviceProductDto, null);
+        ServiceProductOptionDto updateOptionDto =
+                filterOption(serviceProductDto, 1L);
+
+        // 업데이트한 상품 결과 DTO
+        ResponseProductDto expectedResponseProduct =
+                ResponseProductDto.builder()
+                        .id(5L)
+                        .description("수정한 상품 설명입니다.")
+                        .saleStatus(ON_SALE)
+                        .build();
+
+        // requestDto -> ServiceDto 변환
+        given(serviceProductMapper.toServiceDto(eq(requestProduct)))
+                .willReturn(serviceProductDto);
+        // 요청한 셀러 상품 단건 조회 (반환 결과는 dirty checking 대상)
+        given(productRepository.findByIdAndSeller(
+                eq(requestProduct.getId()), eq(member.getId())))
+                .willReturn(Optional.of(targetProductEntity));
+        // 수정, 신규 옵션 DTO -> Entity로 변환 (옵션값 변경 직전)
+        given(serviceProductMapper.toOptionEntity(eq(updateOptionDto)))
+                .willReturn(updateProductOptionEntity());
+        given(serviceProductMapper.toOptionEntity(eq(insertOptionDto)))
+                .willReturn(insertProductOptionEntity());
+        // Entity -> response DTO로 변환 (더티 체킹이므로 변환 전 변경값 검증)
+        ArgumentCaptor<Product> productCaptor =
+                ArgumentCaptor.forClass(Product.class);
+        given(serviceProductMapper.toDto(productCaptor.capture()))
+                .willReturn(expectedResponseProduct);
+
+        // when
+        ResponseProductDto responseProduct =
+                productService.modifyProduct(requestProduct, member);
+
+        // then
+        // 정책 검증 여부 검증
+        verify(productionPolicy, times(1))
+                .validateModify(eq(targetProductEntity), eq(List.of(insertOptionDto)));
+        // 상품 재고 등록 여부 검증
+        verify(stockCacheService, times(1))
+                .saveProductStock(eq(targetProductEntity));
+        // 상품 재고 삭제 여부 검증
+        verify(stockCacheService, never()).deleteProductStock(any());
+
+        // 0. toDto에 전달된 인자 캡처 후 검증 (변경값만 검증)
+        // 상품 판매상태, 설명 / 신규, 수정 옵션 수량 검증
+        Product capturedProduct = productCaptor.getValue();
+        ProductOption updatedOption = filterOption(capturedProduct, 1L);
+        ProductOption insertedOption = filterOption(capturedProduct, null);
+        assertEquals(requestProduct.getSaleStatus(), capturedProduct.getSaleStatus());
+        assertEquals(requestProduct.getDescription(), capturedProduct.getDescription());
+        assertEquals(10, updatedOption.getQuantity());
+        assertEquals(20, insertedOption.getQuantity());
+        // 1. 상품 수정 검증
+        assertEquals(requestProduct.getId(), responseProduct.getId());
+        assertEquals(requestProduct.getDescription(), responseProduct.getDescription());
+        assertEquals(requestProduct.getSaleStatus(), responseProduct.getSaleStatus());
+        // 2. 상품옵션 수정 검증
+        ProductOption responseUpdatedOption = filterOption(capturedProduct, 1L);
+        ProductOption responseInsertedOption = filterOption(capturedProduct, null);
+        assertEquals(requestUpdateOption.getId(), responseUpdatedOption.getId());
+        assertEquals(requestUpdateOption.getOptionCode(), responseUpdatedOption.getOptionCode());
+        assertEquals(requestUpdateOption.getQuantity(), responseUpdatedOption.getQuantity());
+        // 3. 상품옵션 신규등록 검증 (JPA 더티체킹으로, 신규 생성되어야하는 아이디는 미검증)
+        assertEquals(requestInsertOption.getOptionCode(), responseInsertedOption.getOptionCode());
+        assertEquals(requestInsertOption.getQuantity(), responseInsertedOption.getQuantity());
     }
 
     @Test

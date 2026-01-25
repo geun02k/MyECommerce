@@ -7,7 +7,7 @@ import lombok.AllArgsConstructor;
 public enum ProductSaleStatusType {
     ON_SALE("판매중"),
     DISCONTINUED("판매중단"),
-    DELETION("삭제")
+    DELETION("판매종료")
     ;
 
     private final String description;

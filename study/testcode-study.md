@@ -57,6 +57,10 @@
     - Validation, 비즈니스 예외 메시지 테스트
 16. 읽기 쉬운 테스트와 신뢰 가능한 단위 테스트 작성 원칙
 17. verify()를 이용한 메서드 호출 검증
+18. 단위 테스트 작성 가치
+19. 모든 것을 검증하는 정상 시나리오의 문제점
+20. 정상 시나리오 테스트에서 given 중복은 제거 대상이 아니라 설계 정보
+
 
 --- 
 ## 1. 테스트코드
@@ -2090,4 +2094,291 @@ Validation 메시지를 키로 관리하는 설계를 제대로 했는지 검증
         verify(redisSingleDataService, times(1))
                 .setExpire(eq(CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
    ~~~
+
+
+--- 
+## 18. 단위 테스트 작성 가치
+1. 단위 테스트 작성 가치가 없는 경우   
+   비즈니스 판단, 조건 분기, 계산 로직, 정책이 없는 경우, 단위 테스트의 가치가 낮다.
+   테스트가 결국 Mock 검증 밖에 안되기 때문이다.
+   이는 로직 검증이 아니라 구현 검증에 가깝다.
+
+2. 단위 테스트 작성 가치가 있는 경우   
+   - 정책이 포함될 때
+   - 판단/계산이 수행될 때
+   - Redis Key 생성 규칙이 중요할 때   
+     여러 곳에서 쓰이고 포맷이 바뀌면 장애가 나거나 외부 시스템과 약속된 규칙인 경우라면 Key 생성 로직만 빼서 테스트 권장.
+   - 실수하면 장애 나는 코드일 때
+   - 
+
+1. 재고 등록 메서드
+   조회해 그대로 Redis에 데이터를 저장하는 경우이다.
+   아래 코드의 경우 productOptionRepository.findByProductId() 가 호출되었는지, 몇 번 호출 되었는지, key/value가 맞는지 구현에 대한 검증밖에 수행할 게 없다.
+   그리고 실패해도 얻는 신뢰도가 낮다.
+   테스트가 통과해도 Redis에 실제도 잘 들어가는지, 직렬화 문제는 없는지 등 확인이 불가하므로 결국 통합테스트에서만 의미가 있다. 
+   ~~~
+    public void saveProductStock(Product product) {
+        // 옵션목록조회
+        List<ProductOption> options =
+                productOptionRepository.findByProductId(product.getId());
+
+        // 상품옵션 재고등록
+        options.forEach(option -> {
+            redisSingleDataService.saveSingleData(
+                    STOCK,
+                    createStockRedisKey(product.getCode(), option.getOptionCode()),
+                    option.getQuantity());
+        });
+    }
+   ~~~
+
+
+---
+## 19. 모든 것을 검증하는 정상 시나리오의 문제점
+> < 테스트 작성 시 느낀 문제점 >    
+> 테스트가 간단했을 때는 테스트 가시성에 문제가 없었는데, 
+  테스트가 복잡해지니 아래의 문제에 직면하게 되었다.
+> 작성하면서도 테스트가 안 읽힌다는 느낌을 받았고, 
+  그럼에도 정상 시나리오니 모든 내용을 검증해 정상동작하고 있음을 명확히해야 한다고 생각했다.
+> 그럼에도 픽스쳐 메서드와 헬퍼 메서드를 생성해 나름 깔끔하게 만들고 있다고 생각했다.
+> 하지만 그렇지 않았다.   
+> 
+> 목표 : 대표 정상 시나리오는 흐름 중심으로 검증하고, 세부 로직은 역할별 단위 테스트로 분리.
+
+1. 모든 것을 검증하는 정상 시나리오     
+   ~~~
+    @Test
+    @DisplayName("상품수정 성공 - 상품 판매중 유지 시 상품 및 옵션 수정,등록 후 재고 등록")
+    void modifyProduct_shouldUpdateProductAndCacheStock_whenProductOnSale() {
+        // given
+        // 요청 상품옵션 DTO 목록
+        RequestModifyProductOptionDto requestUpdateOption = requestUpdateOption();
+        RequestModifyProductOptionDto requestInsertOption = requestInsertOption();
+        List<RequestModifyProductOptionDto> requestOptions = new ArrayList<>();
+        requestOptions.add(requestUpdateOption);
+        requestOptions.add(requestInsertOption);
+        // 요청 상품 DTO
+        RequestModifyProductDto requestProduct =
+                RequestModifyProductDto.builder()
+                        .id(5L)
+                        .description("수정한 상품 설명입니다.")
+                        .saleStatus(ON_SALE)
+                        .options(requestOptions)
+                        .build();
+        // 요청 회원 DTO
+        Member member = seller();
+
+        Product targetProductEntity = onSaleProductEntity();
+
+        ServiceProductDto serviceProductDto =
+                serviceProductDto(ON_SALE, requestOptions);
+        ServiceProductOptionDto insertOptionDto =
+                filterOption(serviceProductDto, null);
+        ServiceProductOptionDto updateOptionDto =
+                filterOption(serviceProductDto, 1L);
+
+        // 업데이트한 상품 결과 DTO
+        ResponseProductDto expectedResponseProduct =
+                ResponseProductDto.builder()
+                        .id(5L)
+                        .description("수정한 상품 설명입니다.")
+                        .saleStatus(ON_SALE)
+                        .build();
+
+        // requestDto -> ServiceDto 변환
+        given(serviceProductMapper.toServiceDto(eq(requestProduct)))
+                .willReturn(serviceProductDto);
+        // 요청한 셀러 상품 단건 조회 (반환 결과는 dirty checking 대상)
+        given(productRepository.findByIdAndSeller(
+                eq(requestProduct.getId()), eq(member.getId())))
+                .willReturn(Optional.of(targetProductEntity));
+        // 수정, 신규 옵션 DTO -> Entity로 변환 (옵션값 변경 직전)
+        given(serviceProductMapper.toOptionEntity(eq(updateOptionDto)))
+                .willReturn(updateProductOptionEntity());
+        given(serviceProductMapper.toOptionEntity(eq(insertOptionDto)))
+                .willReturn(insertProductOptionEntity());
+        // Entity -> response DTO로 변환 (더티 체킹이므로 변환 전 변경값 검증)
+        ArgumentCaptor<Product> productCaptor =
+                ArgumentCaptor.forClass(Product.class);
+        given(serviceProductMapper.toDto(productCaptor.capture()))
+                .willReturn(expectedResponseProduct);
+
+        // when
+        ResponseProductDto responseProduct =
+                productService.modifyProduct(requestProduct, member);
+
+        // then
+        // 정책 검증 여부 검증
+        verify(productionPolicy, times(1))
+                .validateModify(eq(targetProductEntity), eq(List.of(insertOptionDto)));
+        // 상품 재고 등록 여부 검증
+        verify(stockCacheService, times(1))
+                .saveProductStock(eq(targetProductEntity));
+        // 상품 재고 삭제 여부 검증
+        verify(stockCacheService, never()).deleteProductStock(any());
+
+        // 0. toDto에 전달된 인자 캡처 후 검증 (변경값만 검증)
+        // 상품 판매상태, 설명 / 신규, 수정 옵션 수량 검증
+        Product capturedProduct = productCaptor.getValue();
+        ProductOption updatedOption = filterOption(capturedProduct, 1L);
+        ProductOption insertedOption = filterOption(capturedProduct, null);
+        assertEquals(requestProduct.getSaleStatus(), capturedProduct.getSaleStatus());
+        assertEquals(requestProduct.getDescription(), capturedProduct.getDescription());
+        assertEquals(10, updatedOption.getQuantity());
+        assertEquals(20, insertedOption.getQuantity());
+        // 1. 상품 수정 검증
+        assertEquals(requestProduct.getId(), responseProduct.getId());
+        assertEquals(requestProduct.getDescription(), responseProduct.getDescription());
+        assertEquals(requestProduct.getSaleStatus(), responseProduct.getSaleStatus());
+        // 2. 상품옵션 수정 검증
+        ProductOption responseUpdatedOption = filterOption(capturedProduct, 1L);
+        ProductOption responseInsertedOption = filterOption(capturedProduct, null);
+        assertEquals(requestUpdateOption.getId(), responseUpdatedOption.getId());
+        assertEquals(requestUpdateOption.getOptionCode(), responseUpdatedOption.getOptionCode());
+        assertEquals(requestUpdateOption.getQuantity(), responseUpdatedOption.getQuantity());
+        // 3. 상품옵션 신규등록 검증 (JPA 더티체킹으로, 신규 생성되어야하는 아이디는 미검증)
+        assertEquals(requestInsertOption.getOptionCode(), responseInsertedOption.getOptionCode());
+        assertEquals(requestInsertOption.getQuantity(), responseInsertedOption.getQuantity());
+    }
+   ~~~
+
+2. 위 테스트의 문제점과 해결방법      
+   비즈니스 이해도는 높고 실무 코드 보호력은 강하지만, 좋은 테스트가 아닌 무거운 테스트이다.
+   정확하지만 읽기 힘든 테스트에 가깝고, 몇 가지는 Mockito/JPA 관점에서 위험한 냄새도 있다.
+   1) 과도한 책임   
+      테스트가 한 번에 너무 많은 것을 검증한다.
+      위 테스트는 아래의 총 7가지를 동시에 검증하고 있다.
+      이는 사실상 ***modifyProduct 메서드 전체를 재구현한 수준***이다. 
+      이는, 실매 시 어디가 깨졌느지 파악하기 어렵게 하고, 
+      내부 구현 변경 시 테스트 대량 파손으로 리팩토링에 매우 취약하며, 
+      테스트가 행귀 검증이 아닌 구현 검증이 되게 한다.    
+      시나리오를 ***단위 테스트로 쪼개는 개선이 필요***하다.
+      하나의 테스트는 핵심 행귀 12개, 부수 검증 1~2개 정도가 읽기 좋다.
+      - 요청 DTO -> Service DTO 변환
+      - 상품 조회 및 dirty checking 동작
+      - 옵션 수정 / 옵션 신규 등록 로직
+      - 정책 검증 호출 여부
+      - 재고 캐시 save / delete 분기
+      - Entity 변경값
+      - Response DTO 값
+   2) filterOption(..., null) 패턴 위험    
+      id가 null인 옵션을 신규 옵션으로 간주하는 메서드인데, 이로 인해 테스트 전체가 'null==신규'라는 내부 규칙에 강하게 의존하게 된다.   
+      문제점은, 옵션이 1개 이상 신규이거나 id 생성전략이 변경되면 전체 코드 수정이 필요하고, 
+      의미가 코드에 드러나지도 않아 가독성이 최악이다.   
+      getInsertOption() 같이 의도를 드러내는 헬퍼 메서드로 분리하거나 fixture 단계에서 명시적으로 분리해야 한다.
+   3) ArgumentCaptor 사용 위치가 너무 늦음   
+      ~~~
+      given(serviceProductMapper.toDto(productCaptor.capture()))
+      ~~~
+      toDto 호출을 전제로 내부 상태를 검증하기 때문에 toDto 호출이 제거되면 테스트 의미도 사라진다.   
+      mapper 호출 방식은 비즈니스 핵심이 아니다. 따라서 내부 구현이 변경되면 테스트가 불필요하게 깨질 수 있다.
+      예를 들면 아래와 같이 ***행위 기준으로 캡쳐해야한다.***
+      '재고에 저장된 상품 상태'라는 비즈니스 의미가 생긴다.
+      ~~~
+      ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
+      verify(stockCacheService).saveProductStock(captor.capture());
+      Product savedProduct = captor.getValue();
+      ~~~
+   4) Given 섹션이 너무 길고 핵심이 안보임   
+      현재 Given 블록이 70줄 이상이고, 중간에 흐름이 끊긴다.   
+      이는 테스트에서 중료한 입력이 무엇인지 확인하기 어려운 등 
+      테스트 시나리오가 한눈에 안 들어오게 하는 문제점을 발생시킨다.   
+      Given을 입력, 기존상태, Mock 동작 3단 구조로 정리가 필요하다. 테스트는 이야기여야하기 때문이다.
+   5) 정책 검증 대상이 테스트 내부 구현을 너무 잘 알고 있음.    
+      아래의 코드를 보면, 정책 메서드에 insert 옵션만 전달된다는 구현 세부사항에 의존한다.
+      이는 실제 중요한 건 신규 옵션이 존재한다는 사실인데, 
+      정책 파라미터 구조가 바뀌면 테스트 전부를 수정해야하는 문제를 발생시킨다.   
+      캡쳐를 사용해 이 문제를 해결할 수 있다.
+      ~~~
+      // 문제코드
+      verify(productionPolicy)
+             .validateModify(eq(targetProductEntity), eq(List.of(insertOptionDto)));
+      ~~~
+      ~~~
+      // 해결방법
+      ArgumentCaptor<List<ServiceProductOptionDto>> captor = ArgumentCaptor.forClass(List.class);
+      verify(productionPolicy).validateModify(eq(targetProductEntity), captor.capture());
+      assertTrue(captor.getValue().stream().anyMatch(o -> o.getId() == null));
+      ~~~
+   6) assert가 너무 많고 중복됨.   
+      같은 값이 Entity, Response 양쪽에서 반복 검증되고 있다.   
+      이는 실패 시 메시지 노이즈를 증가시키며 테스트 의도를 흐린다는 문제점을 가지고 있다.   
+      > 역할별 검증을 분리가 필요하다. (근데 어떻게?)
+   7) 테스트 이름이 너무 많은 의미를 담고 있음.   
+      '판매중 상품 수정 시 재고가 다시 등록된다'와 같이 디테일은 다른 테스트에서 책임지게 하는 것이 좋다.
+
+3. 정상 시나리오 테스트의 책임 범위    
+   정상 시나리오가 길어지는 건 자연스럽지만, 정상 시나리오가 모든 것을 검증하는 것은 아니다.
+   현재는 정상 시나리오의 모든 세부 구현을 한 테스트에 몰아 넣은 구조이다.
+   즉, 정상 시나리오 테스트, 단위 테스트, 내부 구현 검증이 섞여 있는 것이다.
+   실무에서 중요한 메인 플로우를 다루고 있는데, 대표 시나리오 테스트 하나 정도는 무겁지 않아도 괜찮다.
+   ***정상 시나리오는 핵심 결과만 책임진다.***
+   여기서는 판매중인 상품을 수정하면, 수정/신규 옵션을 반영하고 재고를 다시 등록한다는 것으로,
+   핵심 검증은 재고가 저장 되었는가, 옵션이 수정/신규 상태가 되었는가, 결과가 성공 응답인가 정도의 핵심 검증 3개 정도면 충분하다.   
+  
+4. 가벼운 정상 시나리오 테스트 생성   
+   테스트의 정체성은 판매중인 상품을 수정하면, 옵션 변경이 반영되고 재고가 다시 등록된다는 것이다.   
+   따라서 내부 구현, mapper 호출 방식, 정책 인자 디테일은 제거하고, 흐름과 핵심 결과만 검증한다.   
+   전달인자를 검증하지 않고, Response의 상세 검증을 제거하고, 정책 인자 검증을 수행하지 않는다. 
+   결과적으로 상품이 어떻게 변경되어쏙, 재고가 저장되었다는 것만 확인한다.
+   여기까지가 대표 정상 시나리오 테스트의 적정 무게이다.
+
+5. 세부 동작 테스트로 분해 
+   기존 무거운 테스트에서 가벼운 정상 시나리오로 변경하기 위해 덜어낸 것들을 각자 책임지는 테스트들이다.
+   
+6. 권장 테스트코드에 대한 의문점
+   1) PK 값 유지 확인을 위한 방어적 검증   
+      대부분 서비스 테스트에서는 불필요하다.
+      단, JPA가 아닌 경우, 직접 재생성 가능성이 있는 로직이라면 필요하다.
+      만약, findById()를 호출해 값을 반환받고 이를 response로 사용한다면, 
+      PK는 이미 식별자 불변성을 가진 객체로, 서비스 로직에서 setId()를 수행하지 않는 한 바뀔 수 없기 때문이다. 
+      위 수정 서비스에서 PK가 유지된다는 건, 비즈니스 규칙이 아니라 영속성 모델의 기본 계약이므로 보통 검증하지 않는다.
+      
+7. ***최종 변경사항 및 개선점***
+   1) 전달인자(ArgumentCaptor) 기반 내부 구현 검증을 제거하고, 서비스 실행 결과와 도메인 상태 변화 중심으로 테스트를 단순화했다.
+   2) 정상 시나리오 테스트에서 PK 유지 여부 같은 방어적 검증을 제거하고, 실제 변경 가능한 값(설명, 판매상태, 수량)만 검증하도록 개선했다.
+   3) 정책(ProductPolicy)은 내부 로직 검증(전달인자를 명확히해 검증) 대신 호출 여부만 확인해 서비스 테스트와 정책 테스트의 책임을 분리했다.
+   4) mapper 호출 결과에 의존하던 테스트 구조를 제거해, 리팩토링 시 깨지기 쉬운 결합도를 낮췄다.
+   5) 반환 DTO에 포함되지 않는 옵션은 도메인 엔티티(Product)의 상태를 직접 검증하도록 테스트 관점을 명확히 했다.
+   6) 판매 상태에 따른 재고 캐시 처리(save/delete)를 명확히 구분해 상태 전이에 따른 부수 효과 검증을 분리했다.
+   7) 테스트 Fixture와 Helper 메서드를 정리해 테스트 의도를 빠르게 파악할 수 있도록 가독성을 개선했다.
+   8) 정상 시나리오 테스트를 “결과 검증” 중심으로 재정의하고, 세부 동작 및 전달 인자 검증은 별도 단위 테스트로 분리 가능한 구조로 개선했다.
+
+
+---
+## 20. 정상 시나리오 테스트에서 given 중복은 제거 대상이 아니라 설계 정보
+테스트를 처음 읽는 사람에게 아래 코드는 단순한 반복이 아닌, 정보이다.
+서비스 설계 전제를 드러내고 있는 것이다.
+- 수정 로직은 Service DTO를 기준으로 동작한다.
+- 수정 대상은 셀러 소유 상품만 조회한다.
+- 더티체킹 대상 엔티티를 직접 수정한다.
+~~~
+// requestDto -> ServiceDto 변환
+given(serviceProductMapper.toServiceDto(requestProduct))
+        .willReturn(serviceProductDto);
+
+// 요청한 셀러 상품 단건 조회
+given(productRepository.findByIdAndSeller(...))
+        .willReturn(Optional.of(targetProduct));
+
+// 옵션 DTO -> Entity 변환
+given(serviceProductMapper.toOptionEntity(...))
+        .willReturn(...);
+~~~
+위 given() 절 구조는 수정 시나리오의 공통 흐름을 설명하는 역할을 한다.
+이는 정상 시나리오 내에서 반복적으로 작성하게 되더라도 테스트 내 유지하는 게 맞다.
+두 정상 시나리오가 거의 동일해도 괜찮다. given이 거의 같은 것은 오히려 좋은 신호다.
+같은 흐름에 상태값 하나만 달라진다는 것을 정확히 보여줄 수 있기 때문이다.
+
+
+---
+## 21. 분기 정상 시나리오를 추가하지 않아도 되는 경우
+테스트의 목적은 ‘코드가 이렇게 동작한다’를 나열하는 것이 아니라 코드가 무엇을 보장하고 무엇을 금지하는지 명확히 드러내는 것이다.   
+이 정상 시나리오는 이미 다른 정상 시나리오에서 수정 성공 흐름을 충분히 설명하고 있어, 유스케이스 관점엥서 새로운 정보를 주지 못하는 ‘정보 중복’이기 때문에 추가하지 않는 것이 좋다.   
+상태만 다른데 성공 흐름, 책임, 결과가 동일하면 정상 시나리오 테스트로서 정보가 늘지 않기 때문이다.   
+또한 이 정상 시나리오의 경우, 판매 상태만 변경하고 상품,옵션 정보를 수정하지 않고, 재고를 삭제하는 흐름이다.   
+이 때 로직을 실행하지 않고 그대로 통과하는 정상 흐름은 관찰 가능한 동작 변화가 없으므로 테스트로 작성해도 새로운 의미를 만들지 못한다.
+실행 결과나 부수 효과가 없는 정상 경로는 테스트 가치가 낮다.   
+또한 재고를 삭제하는 흐름도 이미 다른 성공 시나리오에서 흐름을 보여주고 있다.   
+그래서 분기만 다르고 실행되는 로직, 호출되는 협력자, 결과가 동일하거나 없으면 안 써도 되는 정상 시나리오로 보는 것이 합리적이다.
 

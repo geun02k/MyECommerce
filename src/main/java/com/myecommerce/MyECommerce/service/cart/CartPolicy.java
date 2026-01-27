@@ -29,9 +29,6 @@ public class CartPolicy {
 
     private final ProductRepository productRepository;
 
-    private final ObjectMapper objectMapper;
-
-
     /** 장바구니 추가 정책 **/
     public void validateAdd(String productCode, Member member) {
         // 고객 한정 장바구니 접근 제한

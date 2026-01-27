@@ -50,8 +50,16 @@ dependencies {
 	// mysql 드라이버 의존성 추가
 	runtimeOnly 'com.mysql:mysql-connector-j'
 
+
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'
+
+	// 테스트용 임베디드 Redis 서버 의존성 추가
+	// commons-logging, slf4j-simple 기존 구현체들과 충돌로 제거
+	testImplementation ('it.ozimov:embedded-redis:0.7.3') {
+		exclude group: 'commons-logging', module: 'commons-logging'
+		exclude group: 'org.slf4j', module: 'slf4j-simple'
+	}
 
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

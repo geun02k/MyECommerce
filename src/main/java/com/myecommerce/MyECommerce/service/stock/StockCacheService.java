@@ -3,6 +3,7 @@ package com.myecommerce.MyECommerce.service.stock;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import static com.myecommerce.MyECommerce.type.RedisNamespaceType.STOCK;
 public class StockCacheService {
 
     private final RedisSingleDataService redisSingleDataService;
+    private final RedisMultiDataService redisMultiDataService;
 
     private final ProductOptionRepository productOptionRepository;
 
@@ -49,8 +51,13 @@ public class StockCacheService {
         });
     }
 
+    /** Redis 상품 재고 목록 조회 (키 목록에 대한 다건 조회) **/
+    public List<Object> getProductStockList(List<String> itemKeys) {
+        return redisMultiDataService.getMultiData(itemKeys);
+    }
+
     // 재고 Redis key 생성
-    public String createStockRedisKey(String productCode, String optionCode) {
+    private String createStockRedisKey(String productCode, String optionCode) {
         return productCode + ":" + optionCode;
     }
 }

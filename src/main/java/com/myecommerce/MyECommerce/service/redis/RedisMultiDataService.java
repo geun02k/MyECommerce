@@ -8,6 +8,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 
 /** Redis를 직접 controller 하기위한 서비스 **/
@@ -20,6 +21,11 @@ public class RedisMultiDataService {
     private final RedisTemplate<String, Object> redisTemplate;
 
     private final RedisSingleDataService redisSingleDataService;
+
+    /** Redis 데이터 목록 조회 **/
+    public List<Object> getMultiData(List<String> keyList) {
+        return redisTemplate.opsForValue().multiGet(keyList);
+    }
 
     /** Redis 해시 데이터 사이즈 조회 **/
     public Long getSizeOfHashData(RedisNamespaceType nameSpace,

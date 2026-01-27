@@ -60,6 +60,13 @@
 18. 단위 테스트 작성 가치
 19. 모든 것을 검증하는 정상 시나리오의 문제점
 20. 정상 시나리오 테스트에서 given 중복은 제거 대상이 아니라 설계 정보
+21. 분기 정상 시나리오를 추가하지 않아도 되는 경우
+22. 조회 단위 테스트와 통합 테스트
+    - 장바구니 조회 통합테스트 가치
+23. Redis 통합 테스트: Embedded Redis vs Testcontainers Redis
+    - 테스트에서 Redis 결정
+    - Embedded Redis - 테스트용
+    - Testcontainers Redis - 진짜 Redis
 
 
 --- 
@@ -2381,4 +2388,173 @@ given(serviceProductMapper.toOptionEntity(...))
 실행 결과나 부수 효과가 없는 정상 경로는 테스트 가치가 낮다.   
 또한 재고를 삭제하는 흐름도 이미 다른 성공 시나리오에서 흐름을 보여주고 있다.   
 그래서 분기만 다르고 실행되는 로직, 호출되는 협력자, 결과가 동일하거나 없으면 안 써도 되는 정상 시나리오로 보는 것이 합리적이다.
+
+
+---
+## 22. 조회 단위 테스트와 통합 테스트
+### < 장바구니 조회 통합테스트 가치 >
+- 참고: CartService.retrieveCart()
+
+1. 단위 테스트가 가치 있는 경우   
+   1) 분기 많음 (if, 정책 케이스 다수)
+   2) 계산 로직 복잡
+   3) 실패 케이스 중요
+   4) 외부 의존성 거의 없는 순수 로직
+
+2. 단위 테스트로 신뢰를 만들기 어려운 로직    
+   retrieveCart()는 단순 조회가 아니다. 아래의 내용을 모두 수행한다.   
+   순수 로직이 거의 없고 Redis, ObjectMapper, Policy 등 외부 의존성 투성이 이므로 테스트 시 전무 mocking이 필요하다.
+   만약 단위 테스트로 만든다면, 내가 만든 가짜 세계에서만 통과하는 테스트를 생성하게 된다.   
+   따라서 단위 테스트로는 신뢰를 만들기 어려운 로직이므로, 통합 테스트가 필요한 시나리오이다.   
+   - Redis Hash 조회
+   - key-value 순서 보장 로직
+   - Redis MGET 기반 재고 조회
+   - ObjectMapper 변환
+   - 재고 -> 품절여부/구매가능수량 적용
+   1) 그럼에도 단위 테스트가 의미 있는 대상   
+      1. 정책    
+         순수 로직이거나 실패가 중요하므로 단위 테스트 필수이다.
+         현재 조회 로직에는 정책 로직은 없으므로 패스한다.
+      2. 재고 매핑 로직   
+         재고가 null, 0, 양수이냐에 따라 품절 여부, 구매 가능 수량이 잘 셋팅되는지 검증한다.   
+         값 기반의 로직으로 단위 테스트 가치가 있다.
+
+3. retrieveCart()에서 통합 테스트의 목적    
+   통합 테스트의 목적은 Redis 성능 벤치마크, TPS 측정, ms 단위 응답 검증이 아니다.
+   1) 100건 저장 정상 수행
+   2) 조회
+      - 누락없이 100건 조회
+      - 각 item이 올바른 재고를 가짐.
+      - 품절 여부 계산이 정확함.
+   3) key-item 순서 의존 로직 깨지지 않음.
+
+4. 통합 테스트 시나리오     
+   - 시나리오: 100건 저장 -> 조회 -> 결과 검증
+   - 단순 기능 테스트가 아닌, 설계가 실제 사용 패턴을 버틸 수 있는지 확인하는 테스트.
+   1) 100건 처리
+      - 장바구니 최대 상품 수로 합리적인 숫자.
+      - MGET, 순서 의존 로직 검증 가능.
+      - 성능 병목이 있으면 바로 체감됨.
+
+5. 테스트가 검증하려는 리스크
+   - MGET 결과 순서가 키 순서와 일치하는가
+   - Hash -> keyList -> stockList 매핑이 깨지지 않는가
+   - Redis 직렬화 / 역직렬화 문제
+   - 다건 조회 성능 및 안정성
+
+
+---
+## 23. Redis 통합 테스트: Embedded Redis vs Testcontainers Redis
+테스트를 어느 수준까지 현실에 가깝게 가져갈 것인가?
+
+### < 테스트에서 Redis 결정 >
+1. 사용할 Redis 결정   
+   통합 테스트에서 CartService.retrieveCart() 동작 검증을 목표로 했다. 
+   주요 검증 포인트는 MGET을 통한 다건(100건) 조회, 결과 순서 의존, Hash->DTO 변환, 품절 판단 로직 등이다.
+   초기에는 운영 환경과 최대한 동일한 환경을 만들고자 초기에 Testcontainers Redis 사용을 검토했다.
+   하지만 Embedded Redis로도 충분하다고 판단해 최종적으로 선택했다.
+
+2. 판단 근거 및 최종 선택    
+   CartService.retrieveCart() 테스트의 핵심 검증은 대부분 애플리케이션 레벨 로직 (순서 보장, DTO 매핑, 품절 판단)
+   Redis 엔진 차이와 무관한 부분이 90% 이상
+   Docker 학습 및 설치 비용 대비 실익이 낮음
+
+3. 결론    
+   Embedded Redis로 충분히 통합 테스트 목적 달성 가능
+   Docker 설치/학습 비용 없이 통합 테스트 구현 및 검증에 집중
+   Testcontainers Redis는 Redis 엔진 기능 검증이 필요한 경우에만 사용
+
+### < Embedded Redis - 테스트용 >
+테스트 JVM 안에서 Redis 서버를 띄우는 방식이다.
+로컬 포트에서 Redis 프로세스를 직접 실행한다.
+빠르고 설정이 간단하며 Docker가 필요없다.
+1. 장점   
+   따라서 빠르고 설정이 간단하다.
+2. 단점   
+   Windows 환경에서 자주 깨지고, Redis 최신 기능은 지원하지 않는 등 치명적인 단점이 있다.
+   따라서 테스트 동작은 하지만 ***운영 환경과 일부 동작 차이가 존재해 믿기 어려운 쪽에 가깝다.***
+3. 적합성    
+   Hash, MGET, 순서, DTO 변환 등 통합 테스트 목적 달성 가능.
+   빠른 피드백이 필요한 단순 통합 테스트나 CI 외 테스트에 권장.
+
+### < Testcontainers Redis - 진짜 Redis >
+Docker 컨테이너로 진짜 Redis를 띄운다.
+운영 Redis와 거의 동일한 환경을 가진다.
+1. 장점    
+   느리지만 현실적으로 CI 환경에서도 안정적이다.
+2. 단점   
+   ***Docker 설치 및 학습 필요***   
+   테스트 속도 느림
+3. 적합성   
+   MGET 결과 순서 보장, TTL 등 Redis 엔진 특성 검증 필요 시 적합.
+   단순 애플리케이션 로직 검증에는 과함.
+
+4. 테스트를 위한 의존성 추가
+   - junit-jupiter: 테스트 작성
+   - junit-platform-launcher: 테스트 실행
+   - testcontainers:junit-jupiter: 컨테이너 생명주기 제어
+   1) org.testcontainers:junit-jupiter   
+      Testcontainers 전용 JUnit 확장 라이브러리로 JUnit5와 Testcontainters를 연결해주는 브리지.
+      @Testcontainers, @Container. 테스트 생명주기와 컨테이너 자동 연동을 가능하게 한다.
+      만약 의존성을 추가하지 않는다면, 컨테이너가 뜨지 않게 된다.
+   2) org.junit.platform:junit-platform-launcher   
+      기존 의존성 추가 되어있던 라이브러리이다.   
+      JUnit 테스트를 실행해주는 런처로, IDE/Gradle/Maven이 테스트를 돌릴 때 필요하다.
+      Testcontainers랑 직접적인 연관은 없고, 보통 Spring Boot가 자동으로 포함한다.
+   ~~~
+   Testcontainers 의존성 설정 (단, 도커 필수)
+   testImplementation "org.testcontainers:testcontainers"
+   testImplementation 'org.testcontainers:junit-jupiter'
+   ~~~
+
+5. 주요 어노테이션 
+   1) @ActiveProfiles("test")   
+      - application-test.yml 사용
+      - Redis/DB/로그 레벨을 테스트 전용으로 분리
+      - 운영 설정과 테스트 설정 충돌 방지
+      - 통합 테스트에서는 거의 필수적
+   2) @Testcontainers   
+      해당 클래스에서 Testcontainers를 사용함을 선언해 
+      JUnit이 테스트에서 컨테이너 생명주기를 관리하도록 함.
+   3) @Container   
+      해당 필드가 컨테이너임을 선언.
+      테스트 시작 시 컨테이너를 시작하고, 종료 시 컨테이너를 멈춘다.
+      static으로 선언해 테스트 클래스 전체에서 한 번만 실행하게 하고 성능을 최적화한다.
+   4) @DynamicPropertySource   
+      Redis 컨테이너는 랜덤 포트로 뜬다.
+      컨테이너 실행 후 알 수 있는 값을 Spring Environment에 동적으로 주입한다.
+      예를 들면 Redis 포트, Redis Host를 설정(주입)한다.
+      위 데이터가 없으면 Spring이 Redis를 찾지 못한다.    
+   ~~~
+        import org.springframework.boot.test.context.SpringBootTest;
+      import org.springframework.test.context.DynamicPropertyRegistry;
+      import org.springframework.test.context.DynamicPropertySource;
+      import org.testcontainers.containers.GenericContainer;
+      import org.testcontainers.junit.jupiter.Container;
+      import org.testcontainers.junit.jupiter.Testcontainers;
+   
+      /** 테스트용 Redis 서버 생성 **/
+      @Testcontainers
+      @SpringBootTest
+      public class RedisTestSupport {
+   
+          // 테스트 시작 시 Redis 자동 실행
+          @Container
+          static GenericContainer<?> redisContainer =
+                  new GenericContainer<>("redis:3.0.5")
+                          .withExposedPorts(6379);
+   
+          // Spring Redis 설정에 컨테이너 정보 주입 (Redis 실제 버전 고정 가능)
+          @DynamicPropertySource
+          static void redisProperties(DynamicPropertyRegistry registry) {
+              registry.add("spring.redis.host", redisContainer::getHost);
+              registry.add("spring.redis.port", () ->
+                      redisContainer.getMappedPort(6379));
+          }
+      }
+   ~~~
+
+6. RedisTemplate은 운영 Bean을 쓰는 이유   
+   Testcontainers는 Redis 서버만 제공한다. 
+   따라서 Spring이 생성한 RedisTemplate Bean은 그대로 사용한다.
 

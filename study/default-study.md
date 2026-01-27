@@ -68,6 +68,10 @@
 19. 비즈니스 정책의 구분
     - 비즈니스 정책의 책임 범위: 판단 로직과 구현 로직의 분리
     - 장바구니 만료 정책과 Redis TTL 구현의 책임 분리
+20. Redis와 반환된 HashMap 순서 미보장
+21. 조회
+    - Context 객체 (미사용, 스터디는 필요)
+    - MapStruct (미사용, 스터디는 필요)
 
 
 ---
@@ -2526,4 +2530,44 @@ CartPolicy는 이 판단만 알면 충분하고,
 그 결과, 나중에 Redis를 걷어내고 DB로 전환하거나  
 장바구니 저장 방식을 변경하려 할 때, 정책 코드까지 함께 수정해야 하는 구조가 된다.
 이런 결합을 피하기 위해 TTL 정책과 구현은 분리되어야 한다.
+
+
+---
+## 20. Redis와 반환된 HashMap 순서 미보장
+1. 순서 미보장 케이스    
+   Map은 순서가 보장되지 않는다.
+   따라서 keySet()과 values()의 순서는 같은 Map 인스턴스 기준으로 보통 일치하지만, 명세상 보장되지는 않는다.
+   cart.keySet(), cart.values()로 서로 다른 iteration을 수행을 수행하면 순서가 보장되지 않는다는 것이다.
+   아래의 코드는 itemStock.get(i) <-> targetCartItemList.get(i) 매핑을 전제로 해야 한다.
+   ~~~
+   // key, DTO 생성 (별도 반복)
+   List<String> itemKeys = cart.keySet().stream().toList();
+   List<ResponseCartDetailDto> targetCartItemList = cart.values().stream()
+      .map(...)
+      .toList();
+   
+   // 재고 조회
+   List<Object> itemStock = redisMultiDataService.getMultiData(itemKeys);
+   ~~~
+2. 순서 보장 케이스
+   순서를 보장하려면 iteration은 반드시 한 번이어야 한다.
+   Map을 두 번 돌리는 순간, 설게가 아닌 운에 순서를 맡기는 것이다.
+   아래와 같은 경우는 같은 루프 안에서 key, dto, index를 묶는다. 
+   index 계약을 개발자가 직접 만든 것이다. 
+   따라서 Redis 결과 순서만 믿으면 되고 Map 순서에 더 이상 의존하지 않아도 된다.
+   ~~~
+   // 함께 반복문 수행
+   for (Map.Entry<Object, Object> entry : cart.entrySet()) {
+       itemKeys.add(key);
+       targetCartItemList.add(dto);
+   }
+   ~~~
+
+
+---
+## 21. 조회
+### < Context 객체 (미사용, 스터디는 필요) >
+작업용 객체
+
+### < MapStruct (미사용, 스터디는 필요) >
 

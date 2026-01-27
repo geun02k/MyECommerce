@@ -1,6 +1,7 @@
 package com.myecommerce.MyECommerce.controller;
 
 import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
+import com.myecommerce.MyECommerce.dto.cart.ResponseCartDetailDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.service.cart.CartService;
@@ -10,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/cart")
@@ -40,7 +43,14 @@ public class CartController {
      **/
 
     /**
-     * 장바구니 상품 목록 조회 get /cart/{id}
+     * 장바구니 상품 목록 조회 get /cart
      **/
+    @GetMapping
+    @PreAuthorize("hasAuthority('CUSTOMER')")
+    public ResponseEntity<List<ResponseCartDetailDto>> retrieveCart(
+            @AuthenticationPrincipal Member member) {
+
+        return ResponseEntity.ok(cartService.retrieveCart(member));
+    }
 
 }

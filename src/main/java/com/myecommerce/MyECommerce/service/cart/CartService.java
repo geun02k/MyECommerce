@@ -3,20 +3,28 @@ package com.myecommerce.MyECommerce.service.cart;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myecommerce.MyECommerce.dto.cart.RedisCartDto;
 import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
+import com.myecommerce.MyECommerce.dto.cart.ResponseCartDetailDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
+import com.myecommerce.MyECommerce.service.stock.StockCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_OPTION_NOT_EXIST;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
+import static com.myecommerce.MyECommerce.type.RedisNamespaceType.STOCK;
 
 @Service
 @RequiredArgsConstructor
@@ -29,7 +37,9 @@ public class CartService {
     private final ObjectMapper objectMapper;
     private final RedisCartMapper redisCartMapper;
 
+    private final StockCacheService stockCacheService;
     private final RedisSingleDataService redisSingleDataService;
+    private final RedisMultiDataService redisMultiDataService;
 
     private final ProductOptionRepository productOptionRepository;
 
@@ -60,6 +70,29 @@ public class CartService {
 
         // 4. 장바구니 상품 단건 반환
         return redisCartMapper.toResponseDto(saveCartItem);
+    }
+
+    /** 장바구니 조회 **/
+    public List<ResponseCartDetailDto> retrieveCart(Member member) {
+        // 1. 장바구니 조회
+        Map<Object, Object> cart = getUserCart(member.getUserId());
+        if (cart.isEmpty()) { // 조회 결과 없으면 빈 리스트 반환
+            return Collections.emptyList();
+        }
+
+        // 2. 장바구니 키 목록 및 장바구니 목록 생성
+        List<String> stockItemKeys = new ArrayList<>();
+        List<ResponseCartDetailDto> targetCartItems = new ArrayList<>();
+        buildCartItemAndStockKeys(cart, stockItemKeys, targetCartItems);
+
+        // 3. 재고 캐시 데이터 조회
+        List<Object> itemStock =
+                stockCacheService.getProductStockList(stockItemKeys);
+
+        // 4. 구매가능여부 셋팅
+        setStockInfoForCartItems(targetCartItems, itemStock);
+
+        return targetCartItems;
     }
 
     // 장바구니 조회 Redis Hash Key 생성
@@ -128,4 +161,47 @@ public class CartService {
         redisSingleDataService.setExpire(
                 CART, key, Duration.ofDays(EXPIRATION_PERIOD));
     }
+
+    // 사용자 장바구니 조회
+    private Map<Object, Object> getUserCart (String userId) {
+        return redisMultiDataService.getHashEntries(CART, userId);
+    }
+
+    // 장바구니 목록 및 재고 키 목록 생성
+    private void buildCartItemAndStockKeys(Map<Object, Object> cart,
+                                      List<String> stockItemKeys,
+                                      List<ResponseCartDetailDto> responseCart) {
+        // 장바구니 key / item을 같은 순서로 구성하기 위해 동일 반복문 내에서 생성
+        for (Map.Entry<Object, Object> entry : cart.entrySet()) {
+            // 키 추가
+            String key = STOCK + ":" + entry.getKey().toString();
+            stockItemKeys.add(key);
+
+            // 장바구니에 item 추가
+            // TODO: 조회 트래픽 증가 시 MapStruct 등으로 교체 고려
+            // ObjectMapper convertValue 비용 이슈가 발생하면
+            // MapStruct 등 컴파일 타임 매퍼로 교체 고려.
+            ResponseCartDetailDto item =
+                    objectMapper.convertValue(
+                            entry.getValue(), ResponseCartDetailDto.class);
+            responseCart.add(item);
+        }
+    }
+
+    // 구매 가능 여부 셋팅
+    private void setStockInfoForCartItems(List<ResponseCartDetailDto> cartItemList,
+                                          List<Object> itemStock) {
+        // 구매 가능 여부 셋팅
+        for(int i = 0; i < cartItemList.size(); i++) {
+            Object stockObj = itemStock.get(i);
+            int stock = stockObj == null ?
+                    0 : Integer.parseInt(stockObj.toString());
+            boolean outOfStock = stock <= 0;
+
+            ResponseCartDetailDto item = cartItemList.get(i);
+            item.setOutOfStock(outOfStock); // 품절여부
+            item.setAvailableQuantity(stock); // 구매가능수량
+        }
+    }
+
 }

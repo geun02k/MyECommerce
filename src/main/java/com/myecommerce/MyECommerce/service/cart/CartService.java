@@ -171,7 +171,7 @@ public class CartService {
     private void buildCartItemAndStockKeys(Map<Object, Object> cart,
                                       List<String> stockItemKeys,
                                       List<ResponseCartDetailDto> responseCart) {
-        // 장바구니 key / item을 같은 순서로 구성하기 위해 동일 반복문 내에서 생성
+        // 재고 key / 장바구니 item을 같은 순서로 구성하기 위해 동일 반복문 내에서 생성
         for (Map.Entry<Object, Object> entry : cart.entrySet()) {
             // 키 추가
             String key = STOCK + ":" + entry.getKey().toString();

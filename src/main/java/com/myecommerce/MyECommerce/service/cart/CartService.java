@@ -80,7 +80,7 @@ public class CartService {
             return Collections.emptyList();
         }
 
-        // 2. 장바구니 키 목록 및 장바구니 목록 생성
+        // 2. 재고 키 목록 및 장바구니 목록 생성
         List<String> stockItemKeys = new ArrayList<>();
         List<ResponseCartDetailDto> targetCartItems = new ArrayList<>();
         buildCartItemAndStockKeys(cart, stockItemKeys, targetCartItems);

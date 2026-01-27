@@ -1,4 +1,4 @@
-package com.myecommerce.MyECommerce;
+package com.myecommerce.MyECommerce.integration;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;

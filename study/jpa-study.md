@@ -36,7 +36,7 @@
     - LIKE 검색과 인덱스
     - 클러스티드 인덱스와 넌클러스티드 인덱스
 15. Spring Data JPA에서 DTO Projection + FETCH JOIN으로 인한 QueryCreationException 해결
-
+16. Entity와 초기화와 상태변경
 
 ---
 ### < JPA (Java Persistence API) >
@@ -1229,4 +1229,33 @@ FETCH는 연관된 엔티티를 함께 로드할 때 사용되며, 집계 함수
                 String productCdoe, String optionCode);
       ~~~
 
+
+---
+## 16. Entity와 초기화와 상태변경
+JPA Entity의 컬렉션은 NPE 방지, 객체의 항상 유효한 상태 유지를 위해 
+Entity 내부에서 초기화하는 것이 보편적인 관례이다.
+
+1. Entity   
+   Entity는 항상 유효한 상태여야 한다.
+   생성되는 순간부터 의미적으로 완전해야 하므로, 컬렉션 초기화 책임은 Entity 자신에게 있다.
+   초기화 된 컬렉션이 훨씬 안전하고 예측 가능하다.
+   ~~~
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+    private List<OrderItem> items = new ArrayList<>();
+   ~~~
+   
+2. @Builder   
+   Builder로 객체를 생성하면, 초기화한 필드값이 의미가 없어진다. null이 된다.
+   필드 초기화를 유지하면서 @Builder 어노테이션을 사용하려면 
+   아래와 같이 초기화 필드에 대해 Builder.Default 설정이 필요하다.
+   ~~~
+   @Builder
+   public class Order {
+        @Builder.Default
+        private List<OrderItem> items = new ArrayList<>();
+   }
+   ~~~
+
+3. @Setter
+   상태 변경이 중요한 경우, 제거. 필요한 변경은 별도 메서드를 생성해 지원.
 

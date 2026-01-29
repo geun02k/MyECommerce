@@ -36,4 +36,7 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
 
     // 상품ID에 해당하는 옵션 목록 조회
     List<ProductOption> findByProductId(Long productId);
+
+    // 품절된 상품 옵션 목록 조회
+    List<ProductOption> findByProductIdInAndQuantity(List<Long> idList, int quantity);
 }

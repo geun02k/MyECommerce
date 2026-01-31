@@ -58,7 +58,6 @@ public class OrderItem {
 
     /** 주문 물품 생성 **/
     public static OrderItem createOrderItem(ProductOption registeredOption,
-                                            Product product,
                                             int orderQuantity) {
         // 유효성 검증 (불변 도메인 규칙 검증)
         validateOrderItem(registeredOption, orderQuantity);
@@ -67,7 +66,7 @@ public class OrderItem {
         OrderItem orderItem = OrderItem.builder()
                 .quantity(orderQuantity)
                 .unitPrice(registeredOption.getPrice())
-                .product(product)
+                .product(registeredOption.getProduct())
                 .option(registeredOption)
                 .build();
 
@@ -136,7 +135,7 @@ public class OrderItem {
     private void setCalculatedTotalPrice() {
         this.totalPrice = this.unitPrice
                 .multiply(BigDecimal.valueOf(this.quantity))
-                .setScale(1, RoundingMode.HALF_UP); // 소수점 1자리 반올림;
+                .setScale(0, RoundingMode.HALF_UP); // 소수점없음, 소수점 1자리에서 반올림
     }
 
 }

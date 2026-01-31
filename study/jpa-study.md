@@ -37,6 +37,16 @@
     - 클러스티드 인덱스와 넌클러스티드 인덱스
 15. Spring Data JPA에서 DTO Projection + FETCH JOIN으로 인한 QueryCreationException 해결
 16. Entity와 초기화와 상태변경
+17. 트랜잭션 락
+18. 쿼리 조회 전략
+    - 특정 자식 데이터의 조회 전략
+    - 동시성 조회
+19. JPA 조회 생성 방법
+    - JPA 조회 생성 방법
+    - productId, OptionCode 페어와 비관적 락 사용을 위한 조회 생성 방법 선택
+    - JPQL 사용 방식
+    - QueryDSL
+
 
 ---
 ### < JPA (Java Persistence API) >
@@ -1258,4 +1268,395 @@ Entity 내부에서 초기화하는 것이 보편적인 관례이다.
 
 3. @Setter
    상태 변경이 중요한 경우, 제거. 필요한 변경은 별도 메서드를 생성해 지원.
+
+
+---
+## 17. 트랜잭션 락
+1. 트랜잭션 락
+   여러 트랜잭션이 같은 데이터에 동시에 접근할 때,
+   데이터의 일관성과 정합성을 지키기 위해 접근을 제한하는 제어 장치.   
+   트랜잭션이 작업 단위라면,
+   락은 트랜잭션이 어떤 데이터를 사용하는 동안 다른 트랜잭션의 접근 방식을 제한하는 규칙이다.   
+   데이터베이스는 기본적으로 여러 요청을 동시에 처리하므로, 아무 제어도 없다면 문제가 발생할 수 있다.
+   예를 들어 두 트랜잭션이 같은 데이터를 동시에 읽고 각자 계산한 뒤 서로 모르게 덮어쓴다.
+   그렇게 데이터의 무결성이 붕괴될 수 있다.
+   락은 데이터를 쓰고 있을 때 막고 다른 트랜젹션은 기다리거나 읽기만 하도록 제한한다.
+
+2. 트랜잭션 락 필요성   
+   트랜잭션은 하나의 작업이 전부 성공하거나 전부 실패를 보장한다.
+   중간 상태는 없다.
+   하지만 트랜잭션은 다른 트랜잭션이 동시에 같은 데이터를 어떻게 쓰는지에 대해서는 관심없다.
+   따라서 ***트랜잭션은 자기 자신을 보호하는 용도,***
+   ***트랜잭션 락은 여러 트랜잭션 사이의 질서를 보호하는 용도로 사용한다.***    
+   트랜잭션 락이 필요한 이유는, 동시에 실행되는 트랜잭션들 사이에서 순서를 강제하기 위해서다.
+   락이 없으면 실행 순서가 뒤섞이고, 서로의 결과를 덮어쓰고 계산 결과가 깨지게 된다.
+   반면, 락이 있으면 누가 먼저 끝낼지, 누가 기다릴지, 누가 실패할지가 명확해진다.
+   동시 주문 상황에서 A의 주문이 성공 후 재고가 0이돠어 동시 주문한 B의 주문이 불가한 경우,
+   검증을 통과했는데 결과가 깨지는 경우가 발생한다.
+   따라서 이런 검증과 재고 감소가 원자적으로 묶여야 한다.
+
+3. 트랜잭션 락 전략 종류   
+   언제 막을건지의 차이가 있다.
+    1) 비관적 락 (Pessimistic Lock)    
+       충돌이 일어날 가능성이 높다고 가정하고, 아예 처음부터 접근을 제한하는 전략.    
+       같은 데이터를 여러 트랜잭션이 건드릴 가능성이 있으니, 현재 트랜잭션 작업이 날 때까지 아무도 못 건드리도록 한다.
+       따라서 안전하고 예측 가능하다.
+       하지만 다른 트랜잭션은 대기 시간이 생길 수 있다.
+        1. 트랜잭션이 시작된다.
+        2. 특정 데이터에 대해 락을 건다.
+        3. 다른 트랜잭션은 기다리거나 실패한다.
+        4. 현재 트랜잭션이 끝나면 락을 해제한다.
+
+    2) 낙관적 락 (Optimistic Lock)   
+       충돌은 거의 일어나지 않는다고 가정하고 일단 자유롭게 처리하도록 한 뒤,
+       마지막에 검증하는 전략.   
+       작업 중 누가 먼저 변경한다면 그 때 실패 처리하도록 한다.
+       락을 잡지 않아 성능이 좋지만 대신, 실패 시 재시도하는 로직이 필요하다.
+       따라서 충돌이 잦으면 오히려 복잡하게 된다.
+        1. 트랜잭션이 락 없이 데이터를 읽는다.
+        2. 로직을 수행한다.
+        3. 변경을 저장하려는 순간 데이터가 바뀌었는지 확인한 후 바뀌어 있으면 실패한다.
+
+3. 비관적 락 사용 방법 (Row Lock)   
+   데이터를 읽는 순간부터 다른 접근을 막는다.
+   따라서 DB 수준에서 락을 건다.
+   조회된 특정 행 단위로 잠기게 되므로, 테이블 단위 락이 아닌
+   해당 행에 대해서만 현재 트랜잭션이 끝날 때까지 다른 트랜잭션이 수정하지 못하게 막는 것이다.
+
+    1) Repository에서 락 선언
+      ~~~
+      public interface ProductOptionRepository extends JpaRepository<ProductOption, Long> {
+
+      @Lock(LockModeType.PESSIMISTIC_WRITE)
+      @Query("select po from ProductOption po where po.id = :id")
+      Optional<ProductOption> findByIdForUpdate(Long id);
+      }
+      ~~~
+    - PESSIMISTIC_WRITE   
+      쓰기 락.   
+      다른 트랜잭션은 읽기(DB마다 상이), 쓰기 불가.
+    - findByIdForUpdate    
+      JPA 기본 메서드가 아닌, findById에 락 옵션을 붙인 사용자 정의 조회 메서드이다.
+      둘은 DB에 날아가는 SQL 자체가 다르다.
+      여기서 메서드 이름이 다른 것은 전혀 중요하지 않다.
+      중요한 건 @Lock, 어노테이션과 LockModeType이다.    
+      이름을 다르게 하는 이유는 락 걸린 조회라는 의도 표현을 하기 위해서이다.
+      조회 뒤 반드시 상태를 변경해야 할 때 사용한다.
+
+    2) Service에서 트랜잭션과 함께 사용
+       트랜잭션이 끝날 때까지 락이 유지된다.
+       메서드 종료 와 함께 커밋되고 나면 락이 해제된다.
+       @Transactional 어노테이션이 없다면 락은 의미 없다.
+       ~~~
+       @Transactional
+       public void createOrder(...) {
+     
+            ProductOption option =
+                productOptionRepository.findByIdForUpdate(optionId)
+                    .orElseThrow(...);
+     
+            // 검증
+            option.validateQuantity(requestQuantity);
+     
+            // 상태 변경
+            option.decreaseStock(requestQuantity);
+       }
+       ~~~
+
+
+---
+## 18. 쿼리 조회 전략
+### < 특정 자식 데이터의 조회 전략 >
+1. 질문    
+   주문 상품 하위에 상품 옵션이 존재하는데, 상품은 id, 옵션은 code(pk아님, 도메인의미, 유니크)을 서비스 전달인자로 받는다.     
+   그렇다면 어떻게 조회해야할까? 상품별로 옵션을 in으로 조회해야할까?
+   아니면 요청한 상품id를 조회해, 요청하지 않은 option을 제거하는게 나을까, 다른 방법이 있을까?
+
+2. 질문의 평가    
+   성능, 도메인 모델링, 조회 책임이 얽힌 문제이다.
+
+3. 비관적 락과 조회 전략
+   상품을 먼저 조회하고 옵션을 제거하는 방식은 피하는 게 좋다.
+   특정 상품의 특정 옵션으로 요청된 조합만 정확히 조회하는 방식이 가장 낫다.
+   즉, 요청한 옵션만 정확히 조회하는 것이 권장되므로,
+   Product가 아닌 ProductOption을 조회 루트로 삼는 게 자연스럽다.
+
+    1) 요청 상품 조회 후 불필요한 옵션 제거    
+       옵션 수가 많을수록 불필요한 로딩 발생.
+       제거 행위는 조회가 아닌 가공이므로, 실수로 비즈니스 로직에 섞이기 쉬움.    
+       단, 상품 하위 옵션 전부가 락 대상이므로, 주문 하나 때문에 동일 상품의 다른 옵션 주문까지 막히게 된다.
+       따라서 옵션 수가 많을수록 락 경합이 폭발한다.
+       이 방법은 비관적 락과는 최악의 궁합이다.
+       이는 가장 피해야 할 패턴이다.
+
+    2) 상품별 옵션 IN 조회 (N + 1)   
+       요청 상품 수가 늘면 쿼리 수 증가.
+       서비스 단에서 쿼리 조립이 복잡해진다.    
+       락 쿼리가 상품 수 만큼 여러 번 발생하기 때문에 트랜잭션 중간에 락 획득 순서가 달라질 수 있다.
+       따라서 데드락 가능성이 높아진다.
+       이는 작동은 하지만 불안한 구조이다.
+       소규모에서는 가능하지만, 주문같은 핵심 도메인에서는 위험.
+
+    3) 옵션 중심 단일 조회 (비관적 락에 최적)   
+       핵심은 추후 수정이 필요한 ***재고는 상품이 아닌 옵션에 있다***는 것이다.
+       따라서 락도 옵션에 걸어야 한다.   
+       가장 권장되는 방식으로, ProductOption 테이블을 루트로 조회한다.
+       요청한 옵션만 조회되므로 불필요한 옵션 로딩이 없다.     
+       ***동시성을 고려한다면, ProductOption을 조회 루트로 삼고,
+       요청된 조합만 비관적 락으로 한 번에 조회하는 것이 가장 좋다.***
+       요청된 옵션 row만 락 처리해 ***락 범위를 최소화***하므로서 다른 옵션 주문은 정상 처리된다.
+       또한 단일 쿼리 실행으로 DB가 정산 순서로 row 락을 획들하기 때문에
+       데드락 확률이 줄어 ***락 획득 순서가 안정적***이다.
+
+4. 추가 보완 방법
+   produdctId, optionCode 복합 조건 인덱스 필요    
+   요청 수가 아주 많으면 OR 조건이 커질 수 있다.
+   따라서 인덱스로 조회 성능을 올리는 방법을 추가로 고려할 수 있다.    
+   하지만, 보통 주문 상품 수는 제한되므로 거의 문제가 없긴하다.
+
+
+### < 동시성 조회 >
+1. 비관적 락 관점에서 조회
+   비관적 락 관점에서 가장 중요한 원칙은, ***락은 실제로 변경할 row에만 걸어야 한다***는 것이다.    
+   락 범위가 넓을수록 동시성 저하, 데드락 확률 증가, TPS 감소가 발생한다.
+   따라서 요청되지 않은 데이터까지 락하는 것은 무조건 피해야 한다.
+
+
+---
+## 19. JPA 조회 생성 방법
+### < JPA 조회 생성 방법 >
+1. 메서드 이름 자동 생성
+   - 사용 쉬움, 표현력 약함.
+2. JPQL (@Query)
+   - 문자열, 복잡해지면 위험.
+   - SQL이 아닌 ***Entity 기준 언어***이다. JPA가 SQL로 번역한다.
+3. QueryDSL
+   - 타입 안전, 실무 최강
+   - 실무에서 가장 많이 사용하는 방법.
+   - JPQL을 자바 코드로 쓰게 해주는 라이브러리.
+   - 문자열이 아닌 방법으로 작성 가능.
+   - 컴파일 시점 오류 체크.
+   - 동적 조건에 강함.
+   - 단, 초기 설정이 귀찮다.
+4. Native Query
+   - SQL 그대로 작성, 최후의 수단
+   - DB에 종속적이며 Entity 변경 시 SQL도 수정이 필요하다.
+   - JPA의 이점을 일부 포기하는 방법이다.
+
+
+## < productId, OptionCode 페어와 비관적 락 사용을 위한 조회 생성 방법 선택 >
+productId, OptionCode 페어, 비관적 락 사용을 위해서는 1번은 불가하고 나머지 중 선택이 필요하다.   
+1번의 경우, productId, OptionCode 페어 표현이 불가하기 때문이다.
+
+1. JPQL 시도    
+   가장 먼저 시도해볼 수 있는 방법은 JPQL이다. 하지만 동적 쿼리 사용의 불편함이 한계이다.
+   productId, OptionCode 페어 요청 개수에 따라 쿼리가 달라지므로 사실상 실 사용이 불가하다.
+   JPQL은 문자열 쿼리이므로, 쿼리 문자열이 길어지고 페어 요청 개수가 증가함에 따라 파라미터 바인딩 실수 가능성이 높아지며
+   유지보수 난이도도 올라간다.
+   긴 OR 조건은 즉 리스크가 된다. OR 조건이 많아질수록 실행 계획 예층이 어렵고, 
+   락 획득 순서가 꼬일 가능성이 높아지므로 ***동시성 높은 환경에서는 불안***하다.
+   따라서 JPQL과 OR을 이용해 요청 수가 적을 때만 사용해야 한다.
+   @Query를 사용한 JPQL은 요청 옵션 수가 아주 작고 고정적이며, 락이 없고, 단순 조회하거나 복잡한 동적 조건이 없을 때 사용한다. 
+   (하지만 동적 쿼리도 생성 가능)
+   OR을 사용하는 이유는, JPQL은 SQL처럼 아래의 문법 사용이 불가하기 때문이다.
+   ~~~
+   WHERE (a, b) IN ((1,'A'), (2,'B'))
+   ~~~
+   ~~~
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select o
+        from ProductOption o
+        join fetch o.product p
+        where
+          (p.id = :p1 and o.optionCode = :c1)
+          or (p.id = :p2 and o.optionCode = :c2)
+    """)
+    List<ProductOption> findOptionsForUpdate(
+        @Param("p1") Long p1,
+        @Param("c1") String c1,
+        ...
+    );
+   ~~~
+
+2. QueryDSL (가장 추천하는 방법)     
+   요청 개수만큼 조건 조립이 가능하고 타입 안전하며 유지보수에 유리하다.
+   주문, 결제 도메인의 표준적인 방법이다.
+   요청 개수가 늘어도 코드 변화는 없고, 컴파일 타임에 검증을 수행하기에 유지보수에 안전하다.
+   ~~~
+    QProductOption option = QProductOption.productOption;
+    
+    BooleanBuilder builder = new BooleanBuilder();
+    
+    for (RequestOrderDto r : requests) {
+    builder.or(
+    option.product.id.eq(r.getProductId())
+    .and(option.optionCode.eq(r.getOptionCode()))
+    );
+    }
+    
+    List<ProductOption> options =
+    queryFactory
+    .selectFrom(option)
+    .join(option.product).fetchJoin()
+    .where(builder)
+    .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+    .fetch();   
+   ~~~
+
+3. Negative SQL    
+   튜플 IN이 꼭 필요할 때 사용.
+   ~~~
+    @Query(
+      value = """
+        select *
+        from product_option o
+        where (o.product_id, o.option_code) in (
+          (1, 'RED'),
+          (1, 'BLUE'),
+          (2, 'L')
+        )
+        for update
+      """,
+      nativeQuery = true
+    )
+    List<ProductOption> findForUpdate();
+   ~~~
+
+
+### < JPQL 사용 방식 >
+JPQL은 정적 쿼리에 최적화된 도구이다.
+따라서 동적 쿼리를 진지하게 다룰 거라면 QueryDSL을 쓰는 것이 권장된다.
+하지만 JPQL도 동적 쿼리 생성은 가능하다.
+
+1. 정적 방식 (@Query)    
+   정적 쿼리만 작성 가능하다.
+   ~~~
+   @Query("select o from ProductOption o where o.optionCode = :code")
+   List<ProductOption> findByCode(@Param("code") String code);
+   ~~~
+2. 동적 방식    
+   문자열 직접 조립.   
+   가장 원초적이고 가장 위험한 방법이다.
+   Repository 메서드가 아니라 EntityManager 직접 사용해 자바 코드에서 생성한다.
+   따라서 가독성이 떨어진다.
+   문자열 실수는 런타임 에러로 이어진다.
+   하지만 JPQL만으로 해결 가능하게 하고 외부 라이브러리가 불필요하다. 
+   ~~~
+   EntityManager em;
+
+   String jpql = "select o from ProductOption o where ...";
+   TypedQuery<ProductOption> query =
+         em.createQuery(jpql, ProductOption.class);
+
+   query.setParameter(...);
+   ~~~
+   
+
+3. 기존 Repository와 동적 쿼리를 위한 Custom Repository    
+   기존 Repository는 JpaRepository를 상속하므로 Spring Data JPA가 자동 구현체를 생성해 준다.    
+   커스텀 Repository는 Spring이 구현 방법을 알 수 없기 때문에 개발자가 직접 구현체를 작성해야 한다.
+
+4. 커스텀 Repository를 기존 Repository에 상속으로 확장하는 이유    
+   Service가 하나의 Repository에만 의존하도록 하여 구현 방식 변경에 영향을 받지 않게 하기 위함이다.     
+
+   Custom Repository라는 기능 확장 인터페이스를 생성해 기존 Repository가 상속해야 한다.
+   하지만 JpaRepository는 자동 구현하므로 기존 Repository와 달리 Custom Repository는 Spring Data가 자동 구현해주지 않으므로,
+   개발자가 직접 구현해야 한다. 스프링 입장에서는 Custom Repository의 구현을 모르기 때문이다.
+   개발자가 직접 구현하는 경우, EntityManager를 직접 사용해야 한다.
+   Spring Data는 런타임에 자동 생성된 기존 Repository 인터페이스의 구현체와 Custom Repository의 구현체를 프록시로 조합해 합친다.
+   Spring Data JPA는 런타임에 구현 클래스 생성, EntityManager 주입, 트랜잭션 연동, 메서드 이름 기반의 쿼리 생성을 수행한다.      
+
+   Spring Data JPA에서 Repository의 역할은 Aggregate 단위 조회의 하나의 진입점이다.
+   Service가 의존하는 Aggregate 기준의 유일한 Repository이다.
+   조회 방식(JPQL, QueryDSL, Native) 별로 나누는 것이 아니다.
+   따라서 모두 같은 Repository 소속이어야 한다.      
+
+   Repository는 기능 묶음이 아닌 Aggregate 의 영속성 진입점이기 때문에 하나여야한다. 
+   이게 커스텀 Repository를 기본 Repositroy가 상속하는 이유이다.
+   따라서 Repository 내부에서는 단순 조회는 Spring Data가, 복잡한 조회는 Custom Repository를 구현하므로
+   이 때 Service 입장에서는 조회만 요청하고 어떻게 조회하는지는 알지 못해도 된다.
+   Repository는 하나에 구현은 여러 개지만, Service는 하나에만 의존한다.      
+
+
+### < QueryDSL >
+1. 의존성 설정
+   Spring Boot 3부터는 모든 JPA 라이브러리는 jakarta 버전이어야 한다.   
+   따라서 Spring Boot 3에서 QueryDSL 의존성 추가 시 버전 명시 + :jakarta classifier 필수.
+   ~~~
+    dependencies {
+      	// QueryDSL 도입을 위한 의존성 추가
+        implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
+
+        annotationProcessor 'com.querydsl:querydsl-apt:jakarta'
+        annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+    }
+   ~~~
+   
+1. Q클래스     
+   QueryDSL이 Entity를 보고 자동 생성하는 메타 클래스.
+   ~~~
+   QProductOption option = QProductOption.productOption;
+   ~~~
+   1) Q클래스 자동 생성    
+      Entity가 있으면 빌드 시 Q클래스가 자동 생성된다.   
+      Q클래스가 있어야 타입 안전한 쿼리를 작성할 수 있다.    
+      ~~~
+      QProductOption {
+         StringPath optionCode;
+         QProduct product;
+      }
+      ~~~
+   2) Q클래스를 위한 설정    
+      빌드할 때 Q클래스를 어디에 만들고, 컴파일 대상에 포함시킬지 알려주는 설정.
+      build.gradle에 아래에 의존성 추가 및 아래의 설정을 추가하지 않으면, 
+      Q클래스는 생성되는데 IDE/컴파일러가 존재하지 않는 클래스로 본다.
+      build 폴더에 build/generated/querydsl/@ProductOption.java 가 생성되면 설정이 완료된 것이다.
+      ~~~
+      // QueryDSL Q클래스를 위한 설정
+      sourceSets {
+        main {
+          java {
+            srcDirs += "$buildDir/generated/querydsl"
+          }
+        }
+      }
+      ~~~
+
+3. QuerydslConfig 설정 파일    
+   QueryDSL이 EntityManager를 사용하게 해주는 연결 다리 역할 수행.   
+   JPA 쿼리는 EntityManager를 필요로 한다. 
+   QueryDSL도 결국 JPA 위에서 동작하기 때문에 내부적으로 EntityManager가 필요하다.
+   1) 직접 EntityManager 생성
+      ~~~
+      @Configuration
+      @RequiredArgsConstructor
+      public class QuerydslConfig {
+          private final EntityManager em;
+
+          @Bean
+          public JPAQueryFactory jpaQueryFactory() {
+              return new JPAQueryFactory(em);
+          }
+      }
+      ~~~
+   2) Spring이 트랜잭션 EntityManager 프록시를 주입
+      ~~~
+      @PersistenceContext
+      private EntityManager em;
+      ~~~
+   
+4. repositoryImple 클래스 이름 규칙   
+   Spring Data JPA의 컨벤션(약속)이기 때문이다.
+   아래의 Spring 동작 방식으로 인해 이름이 틀리면 아예 연결이 되지 않기 때문에 꼭 지켜야 한다.
+   - Spring 동작 방식
+     1) ProductOptionRepository 스캔
+     2) 같은 이름 + Impl 클래스 찾음
+     3) 자동으로 합쳐서 하나의 Repository로 만듦
+
+5. 기존 Repository를 쓰지 않고 QueryDSL을 위한 Custom Repository 분리 이유   
+   기존 Repository는 단순 조회, CRUD를 목적으로 한다.   
+   하지만 QueryDSL로 작성할 비관적 락, 동적 조건, 도메인 로직과 밀접한 쿼리는 CRUD 레벨을 넘어선다.    
+   따라서 책임을 분리하고 Repository 인터페이스가 깔끔할 수 있도록 해 가독성을 높이고 
+   복잡 쿼리 단위 테스트를 용이하게 하는 등의 이유로 분리하는 것이다.
 

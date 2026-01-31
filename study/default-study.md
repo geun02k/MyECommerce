@@ -35,6 +35,7 @@
    - 도메인과 DTO
    - 요청과 응답으로 DTO 사용해야하는 이유
    - request, response DTO 분리
+   - Value Object (VO)
 7. 인터페이스
    - 인터페이스 사용 이유
    - 인터페이스와 추상화 클래스의 차이
@@ -73,6 +74,7 @@
     - Context 객체 (미사용, 스터디는 필요)
     - MapStruct (미사용, 스터디는 필요)
 22. DB 키 사용 원칙
+23. Java에서 ""와 """ 차이
 
 ---
 ## 1. Spring
@@ -1012,6 +1014,50 @@ https://velog.io/@chae_ag/Model-DTO-VO-DAO-%EA%B0%80-%EB%AC%B4%EC%97%87%EC%9D%B8
    validation check 어노테이션을 사용 -> 데이터의 유효성 검사.
 2. response DTO   
    단순히 데이터를 반환.
+
+
+### < Value Object (VO) >
+1. Value Object (VO)
+   식별자가 없고 값 그 자체로 의미를 가지는 객체.
+   여러 값이 따로는 의미가 없고 함께 있을 때만 의미가 있는 경우 VO로 생성한다.
+   1) VO 특징   
+     id가 없고 불변의 특성이 있으며 equals/hashCode가 값의 기준이 된다.
+     - 모든 필드가 private final
+     - setter 없음
+     - 값 기반 equals/hashCode 자동
+     - 생성자도 있음
+   2) VO 사용 의의   
+      여러 값이 따로는 의미가 없고 함께 있을 때만 의미가 있는 경우 VO로 생성하므로,
+      productId-optionCode 조합을 임의로 생성해 데이터를 구분할 필요가 없어진다.   
+   ~~~
+    public record ProductOptionKey(
+            Long productId,
+            String optionCode
+    ) {}
+   ~~~
+
+2. record
+   VO 생성을 위한 자바 문법.
+   Java 16 버전부터 지원한다.
+   위 코드로 생성자, getter, equals, hashCode, toString을 자동 생성한다.
+   class로 객체 생성하는 것과 기능은 동일하지만, record를 사용하는 경우가 압도적으로 간결해진다.
+   1) record 사용 전
+      Java 16 이전에는 아래의 코드로 VO를 생성했다.
+      ~~~
+      @Value
+      public class ProductOptionKey {
+         Long productId;
+         String optionCode;
+      }
+      ~~~
+
+3. 데이터 전달 클래스의 추가 생성    
+   DTO를 남발하는 것과 VO는 다르다.
+   VO를 만드는 이유는 의미있는 하나의 개념으로 묶기 위함이다.
+   이건 클래스를 남발하는 게 아닌, 개념을 모델링하는 것이다.
+   데이터 전달용이라서 DTO를 만드는 것은 권장되지 않지만, 개념적 의미가 있다면 만드는 것이다.
+   값 묶음이 한 번만 쓰인다면 굳이 VO로 생성할 필요가 없지만,
+   코드 여러 곳에서 반복 사용된다면 VO로 만들 가치가 충분하다.
 
 
 ---
@@ -2593,3 +2639,17 @@ CartPolicy는 이 판단만 알면 충분하고,
    예를 들면, 주문 요청에서는 productId + optionCode 조합을 사용한다.
 
    
+---
+## 23. Java에서 ""와 """ 차이
+기능의 차이는 없고, 표현과 가독성에 차이가 있다.
+1. " "    
+   - 일반 문자열 (String Literal)   
+   - 한 줄 기준
+   - 줄바꿈 시 \n 필요
+   - 내용이 길어지면 가독성 떨어짐
+2. """ """
+   - Text Block
+   - Java 15 버전부터 사용 가능
+   - 여러 줄의 문자열 표현 가능
+   - 개행, 들여쓰기를 그대로 유지
+

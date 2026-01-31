@@ -11,7 +11,8 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ProductOptionRepository extends JpaRepository<ProductOption, Long> {
+public interface ProductOptionRepository extends JpaRepository<ProductOption, Long>,
+                                                 ProductOptionRepositoryCustom {
     // 상품의 옵션코드목록에 대한 옵션 목록 조회
     @Query(" SELECT PRD " +
             " FROM Product PRD" +

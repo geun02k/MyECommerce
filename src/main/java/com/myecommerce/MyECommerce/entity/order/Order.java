@@ -23,6 +23,7 @@ import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 @Builder(access = AccessLevel.PRIVATE) // Builder 접근 제한
 @AllArgsConstructor(access = AccessLevel.PRIVATE) // 생성자 접근 제한, Lombok Builder의 내부 구현으로 없으면 @Builder 오류발생
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // application 접근제한, JPA(Hibernate)는 리플렉션으로 접근 가능
+@Table(name = "orders")
 public class Order extends BaseEntity {
 
     @Id

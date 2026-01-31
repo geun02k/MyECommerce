@@ -6,7 +6,6 @@ import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.exception.OrderException;
-import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,16 +15,13 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.OrderErrorCode.*;
-import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_ON_SALE;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
-import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 
 @Component
 @RequiredArgsConstructor
 public class OrderPolicy {
 
     private final static int ORDER_ITEM_MAX_CNT = 100; // 물품 주문가능 최대 수량
-    private final static int ITEM_MIN_QUANTITY = 1; // 물품 당 최소 주문 수량
     private final static int ITEM_MAX_QUANTITY = 50; // 물품 당 최대 주문 수량
 
     private final ProductRepository productRepository;
@@ -49,12 +45,8 @@ public class OrderPolicy {
         List<Product> registeredProducts = productRepository.findByIdIn(productIds);
 
         // 2. 도메인 규칙 검증 (서비스 로직 수행 가능한가?)
-        // 요청 물품별 최소, 최대 수량 제한
+        // 요청 물품별 최대 수량 제한
         validateQuantityOfItemPolicy(orderItemList);
-        // 주문 가능한 상품은 판매중 상태로 제한
-        validateProductSaleStatusPolicy(productIds);
-        // 품절 상품 옵션 주문 제한
-        validateOutOfStockPolicy(orderItemList, productIds, registeredProducts);
         // 등록된 상품 옵션 한정 주문 제한
         validateNotRegisteredProductOptionPolicy(
                 orderItemList, productIds, registeredProducts);
@@ -104,75 +96,13 @@ public class OrderPolicy {
 
     // 요청 물품 수량 제한 정책
     private void validateQuantityOfItemPolicy(List<RequestOrderDto> orderItemList) {
-        // 1. 요청 최소 수량 검증
-        long itemsBelowMinQuantity = orderItemList.stream()
-                .filter(item ->
-                        item.getQuantity() < ITEM_MIN_QUANTITY)
-                .count();
-        if(itemsBelowMinQuantity > 0) {
-            throw new OrderException(ORDER_ITEM_MIN_QUANTITY_BELOW);
-        }
-
-        // 2. 요청 최대 수량 검증
+        // 1. 요청 최대 수량 검증
         long itemsAboveMinQuantity = orderItemList.stream()
                 .filter(item ->
                         item.getQuantity() > ITEM_MAX_QUANTITY)
                 .count();
         if(itemsAboveMinQuantity > 0) {
             throw new OrderException(ORDER_ITEM_MAX_QUANTITY_EXCEEDED, ITEM_MAX_QUANTITY);
-        }
-    }
-
-    // 상품 옵션 품절 정책
-    private void validateOutOfStockPolicy(List<RequestOrderDto> orderItemList,
-                                          List<Long> productIds,
-                                          List<Product> registeredProducts) {
-        // 1. 상품 판매 가능 수량이 0이면 품절로 주문불가
-        // 상품 ID 목록 조회
-        List<ProductOption> outOfStockOptions =
-                productOptionRepository.findByProductIdInAndQuantity(productIds, 0);
-        // 옵션별 판매가능수량 체크
-        if(!outOfStockOptions.isEmpty()) {
-            throw new OrderException(PRODUCT_OPTION_OUT_OF_STOCK);
-        }
-
-        // 2. 요청 수량이 판매 수량보다 많으면 주문불가
-        // TODO: O(R^2*O)는 벗어났지만 검증 대상을 기준으로 반복하도록 변경하면 P * O 구조 벗어날 수 있음.
-        // 검증 대상은 ‘요청’인데, 순회의 기준은 ‘전체 옵션’이므로 변경 필요.
-        // 불필요한 옵션까지 전부 순회할 필요 없음.
-        // reqeustOrderItems는 List 유지, registeredOptions를 Map으로 선언.
-        // List -> Map으로 변환
-        Map<String, RequestOrderDto> requestOrderItems =
-                convertOrderItemListToMap(orderItemList);
-
-        for(Product product : registeredProducts) {
-            for(ProductOption option : product.getOptions()) {
-                String itemKey = createUniqueItemKey(
-                        product.getId(), option.getOptionCode());
-                RequestOrderDto requestItem = requestOrderItems.get(itemKey);
-
-                if(requestItem == null) {
-                    continue;
-                }
-
-                int requestQuantity = requestItem.getQuantity();
-                int sellAvailableQuantity = option.getQuantity();
-                if(sellAvailableQuantity < requestQuantity) {
-                    throw new OrderException(ORDER_AVAILABLE_QUANTITY_EXCEEDED);
-                }
-            }
-        }
-    }
-
-    // 상품 목록 판매상태 검증 정책
-    private void validateProductSaleStatusPolicy(List<Long> productIds) {
-
-        int notOnSaleProductCnt = productRepository
-                .findByIdInAndSaleStatusNot(productIds, ON_SALE).size();
-
-        // 판매중이 아닌 상품 주문 불가
-        if (0 < notOnSaleProductCnt) {
-            throw new ProductException(PRODUCT_NOT_ON_SALE);
         }
     }
 
@@ -231,11 +161,4 @@ public class OrderPolicy {
         return createUniqueItemKey(item.getProductId(), item.getOptionCode());
     }
 
-    // 요청 물품 목록 List -> Map 변환
-    private Map<String, RequestOrderDto> convertOrderItemListToMap(
-            List<RequestOrderDto> orderItemList) {
-        return orderItemList.stream()
-                .collect(Collectors.toMap(
-                        this::createUniqueItemKey, item -> item));
-    }
 }

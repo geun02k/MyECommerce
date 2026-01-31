@@ -2,6 +2,7 @@ package com.myecommerce.MyECommerce.entity.order;
 
 import com.myecommerce.MyECommerce.entity.BaseEntity;
 import com.myecommerce.MyECommerce.entity.member.Member;
+import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.type.OrderStatusType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -13,7 +14,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_ON_SALE;
 import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 
 @Entity
 @Getter
@@ -64,6 +67,9 @@ public class Order extends BaseEntity {
 
     /** 주문 생성 **/
     public static Order createOrder(List<OrderItem> items, Member member) {
+        // 유효성 검증 (불변 도메인 규칙 검증)
+        validateOrder(items);
+
         LocalDateTime now = LocalDateTime.now();
 
         // totalPrice, items 외 값 추가
@@ -80,6 +86,25 @@ public class Order extends BaseEntity {
         order.setCalculatedTotalPrice();
 
         return order;
+    }
+
+    // 유효성 검증
+    private static void validateOrder(List<OrderItem> items) {
+        validateProductSaleStatus(items);
+    }
+
+    // 상품 목록 판매상태 검증 정책
+    private static void validateProductSaleStatus(List<OrderItem> items) {
+        // 판매중이 아닌 상품 수 조회
+        long notOnSaleProductCnt = items.stream()
+                .map(item -> item.getProduct().getSaleStatus())
+                .filter(saleStatus -> saleStatus != ON_SALE)
+                .count();
+
+        // 판매중이 아닌 상품 주문 불가
+        if (0 < notOnSaleProductCnt) {
+            throw new ProductException(PRODUCT_NOT_ON_SALE);
+        }
     }
 
     // 주문 물품 목록 셋팅 및 연관관계 설정

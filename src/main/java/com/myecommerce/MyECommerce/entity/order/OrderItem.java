@@ -54,11 +54,13 @@ public class OrderItem {
         Method
        ---------------------- */
 
+    private final static int ITEM_MIN_QUANTITY = 1; // 물품 당 최소 주문 수량 (불변, JPA가 Entity 생성 시 무시)
+
     /** 주문 물품 생성 **/
     public static OrderItem createOrderItem(ProductOption registeredOption,
                                             Product product,
                                             int orderQuantity) {
-        // 유효성 검증 (불변 조건 강제)
+        // 유효성 검증 (불변 도메인 규칙 검증)
         validateOrderItem(registeredOption, orderQuantity);
 
         // totalPrice, order 외 값 추가
@@ -85,18 +87,48 @@ public class OrderItem {
 
     // 불변 조건 강제 (null, 입력 금지 값을 허용하지 않는 상태만 생성되게 만드는 것이 핵심)
     private static void validateOrderItem(ProductOption registeredOption, int orderQuantity) {
-        // 주문 수량 최소 1개 이상
-        if (orderQuantity < 1) {
-            throw new OrderException(ORDER_ITEM_MIN_QUANTITY_BELOW);
-        }
+        // 주문 물품 가격 방어 검증
+        validateItemPrice(registeredOption.getPrice());
+        // 주문 최소 수량 검증
+        validateMinOrderQuantity(orderQuantity);
+        // 상품 옵션 품절 여부 확인
+        validateOutOfStock(registeredOption, orderQuantity);
+    }
 
+    // 주문 물품 가격 방어 검증
+    private static void validateItemPrice(BigDecimal optionPrice) {
         // 주문 물품 가격 필수
-        if (registeredOption.getPrice() == null) {
+        if (optionPrice == null) {
             throw new OrderException(ORDER_ITEM_PRICE_INVALID);
         }
         // 주문 물품 가격은 양수
-        if (registeredOption.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+        if (optionPrice.compareTo(BigDecimal.ZERO) <= 0) {
             throw new OrderException(ORDER_ITEM_PRICE_INVALID);
+        }
+    }
+
+    // 주문 최소 수량 검증
+    private static void validateMinOrderQuantity(int orderQuantity) {
+        // 주문 수량 최소 1개 이상
+        if (orderQuantity < ITEM_MIN_QUANTITY) {
+            throw new OrderException(ORDER_ITEM_MIN_QUANTITY_BELOW);
+        }
+    }
+
+    // 상품 옵션 품절 정책
+    private static void validateOutOfStock(ProductOption registeredOption,
+                                           int orderQuantity) {
+        int sellAvailableQuantity = registeredOption.getQuantity();
+
+        // 1. 상품 판매 가능 수량이 0이면 품절로 주문불가
+        // 등록된 옵션의 판매가능수량 체크
+        if(sellAvailableQuantity <= 0) {
+            throw new OrderException(PRODUCT_OPTION_OUT_OF_STOCK);
+        }
+
+        // 2. 요청 수량이 판매 수량보다 많으면 주문불가
+        if(sellAvailableQuantity < orderQuantity) {
+            throw new OrderException(ORDER_AVAILABLE_QUANTITY_EXCEEDED);
         }
     }
 

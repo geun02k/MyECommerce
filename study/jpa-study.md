@@ -46,6 +46,9 @@
     - productId, OptionCode 페어와 비관적 락 사용을 위한 조회 생성 방법 선택
     - JPQL 사용 방식
     - QueryDSL
+20. JPA 연관관계와 PK, FK
+    - Cascade = CascadeType.ALL
+    - 연관관계에서 신규 저장
 
 
 ---
@@ -1659,4 +1662,91 @@ JPQL은 정적 쿼리에 최적화된 도구이다.
    하지만 QueryDSL로 작성할 비관적 락, 동적 조건, 도메인 로직과 밀접한 쿼리는 CRUD 레벨을 넘어선다.    
    따라서 책임을 분리하고 Repository 인터페이스가 깔끔할 수 있도록 해 가독성을 높이고 
    복잡 쿼리 단위 테스트를 용이하게 하는 등의 이유로 분리하는 것이다.
+
+   
+---
+## 20. JPA 연관관계와 PK, FK
+### < Cascade = CascadeType.ALL >
+1. Cascade   
+   부모 Entity가 수행한 작업을 자식 Entity에 자동 전파하는 옵션.    
+   연관관계에서 읽기 전용과 쓰기 전파용을 구분해야 한다.
+   CascadeType.ALL은 쓰기 전파용으로, 단순 조회용 관계에서는 제거해야한다.
+   즉, 연관관계가 많은 Entity에서는 Cascade를 최소화 해 성능 문제를 예방해야 한다.   
+   cascade를 잘못 설정하게 되면 에상치 못한 update/delete까지 발생할 가능성도 있다. 
+   - ALL    
+     모든 작업 전파.
+     부모 Entity가 수행하는 persist(save), merge, remove, refresh, detach를 자식 Entity에도 자동으로 적용.
+
+
+### < 연관관계에서 신규 저장 >
+Order 엔티티 - PK 존재 (auto-generated)     
+OrderItem 엔티티 - PK 존재 (auto-generated)    
+연관 관계 - Order : OrderItem = 1 : N    
+OrderItem을 저장하려면 order PK가 필요    
+
+1. 연관관계에서 주의할 점    
+   1:n 관계에서 FK가 있을 때, DB 기준 주인이 누구인지가 중요하다.
+   mappedBy = "order"라면, OderItem이 FK를 가진 주인으로 본다.
+   즉, DB insert/update는 OrderItem을 기준으로 FK 설정이 필요하다.
+   JPA에서 insert/update는 주인을 기준으로 반영되기 때문이다.
+   Order 객체에만 items 추가하고 item.order 안 하면 DB에는 FK null로 insert 실패한다.
+   Order 객체의 items 리스트는 단순한 컬렉션으로 cascade 편의, 양방향 참조 유지용일 뿐이다.
+   DB insert/업데이트에는 직접적인 영향은 없다.
+   따라서 item.setOrder(order) + order.items.add(item) 둘 다 필요하다.
+   ~~~
+   @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+   private List<OrderItem> items;
+   ~~~
+   ~~~
+   @ManyToOne
+   @JoinColumn(name="order_id")
+   private Order order;
+   ~~~
+
+2. Cascade 옵션을 활용한 저장
+   - insert 한번에 부모와 자식 데이터가 모두 저장된다.
+   - PK/FK가 자동 처리된다.   
+   Cascade를 쓰면 Order 저장만으로 OrderItem도 자동 insert 가능.   
+   단, FK 연결 위해 OrderItem.setOrder(order)는 필수이다.   
+   OrderItem의 order 속성값에 부모 객체를 저장하면, 부모에 대한 PK는 JPA가 알아서 할당하기 때문이다.
+   즉, items 객체에 PK 없어도, FK(order) 연결 + cascade 사용이면 JPA가 알아서 insert 한다.
+   만약 OrderItem.setOrder(order)를 하지 않아, FK인 order_id가 없다면 FK 위반으로 insert 불가하다.
+   즉, Cascade PERSIST + orderItem.setOrder(order) 해주면 JPA가 알아서 FK를 채운다.
+   ~~~
+   @Entity
+   public class OrderItem {
+       // ...
+       @OneToMany(mappedBy="order", cascade = CascadeType.PERSIST) 
+       private Order order;
+   } 
+   ~~~ 
+   ~~~
+    Order order = new Order();
+    List<OrderItem> items = request.getItems();
+    
+    for(OrderItem item : items) {
+    item.setOrder(order); // FK 연결
+    }
+    order.setItems(items);
+    
+    orderRepository.save(order); // order + items insert 한 번에 처리
+   ~~~
+
+3. 순차 저장
+   - PK 기반으로 로직을 명시적으로 처리하는 방법
+   - insert가 최소 2~N번 수행된다. 
+     부모 Entity 저장 후 자식 Entity 개수만큼 insert 수행하기 때문이다.
+   - 트랜잭션 안정성이 보장된다.
+   ~~~
+      Order order = new Order();
+      orderRepository.save(order); // PK 생성
+    
+      // 주문번호 생성 가능
+      order.assignOrderNumber(generateOrderNumber(order.getId()));
+    
+      for(OrderItem item : items) {
+          item.setOrder(order); // FK 연결
+          orderItemRepository.save(item); // insert
+      }
+   ~~~
 

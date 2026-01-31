@@ -5,18 +5,21 @@ import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.type.OrderStatusType;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.ColumnDefault;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+
+import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
 
 @Entity
 @Getter
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
+@Builder(access = AccessLevel.PRIVATE) // Builder 접근 제한
+@AllArgsConstructor(access = AccessLevel.PRIVATE) // 생성자 접근 제한, Lombok Builder의 내부 구현으로 없으면 @Builder 오류발생
+@NoArgsConstructor(access = AccessLevel.PROTECTED) // application 접근제한, JPA(Hibernate)는 리플렉션으로 접근 가능
 public class Order extends BaseEntity {
 
     @Id
@@ -24,8 +27,8 @@ public class Order extends BaseEntity {
     @Column(nullable = false)
     private Long id;
 
-    // yyyyMMddHHmmss + 4자리 시퀀스
-    // -> 동시성 고려, 초당 최대 9,999건 처리가능
+    // yyyyMMdd 8자리 + 하이픈 + 주문 ID 9자리
+    // 추후 주문ID 값 증가 예상으로 길이 제한하지 않음.
     @Column(nullable = false, unique = true, length = 18)
     private String orderNumber;
 
@@ -49,10 +52,55 @@ public class Order extends BaseEntity {
     // 주문:주문물품 (1:N)
     // 주문 물품 데이터를 order_item 테이블 join해서 가져옴.
     // 연관관계의 주인은 OrderItem.
-    // 한 주문이 여러 주문 상품울 거잘 수 있음.
+    // 한 주문이 여러 주문 상품울 가질 수 있음.
     // CascadeType: 주문이 주문물품 생명주기 관리.
     @Builder.Default
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY, mappedBy = "order")
     private List<OrderItem> items = new ArrayList<>();
+
+    /* ----------------------
+        Method
+       ---------------------- */
+
+    /** 주문 생성 **/
+    public static Order createOrder(List<OrderItem> items, Member member) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // totalPrice, items 외 값 추가
+        Order order = Order.builder()
+                .orderNumber(createOrderNumber(now))
+                .buyer(member)
+                .orderStatus(CREATED)
+                .orderedAt(now)
+                .build();
+
+        // 주문 물품 목록 셋팅 및 연관관계 설정
+        order.setItems(items);
+        // 총 주문 금액 계산 및 셋팅
+        order.setCalculatedTotalPrice();
+
+        return order;
+    }
+
+    // 주문 물품 목록 셋팅 및 연관관계 설정
+    private void setItems(List<OrderItem> items) {
+        this.items = items;
+        this.items.forEach(orderItem ->
+                orderItem.assignOrder(this));
+    }
+
+    // 총 금액 계산 및 셋팅
+    private void setCalculatedTotalPrice() {
+        this.totalPrice = this.items.stream()
+                .map(OrderItem::getTotalPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add); // reduce(초기값, 연산) : 전체합산
+    }
+
+    // 주문번호 생성
+    private static String createOrderNumber(LocalDateTime now) {
+        // yyyyMMdd 8자리 + 하이픈 + 주문 ID 9자리
+        return now.format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+                + "-" +  UUID.randomUUID().toString().substring(0,9).toUpperCase();
+    }
 
 }

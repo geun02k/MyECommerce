@@ -30,7 +30,13 @@ public enum OrderErrorCode implements CommonErrorCode {
     PRODUCT_OPTION_OUT_OF_STOCK(HttpStatus.CONFLICT.value(),
             "error.order.product.option.out.of.stock"),
     ORDER_AVAILABLE_QUANTITY_EXCEEDED(HttpStatus.CONFLICT.value(), // 재고/상태기반 수량제한 (가변값)
-            "error.order.available.quantity.exceeded")
+            "error.order.available.quantity.exceeded"),
+
+    // 주문 물품 validation check
+    ITEM_ALREADY_ORDERED(HttpStatus.CONFLICT.value(),
+            "error.order.item.already_ordered"),
+    ORDER_ITEM_PRICE_INVALID(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            "error.order.item.price.invalid"),
     ;
 
     private final int statusCode;

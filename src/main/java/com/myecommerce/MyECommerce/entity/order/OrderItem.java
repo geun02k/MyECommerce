@@ -2,19 +2,20 @@ package com.myecommerce.MyECommerce.entity.order;
 
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
+import com.myecommerce.MyECommerce.exception.OrderException;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+import static com.myecommerce.MyECommerce.exception.errorcode.OrderErrorCode.*;
 
 @Entity
 @Getter
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
+@Builder(access = AccessLevel.PRIVATE) // Builder 접근 제한
+@AllArgsConstructor(access = AccessLevel.PRIVATE)  // 생성자 접근 제한
+@NoArgsConstructor(access = AccessLevel.PROTECTED) // application 접근제한, JPA(Hibernate)는 리플렉션으로 접근 가능
 public class OrderItem {
 
     @Id
@@ -48,5 +49,62 @@ public class OrderItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="product_option_id", nullable = false) // 테이블 매핑 시 foreign key 지정
     private ProductOption option;
+
+    /* ----------------------
+        Method
+       ---------------------- */
+
+    /** 주문 물품 생성 **/
+    public static OrderItem createOrderItem(ProductOption registeredOption,
+                                            Product product,
+                                            int orderQuantity) {
+        // 유효성 검증 (불변 조건 강제)
+        validateOrderItem(registeredOption, orderQuantity);
+
+        // totalPrice, order 외 값 추가
+        OrderItem orderItem = OrderItem.builder()
+                .quantity(orderQuantity)
+                .unitPrice(registeredOption.getPrice())
+                .product(product)
+                .option(registeredOption)
+                .build();
+
+        // 주문 물품 총 금액 셋팅
+        orderItem.setCalculatedTotalPrice();
+
+        return orderItem;
+    }
+
+    /** 주문 물품에 주문 객체 할당 **/
+    public void assignOrder(Order order) {
+        if (this.order != null) {
+            throw new OrderException(ITEM_ALREADY_ORDERED);
+        }
+        this.order = order;
+    }
+
+    // 불변 조건 강제 (null, 입력 금지 값을 허용하지 않는 상태만 생성되게 만드는 것이 핵심)
+    private static void validateOrderItem(ProductOption registeredOption, int orderQuantity) {
+        // 주문 수량 최소 1개 이상
+        if (orderQuantity < 1) {
+            throw new OrderException(ORDER_ITEM_MIN_QUANTITY_BELOW);
+        }
+
+        // 주문 물품 가격 필수
+        if (registeredOption.getPrice() == null) {
+            throw new OrderException(ORDER_ITEM_PRICE_INVALID);
+        }
+        // 주문 물품 가격은 양수
+        if (registeredOption.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new OrderException(ORDER_ITEM_PRICE_INVALID);
+        }
+    }
+
+    // 주문 물품 총 금액 셋팅
+    private void setCalculatedTotalPrice() {
+        this.totalPrice = this.unitPrice
+                .multiply(BigDecimal.valueOf(this.quantity))
+                .setScale(1, RoundingMode.HALF_UP); // 소수점 1자리 반올림;
+    }
 
 }

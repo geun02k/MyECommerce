@@ -9,6 +9,7 @@ import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.mapper.OrderMapper;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.service.stock.StockCacheService;
 import com.myecommerce.MyECommerce.vo.order.ProductOptionKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,8 @@ import java.util.stream.Collectors;
 public class OrderService {
 
     private final OrderPolicy orderPolicy;
+
+    private final StockCacheService stockCacheService;
 
     private final ProductOptionRepository productOptionRepository;
     private final OrderRepository orderRepository;
@@ -52,7 +55,10 @@ public class OrderService {
         // 4. 상품옵션 목록 재고 차감 (dirty checking)
         decreaseStockOfProductOptions(savedOrder.getItems(), registeredOptions);
 
-        // 5. Entity -> responseDTO로 변환해 반환
+        // 5. 재고 캐시 데이터 차감 (원자적 감소)
+        stockCacheService.decrementProductStock(savedOrder.getItems());
+
+        // 6. Entity -> responseDTO로 변환해 반환
         return orderMapper.toResponseDto(savedOrder);
     }
 

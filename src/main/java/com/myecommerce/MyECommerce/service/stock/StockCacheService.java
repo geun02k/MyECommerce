@@ -1,5 +1,6 @@
 package com.myecommerce.MyECommerce.service.stock;
 
+import com.myecommerce.MyECommerce.entity.order.OrderItem;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
@@ -35,6 +36,20 @@ public class StockCacheService {
                     createStockRedisKey(product.getCode(), option.getOptionCode()),
                     option.getQuantity());
         });
+    }
+
+    /** Redis 상품 재고 감소 **/
+    public void decrementProductStock(List<OrderItem> orderItems) {
+        for(OrderItem orderItem : orderItems) {
+            String productCode = orderItem.getProduct().getCode();
+            String optionCode = orderItem.getOption().getOptionCode();
+
+            String redisKey = createStockRedisKey(productCode, optionCode);
+            Long orderQuantity = (long) orderItem.getQuantity();
+
+            // 원자적 감소
+            redisMultiDataService.decrementData(STOCK, redisKey, orderQuantity);
+        }
     }
 
     /** Redis 상품 재고 삭제 **/

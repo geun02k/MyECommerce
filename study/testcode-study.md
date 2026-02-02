@@ -67,6 +67,8 @@
     - 테스트에서 Redis 결정
     - Embedded Redis - 테스트용
     - Testcontainers Redis - 진짜 Redis
+24. 테스트에서 발생한 Auditing 에러
+25. 프로파일 전략 (@Profile)
 
 
 --- 
@@ -2557,4 +2559,105 @@ Docker 컨테이너로 진짜 Redis를 띄운다.
 6. RedisTemplate은 운영 Bean을 쓰는 이유   
    Testcontainers는 Redis 서버만 제공한다. 
    따라서 Spring이 생성한 RedisTemplate Bean은 그대로 사용한다.
+
+
+---
+## 24. 테스트에서 발생한 Auditing 에러
+> Auditing 에러는 테스트 환경에 Spring Security 인증 정보가 없는데,
+  AuditorAware가 SecurityContext에 의존했기 때문에 발생했다. 
+  테스트에서는 운영 Auditor를 로딩하지 않고, 테스트용 Auditor를 분리해 해결했다.
+
+1. 발생 에러       
+   통합 테스트 실행 중, Repository.save() -> persist() 시점, JPA Auditing 동작 중 발생한다.
+   ~~~
+   com.myecommerce.MyECommerce.exception.SpringSecurityException
+           at SecurityAuditorAware.getCurrentAuditor(...)
+   ~~~
+
+2. 에러 발생 원인      
+   Entity에 Auditing을 적용하거나 Auditor 제공자에서 에러가 발생한다.   
+   JPA Auditing이 엔티티 저장 시 @CreatedBy / @LastModifiedBy 값을 채우려고 했는데,
+   Spring Security 컨텍스트에서 인증 정보를 못 찾아서 예외가 터진 것이다.
+   테스트 환경에서는 Spring Security 인증 정보가 없다.
+
+   1) 테스트에서 Entity save() 실행.
+   2) JPA Auditing이 @CreatedBy 값을 채우려 함.
+   3) AuditorAware.getCurrentAuditor() 호출.
+   4) SecurityContextHolder에 Authentication 없음.
+   5) SpringSecurityException 발생.     
+
+   실제 운영에서는 실제 API 요청이 발생해 SecurityFilterChain을 통과하기 떄문에 
+   SecurityContextHolder에 인증 정보가 존재하므로 Auditing이 정상 동작한다.    
+   따라서 테스트에서만 문제가 발생하게 된다.
+
+   ~~~
+   // Entity
+   @CreatedBy
+   private Long createId;
+   ~~~
+   ~~~
+   @Component
+   public class SecurityAuditorAware implements AuditorAware<Long> {
+   
+       @Override
+       public Optional<Long> getCurrentAuditor() {
+           Authentication authentication =
+               SecurityContextHolder.getContext().getAuthentication();
+   
+           if (authentication == null) {
+               throw new SpringSecurityException();
+           }
+           ...
+       }
+   }
+   ~~~ 
+
+3. 해결 방법
+   1) 테스트용 Auditor 분리    
+      SecurityContext가 필요없고, 인증 세팅이 불필요하다.
+      테스트 안정적이므로 실무에서 가장 많이 쓰는 방식이다.     
+      - TestAuditingConfig 생성
+         ~~~
+         @TestConfiguration
+         @EnableJpaAuditing
+         public class TestAuditingConfig {
+   
+             @Bean
+             public AuditorAware<Long> auditorAware() {
+                 return () -> Optional.of(1L);
+             }
+         }
+         ~~~
+      - 테스트 클래스에 TestAuditingConfig import
+        ~~~
+        @SpringBootTest
+        @ActiveProfiles("test")
+        @Import(TestAuditingConfig.class)
+        class OrderCreateIntegrationTest {
+        }
+        ~~~
+      - 운영 Auditing Config에 테스트 시 미실행 되도록 설정
+        ~~~
+        @Configuration
+        @EnableJpaAuditing
+        @Profile("!test")
+        public class JpaAuditingConfig {
+        }
+        ~~~
+
+
+---
+## 25. 프로파일 전략 (@Profile)
+1. @Profile   
+   환경별로 빈 설정을 분리할 때 사용한다.
+   Auditing이나 Security처럼 테스트에서 불필요한 인프라는 프로파일이나 테스트 설정으로 분리해서, 
+   도메인 테스트가 인프라에 끌려가지 않도록 설정할 수 있다.
+
+2. @Profile 적용    
+   아래와 같이 테스트에서는 필요 없고, 운영에서는 필수인 경우 사용한다.
+   - 보안 / 인증 / Auditing 관련 
+   - AuditorAware
+   - SecurityConfig
+   - JwtProvider
+   - OAuth / SSO 연동
 

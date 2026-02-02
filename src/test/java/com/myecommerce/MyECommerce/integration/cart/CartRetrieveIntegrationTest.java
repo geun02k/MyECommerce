@@ -4,15 +4,15 @@ import com.myecommerce.MyECommerce.dto.cart.RedisCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDetailDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.service.cart.CartService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.STOCK;
@@ -31,10 +31,30 @@ public class CartRetrieveIntegrationTest {
         Test Fixtures
        ------------------ */
 
+    private final String USER_ID = "customer";
+    private final String CART_KEY = CART + ":" + USER_ID;
+
+    Object[] cartKeys;
+    List<String> stockCache;
+
+    @BeforeEach
+    void setUp() {
+        // 장바구니 상품 옵션 100건 저장
+        cartKeys = givenCartItemList();
+        // 장바구니 상품 옵션 재고 저장
+        stockCache = givenItemStockCache();
+    }
+
+    @AfterEach
+    void cleanUp() {
+        redisTemplate.opsForHash().delete(CART_KEY, cartKeys);
+        redisTemplate.delete(stockCache);
+    }
+
     /** 고객권한 사용자 */
     Member customer() {
         return Member.builder()
-                .userId("customer")
+                .userId(USER_ID)
                 .build();
     }
 
@@ -43,8 +63,7 @@ public class CartRetrieveIntegrationTest {
        ------------------ */
 
     /** Redis에 사용자 장바구니 저장 */
-    void givenCartItemList(String userId) {
-        String key = CART + ":" + userId;
+     Object[] givenCartItemList() {
         Map<String, RedisCartDto> value = new HashMap<>();
 
         // 100건 장바구니 상품 옵션 데이터 생성
@@ -65,11 +84,14 @@ public class CartRetrieveIntegrationTest {
         }
 
         // 장바구니 상품 목록 저장
-        redisTemplate.opsForHash().putAll(key, value);
+        redisTemplate.opsForHash().putAll(CART_KEY, value);
+
+        // 장바구니 상품 목록 반환
+        return value.keySet().stream().toArray();
     }
 
     /** Redis에 재고 캐시 데이터 저장 */
-    void givenItemStockCache() {
+    List<String> givenItemStockCache() {
         Map<String, Integer> stock = new HashMap<>();
 
         for (int i = 1; i <= 70; i++) {
@@ -90,6 +112,8 @@ public class CartRetrieveIntegrationTest {
         }
 
         redisTemplate.opsForValue().multiSet(stock);
+
+        return stock.keySet().stream().toList();
     }
 
     /** 장바구니에서 특정 상품 옵션 찾기 */
@@ -115,11 +139,6 @@ public class CartRetrieveIntegrationTest {
         // given
         // 요청 사용자 DTO
         Member member = customer();
-
-        // 장바구니 상품 옵션 100건 저장
-        givenCartItemList(member.getUserId());
-        // 장바구니 상품 옵션 재고 저장
-        givenItemStockCache();
 
         // when
         List<ResponseCartDetailDto> response =

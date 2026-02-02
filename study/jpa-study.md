@@ -49,6 +49,7 @@
 20. JPA 연관관계와 PK, FK
     - Cascade = CascadeType.ALL
     - 연관관계에서 신규 저장
+21. JAP 인터페이스에의 @Repository
 
 
 ---
@@ -1749,4 +1750,23 @@ OrderItem을 저장하려면 order PK가 필요
           orderItemRepository.save(item); // insert
       }
    ~~~
+
+
+---
+## 21. JAP 인터페이스에의 @Repository
+### < 인터페이스에 적용한 @Repository >
+전통적인 Spring 구조에서는 @Repository는 빈으로 등록 및 예외 변환 역할을 한다.
+빈으로 등록되는 대상은 구현체여야 한다.    
+인터페이스는 인스턴스화 대상이 아니므로, 
+AOP, 예외 변환도 실제 객체(구현체)를 기준으로 적용되기 때문이다.   
+그래서 보통은 인터페이스가 아닌 구현체에만 적용하는 것이 원칙이다.    
+<br>
+Spring Data JPA의 Repository 인터페이스는 @Repository를 붙여도 되고 안 붙여도 되는 특수한 케이스이다.
+Spring Data JPA는 인터페이스를 그대로 두고 런타임에 프록시 구현체를 자동 생성한다.  
+그리고 이 프록시가 빈으로 등록되고 트랜잭션, 예외 변환도 적용된다.    
+Spring Data JPA 내부에서 Repository 인터페이스를 스캔해 프록시 구현체를 생성하고 
+자동으로 @Repository 역할을 수행하는 빈으로 등록한다.
+따라서 우리가 @Repository 어노테이션을 붙이지 않아도 적용한 것 같은 효과가 나는 것이다.   
+인터페이스에 붙여도 에러는 발생하지 않고 정상 동작은 한다.
+하지만 굳이 안 붙이는 이유는, 중복 의미를 제거하고 개발자가 만든 구현체인지 Spring Data JPA 리포지토리인지 헷갈림을 유발하므로 제거가 권장된다.
 

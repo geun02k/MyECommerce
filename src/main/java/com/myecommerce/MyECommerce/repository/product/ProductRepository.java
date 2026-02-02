@@ -7,12 +7,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
-@Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
     // 판매자의 동일 상품코드 조회
     Optional<Product> findBySellerAndCode(long id, String code);

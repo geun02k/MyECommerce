@@ -17,7 +17,7 @@ public class ResponseOrderDto {
 
     private String orderNumber;
 
-    private Member buyer;
+    private String buyerUserId;
 
     private BigDecimal totalPrice;
 

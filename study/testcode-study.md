@@ -69,6 +69,9 @@
     - Testcontainers Redis - 진짜 Redis
 24. 테스트에서 발생한 Auditing 에러
 25. 프로파일 전략 (@Profile)
+26. 동시성 통합 테스트
+27. 테스트에서 @Transactional
+28. 동시성 통합 테스트에서 @Transactional이 무시된 이유와 해결
 
 
 --- 
@@ -2660,4 +2663,192 @@ Docker 컨테이너로 진짜 Redis를 띄운다.
    - SecurityConfig
    - JwtProvider
    - OAuth / SSO 연동
+
+
+---
+## 26. 동시성 통합 테스트
+비관적 락 동시성 제어가 들어간 주문 생성 메서드에 대한 통합 테스트 설계 문제이다.
+1. 테스트 케이스 분리
+   아래의 두 테스트는 역할이 다르므로 분리하는 것이 좋다.    
+   하나로 합치면 테스트가 복잡해지고 실패 원인 분석이 어렵다.
+   1) 정상 주문 생성 테스트    
+      단순히 주문이 정상적으로 저장되고 DTO가 잘 반환되는지 확인.
+      단순하고 예측 가능한 단건 테스트이다.
+      주문 1, 2건만 있는 단건 테스트로 충분하다. 
+      DTO 변환, 재고 차감, DB 저장 모두 확인 가능하기 때문이다.
+   2) 동시성 제어 테스트    
+      두 개 이상 요청이 동시에 들어왔을 때 재고 차감이 정상적으로 처리되는지 검증.    
+      멀티스레드와 멀티트랜잭션 환경에서 재고가 안전하게 처리되는지를 검증한다.
+      동시성 시뮬레이션용 다건 테스트가 필요하다.
+      핵심은 충돌 상황을 만들어내는 것이므로, 2~5건 정도면 충분하다.
+      너무 많으면 테스트 시간이 늘어나고, 오히려 실패 원인 분석이 힘들어진다.
+      적은 수치와 반복 횟수로 동시성 버그를 검증한다.
+
+2. 동시성 테스트 설계     
+   Thread, ExcutorService 등을 사용해 멀티스레드로 동시 주문 요청을 수행한다.    
+   재고가 충분한 상태에서 두 개 이상 요청이 동시에 들어오면, 재고가 0이하로 내려가지 않는지 확인한다.     
+
+3. 트랜잭션 락이 적용된 동적 JPQL 단위 테스트 불필요    
+   통합 테스트에서 조회 쿼리까지 포함해 검증 가능하다.
+   따라서 별도 단위 테스트로 JPQL 동작 검증을 수행할 필요는 없다.    
+   만약 쿼리 메서드에 복잡한 비즈니스 로직을 포함하거나 동적 조건 분기가 많다면,
+   Repository 단위 테스트를 작서앻 놓으면 문제를 빠르게 찾을 수 있다.
+
+
+### < 멀티스레드 환경에서 ArrayList에 데이터 저장 >
+1. 문제점    
+   멀티 스레드에서 ArrayList는 thread-safe 하지 않다.    
+   동시 접근 시 데이터가 꼬이거나 예외 발생이 가능하다. 
+   운이 좋으면 동작하고 아니면 값이 누락되거나, IndexOutOfBoundsException이 발생할 수 있다.
+
+2. 해결방법
+   1) thread-safe 컬렉션 사용   
+      가장 간단히 해결 가능한 방법이다.
+      ~~~
+      List<Long> orderIds = Collections.synchronizedList(new ArrayList<>());
+      ~~~
+   2) Concurrent 컬렉션 사용   
+      실무에서 선호하는 방법이다.
+      락을 신경쓰지 않아도 되지 않지만, 쓰기가 많으면 성능 측면에서 손해 볼 수 있다.
+      하지만 테스트라면 무시 가능한 측면이다.
+      ~~~
+      List<Long> orderIds = new CopyOnWriteArrayList<>();
+      ~~~
+   3) Future로 결과 수집    
+      가장 정석적인 방법이다.
+      결과 수집 구조가 가장 깔끔하고 동시성 컬렉션도 불필요하다.
+      또한 예외 처리도 명확해진다.
+      ~~~
+      List<Future<ResponseOrderDto>> futures = new ArrayList<>();
+
+      for (int i = 0; i < threadCount; i++) {
+         futures.add(executor.submit(() ->
+               orderService.createOrder(requestOrder, member)
+         ));
+      }
+   
+      for (Future<ResponseOrderDto> future : futures) {
+         orderIds.add(future.get().getOrderId());
+      }
+      ~~~
+
+
+---
+## 27. 테스트에서 @Transactional
+테스트에서 @Transactional 사용은 선택사항이지만, 통합 테스트에서는 보통 적용한다.
+- 라이브러리     
+  org.springframework.transaction.annotation.Transactional    
+  Spring AOP 기반 트랜잭션으로 전파 옵션, 격리 수전, rollback 규칙을 포함한다.
+  Spring Data JPA, 테스트, 프록시 전부 연동 가능하다.
+   jakarta에서 제공하는 것은 Spring에서 지원은 하지만 핵심 기능이 빠져 있으므로 사용하지 않도록 하자.   
+
+1. Service에서 @Transactional
+   - 비즈니스 동작 보장
+   - 더티체킹
+   - 락 유지
+   - 원자성 보장
+
+2. 테스트에서의 @Transactional
+   - 테스트 격리 (테스트 clean up 편의성 용으로 사용)
+   - 테스트 종료 시 자동 롤백으로 DB 정리하지 않아도 됨.
+
+3. 테스트에서 @Transactional과 비관적 락     
+   운영 코드에서 트랜잭션 락을 걸었다면, 테스트에서 @Transactional을 적용하면 안된다.     
+   테스트에서 @Transactional 적용하면 메서드 시작 시 하나의 트랜잭션, 하나의 커넥션을 가진다.   
+   내부에서 스레드를 아무리 나눠도 실제 DB 입장에서는 동일 트랜잭션이므로 락 경쟁 자체가 발생하지 않는다.
+   즉, 동시성 테스트가 구조적으로 불가능하게 된다.
+    
+4. 테스트에서 @Transactional과 Redis     
+   @Transactional은 Redis를 롤백해주지 않는다.
+   따라서 테스트에서 사용한 데이터는 직접 정리해야 한다.
+   @Transactional은 트랜잭션 매니저가 관리하는 리소스만 롤백하기 때문이다.
+   RDB 관련한 JPA, JDBC의 경우는 DataSourceTransactionManager가 관리하는 한다.
+   하지만 Redis는 트랜잭션이 관리하지 않는다.
+
+
+---
+## 28. 동시성 통합 테스트에서 @Transactional이 무시된 이유와 해결
+1. 발생 에러
+   member 테이블의  user_id 컬럼에 유니크 제약 조건이 있다.
+   동시성 테스트 실행 후 테스트 데이터가 롤백되지 않은 상태에서
+   다음 테스트에서 user_id = "customer"인 회원 insert를 다시 시도했다.
+   이 때 이미 존재하는 값이라 DB가 거부한다.
+   ~~~
+   could not execute statement
+   Duplicate entry 'customer' for key 'member.UK_user_id'
+   ~~~
+
+2. 에러 발생 원인
+   > 이번 에러의 원인은 멀티스레드 자체가 아니라,
+   Self-invocation으로 인해 @Transactional이 적용되지 않은 cleanup 로직에서
+   테스트 데이터가 정상적으로 삭제되지 않은 것이었다.
+
+   동시성 테스트에서 흔한 함정이다.   
+
+   멀티스레드 환경에서 주문 생성 로직이 실행되었고,
+   테스트 종료 후 데이터 정리를 위해 별도의 cleanup 메서드를 호출했지만,
+   해당 cleanup 로직이 트랜잭션 없이 실행되었다.
+
+   cleanup 메서드에는 @Transactional이 적용되어 있었으나,
+   같은 테스트 클래스 내부에서 직접 호출(Self-invocation)되었기 때문에
+   Spring 트랜잭션 프록시를 거치지 않았고, 트랜잭션이 실제로 시작되지 않았다.
+
+   그 결과 Member / Product / Order 데이터 삭제가 정상적으로 수행되지 않았고,
+   다음 테스트에서 동일한 userId로 회원 insert 시 UNIQUE 제약 오류가 발생했다.
+   
+   Spring 트랜잭션은 프록시 기반으로 동작한다.
+   따라서 같은 클래스 내부 메서드 호출 시 프록시를 타지 않으며
+   @Transactional은 무시된다.
+   ~~~
+   @Transactional
+   void cleanUpSavedDataForConcurrency(...) { 
+            orderRepository.deleteByIdIn(orderIds);
+            productRepository.deleteById(savedProduct.getId());
+            memberRepository.deleteById(savedMember.getId());
+   }
+   
+   @Test
+   @DisplayName("주문생성 성공 - 동시에 여러 주문 요청 시 옵션 재고 차감")
+   void createOrder_shouldDecreaseOptionStock_whenConcurrentlyOrderRequest() {
+       // ...
+       cleanUpSavedDataForConcurrency(orderIds, savedProduct, savedMember); 
+   }
+   ~~~
+
+3. 해결방법
+   cleanup 로직에서 @Transactional에 의존하는 방식을 제거하고,
+   트랜잭션을 명시적으로 시작할 수 있는 TransactionTemplate을 사용한다.
+
+   TransactionTemplate은 프록시 호출 여부와 무관하게
+   해당 지점에서 즉시 트랜잭션을 시작하므로
+   Self-invocation 문제를 회피할 수 있다.
+   
+   이를 통해 트랜잭션 경계가 코드상 명확해지고
+   cleanup 로직이 항상 트랜잭션 내에서 실행되며
+   테스트 종료 후 DB 상태를 확실하게 정리할 수 있다.
+   ~~~
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+   
+    /** 테스트 데이터 정리 */
+    void cleanUpSavedDataForConcurrency(List<Long> orderIds,
+                          Product savedProduct,
+                          Member savedMember) {
+        transactionTemplate.executeWithoutResult(status -> {
+            orderRepository.deleteByIdIn(orderIds);
+            productRepository.deleteById(savedProduct.getId());
+            memberRepository.deleteById(savedMember.getId());
+        });
+    }
+   
+   @Test
+   @DisplayName("주문생성 성공 - 동시에 여러 주문 요청 시 옵션 재고 차감")
+   void createOrder_shouldDecreaseOptionStock_whenConcurrentlyOrderRequest() {
+       // ...
+       cleanUpSavedDataForConcurrency(orderIds, savedProduct, savedMember); 
+   }
+   ~~~
+ 
+
+
 

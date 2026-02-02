@@ -20,7 +20,7 @@ public class ProductOption extends BaseEntity {
     @Column(nullable = false)
     private Long id;
 
-    @Column(nullable = false, length = 10)
+    @Column(nullable = false, length = 50)
     private String optionCode;
 
     @Column(nullable = false, length = 100)
@@ -35,7 +35,7 @@ public class ProductOption extends BaseEntity {
     private int quantity;
 
     @ManyToOne
-    @JoinColumn(name="productId") // 테이블 매핑 시 foreign key 지정
+    @JoinColumn(name="product_id") // 테이블 매핑 시 foreign key 지정
     private Product product;
 
 }

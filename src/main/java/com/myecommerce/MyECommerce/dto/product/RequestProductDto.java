@@ -16,7 +16,7 @@ import java.util.List;
 public class RequestProductDto {
 
     @NotBlank(message = "{validation.product.code.not.blank}")
-    @Size(min=1, max=100, message ="{validation.product.code.size}")
+    @Size(min=1, max=50, message ="{validation.product.code.size}")
     @Pattern(regexp = "^[a-zA-Z0-9][a-zA-Z0-9\\-]*$",
             message = "{validation.product.code.pattern}")
     private String code;

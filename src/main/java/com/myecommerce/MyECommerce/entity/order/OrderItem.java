@@ -77,7 +77,7 @@ public class OrderItem {
     }
 
     /** 주문 물품에 주문 객체 할당 **/
-    public void assignOrder(Order order) {
+   void assignOrder(Order order) {
         if (this.order != null) {
             throw new OrderException(ITEM_ALREADY_ORDERED);
         }

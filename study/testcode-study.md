@@ -72,6 +72,9 @@
 26. 동시성 통합 테스트
 27. 테스트에서 @Transactional
 28. 동시성 통합 테스트에서 @Transactional이 무시된 이유와 해결
+29. 도메인 테스트
+    - 도메인 테스트
+    - Order–OrderItem 관계의 불변식을 설계로 고정해 테스트하지 않음
 
 
 --- 
@@ -2863,4 +2866,73 @@ Docker 컨테이너로 진짜 Redis를 띄운다.
 2. 필수 테스트   
    1) validation 실패 테스트   
       도메인 정책이므로, 정책 실패 테스트는 필수이다.
+
+
+### < Order–OrderItem 관계의 불변식을 설계로 고정해 테스트하지 않음 >
+1. 문제점
+   orderItem.assignOrder(null)에서 Order 객체 재할당 시도를 위해 null을 전달한다. 
+   주문물품 없이 주문 객체 생성 불가하므로, Order는 설계적으로 빈 객체 생성을 막았기 때문이다.    
+
+   orderItem.assignOrder()는 이미 주문이 있으면 실패만 검증하면 된다.   
+   성공 케이스를 만들 수 있는 public API가 없기 때문이다.
+   그래서 null을 전달했다.
+   이는 테스트가 도메인 설계 한계를 드러낸 부분으로 볼 수 있다.
+   ~~~
+    @Test
+    @DisplayName("주문물품에 주문 할당 - 주문된 주문물품에 대해 주문 재할당 불가")
+    void assignOrder_shouldNotAssignOrderAtOrderItem_whenItemAlreadyOrdered() {
+        // given
+        // 주문 상품옵션
+        ProductOption option = productOption();
+        // 주문요청 상품옵션 수량
+        int orderQuantity = 3;
+        // 주문물품 생성
+        OrderItem orderItem = OrderItem.createOrderItem(option, orderQuantity);
+        // 주문 생성
+        Order.createOrder(List.of(orderItem), member()); // 주문물품에 주문 할당됨
+
+        // when
+        // then
+        OrderException e = assertThrows(OrderException.class, () ->
+                orderItem.assignOrder(null)); // 주문물품에 주문 재할당 시도
+        assertEquals(ITEM_ALREADY_ORDERED, e.getErrorCode());
+    }
+   ~~~   
+   
+2. 해결방법    
+   assignOrder()의 외부 호출을 막는다.   
+   메서드를 호출 가능한 클래스를 /order 패키지로 한정해  Order.createOrder()에서만 호출 가능하도록 변경하는 것이다.   
+   그러면 불변식은 설계로 보장 테스트를 굳이 하지 않아도된다.    
+   따라서 재할당 실패 테스트 자체를 제거해도 된다. 
+   상태 전이 불가는 설계로 증명되기 때문이다.
+   ~~~
+   void assignOrder(Order order) // package-private
+   ~~~
+
+   1) protected vs package-private    
+      - protected       
+        같은 패키지내에서 접근 가능하도록 제한하지만, 상속받은 외부 클래스에서도 호출 가능하므로 권장하지 않음.    
+        확장을 허용한다는 의미가 되어 '이 메서드는 Order만 써야 한다'는 의도가 상속 하나로 깨지게 된다.
+      - package-private
+        접근 제한자가 없는 경우로, 같은 패키지에서만 호출 가능하다.
+        DDD 관점에서 제일 자연스럽다. 
+   
+   2) 설계로 보장된다는 것의 의미     
+      현재 Order.createOrder 내부에서 orderItem.assignOrder(this)를 호출하고 있다.   
+      그리고 orderItem.assignOrder() 메서드를 package-private로 선언해 외부에서 호출 불가하게 막는다면, 
+      OrderItem은 이미 주문에 속한 상태로만 생성되게 된다.    
+      즉, OrderItem이 주문에 할당되는 유일한 경로가 Order.createOrder() 뿐이게 되는 것이다.   
+      이것은 설계로 보장된 상태로 본다.
+   
+   3) 설계로 보장되어 테스트가 필요 없다는 것의 의미     
+      테스트의 목적은 '이 코드가 깨질 가능성이 있는가?'를 확인하는 것이다.   
+      orderItem.assignOrder() 메서드를 package-private로 선언해 외부에서 호출 불가하게 막고, 
+      유일하게 Order.createOrder()를 통해서만 OrderItem에 주문 할당이 가능하다면 
+      성공 경로가 외부에서 조작 불가하고, 제공하는 public API로는 잘못된 상태를 만들 수 없다.
+      따라서 깨질 수 없는 구조는 테스트 대상이 아니다.     
+      불변식을 코드로 고정했기 때문이다.
+
+   4) 정상 동작의 증명    
+      정상 동작은 OrderEntity 테스트 하나면 충분하다.
+      assignOrder() 정상 동작은 재할당 불가 전체를 충족하게 되고 Order -> OrderItem 관계를 보장하게 된다.
 

@@ -6,7 +6,6 @@ import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.exception.OrderException;
-import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -25,7 +24,6 @@ public class OrderPolicy {
     private final static int ITEM_MAX_QUANTITY = 50; // 물품 당 최대 주문 수량
 
     private final ProductRepository productRepository;
-    private final ProductOptionRepository productOptionRepository;
 
     /** 주문 생성 정책 **/
     public void validateCreate(List<RequestOrderDto> orderItemList,
@@ -38,15 +36,17 @@ public class OrderPolicy {
         // 물품 중복 요청 거부
         validateDuplicatedItemRequestPolicy(orderItemList);
 
+        // 2. 도메인 규칙 검증 (서비스 로직 수행 가능한가?)
+        // 요청 물품별 최대 수량 제한
+        validateQuantityOfItemPolicy(orderItemList);
+
         // 도메인 규칙 검증 전 조회
         // 상품 ID 목록 생성
         List<Long> productIds = getProductIds(orderItemList);
         // 등록된 상품 ID 목록 조회
         List<Product> registeredProducts = productRepository.findByIdIn(productIds);
 
-        // 2. 도메인 규칙 검증 (서비스 로직 수행 가능한가?)
-        // 요청 물품별 최대 수량 제한
-        validateQuantityOfItemPolicy(orderItemList);
+        // 3. DB 조회 필요 도메인 규칙 검증
         // 등록된 상품 옵션 한정 주문 제한
         validateNotRegisteredProductOptionPolicy(
                 orderItemList, productIds, registeredProducts);

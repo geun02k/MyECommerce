@@ -65,10 +65,10 @@ class OrderTest {
         주문 객체 생성 Test
        ------------------ */
     @Test
-    @DisplayName("주문 객체 생성 성공 - 주문 생성 시 주문 물품 양방향 연관관계 설정 및 총액 계산")
+    @DisplayName("주문 객체 생성 성공 - 주문 객체 생성 시 주문 물품 양방향 연관관계 설정 및 총액 계산")
     void createOrder_shouldAssignOrderAndCalculateTotalPrice_whenValidItemsAndMember() {
         // given
-        // 주문 물품 목록
+        // 주문 상품옵션
         ProductOption registeredOption = ProductOption.builder()
                 .price(new BigDecimal("10000"))
                 .quantity(10)
@@ -76,7 +76,9 @@ class OrderTest {
                         .saleStatus(ON_SALE)
                         .build())
                 .build();
+        // 주문요청 상품옵션 수량
         int orderQuantity = 3;
+        // 주문 물품 목록
         OrderItem item = OrderItem.createOrderItem(registeredOption, orderQuantity);
         // 주문자
         Member member = member();
@@ -116,7 +118,7 @@ class OrderTest {
     }
 
     @Test
-    @DisplayName("주문 객체 생성 실패 - 판매 중이 아니면 주문 생성 불가")
+    @DisplayName("주문 객체 생성 실패 - 판매 중이 아니면 주문 객체 생성 불가")
     void createOrder_shouldNotCreateOrder_whenProductNotOnSale() {
         // given
         // 주문 물품 목록

@@ -35,6 +35,21 @@ class OrderTest {
         return OrderItem.createOrderItem(registeredOption, orderQuantity);
     }
 
+    /** 주문물품 생성 */
+    private OrderItem orderItem(String price, int orderQuantity) {
+        // 상품옵션 생성
+        ProductOption productOption =  ProductOption.builder()
+                .price(new BigDecimal(price))
+                .quantity(10)
+                .product(Product.builder()
+                        .saleStatus(ON_SALE)
+                        .build())
+                .build();
+
+        // 주문물품 생성
+        return OrderItem.createOrderItem(productOption, orderQuantity);
+    }
+
     /** 고객 생성 */
     Member member() {
         return Member.builder()
@@ -80,6 +95,24 @@ class OrderTest {
 
         assertEquals(order, resultOrderItem.getOrder()); // 연관관계 검증
         assertEquals(new BigDecimal("30000"), order.getTotalPrice()); // 금액 계산 로직 검증
+    }
+
+    @Test
+    @DisplayName("주문 객체 생성 성공 - 주문 객체 생성 시 여러 주문물품의 금액은 합산")
+    void createOrder_shouldCalculateTotalPrice_whenOrderItemsRequest() {
+        // given
+        // 주문자
+        Member member = member();
+        // 주문 물품 목록
+        OrderItem item1 = orderItem("10000", 3); // 10,000 * 3 = 30,000
+        OrderItem item2 = orderItem("1000", 5); // 1,000 * 5 = 5,000
+
+        // when
+        Order order = Order.createOrder(List.of(item1, item2), member);
+
+        // then
+        // 금액 계산 로직 검증
+        assertEquals(new BigDecimal("35000"), order.getTotalPrice());
     }
 
     @Test

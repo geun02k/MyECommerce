@@ -25,7 +25,7 @@ public class Product extends BaseEntity {
     @Column(nullable = false)
     private Long seller;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 50)
     private String code;
 
     @Column(nullable = false, length = 200)

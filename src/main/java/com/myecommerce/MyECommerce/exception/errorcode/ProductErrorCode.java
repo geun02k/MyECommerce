@@ -22,6 +22,8 @@ public enum ProductErrorCode implements CommonErrorCode {
             "error.product.option.code.already.registered"),
     PRODUCT_OPTION_CODE_DUPLICATED(HttpStatus.BAD_REQUEST.value(),
             "error.product.option.code.duplicated"),
+    OPTION_PRICE_NOT_POSITIVE(HttpStatus.BAD_REQUEST.value(),
+            "error.product.option.price.not.positive"),
 
     // 상품수정 validation check
     PRODUCT_EDIT_FORBIDDEN(HttpStatus.FORBIDDEN.value(),

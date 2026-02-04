@@ -5,13 +5,12 @@ import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
-@Repository
-public interface ProductOptionRepository extends JpaRepository<ProductOption, Long> {
+public interface ProductOptionRepository extends JpaRepository<ProductOption, Long>,
+                                                 ProductOptionRepositoryCustom {
     // 상품의 옵션코드목록에 대한 옵션 목록 조회
     @Query(" SELECT PRD " +
             " FROM Product PRD" +
@@ -36,4 +35,7 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
 
     // 상품ID에 해당하는 옵션 목록 조회
     List<ProductOption> findByProductId(Long productId);
+
+    // 품절된 상품 옵션 목록 조회
+    List<ProductOption> findByProductIdInAndQuantity(List<Long> idList, int quantity);
 }

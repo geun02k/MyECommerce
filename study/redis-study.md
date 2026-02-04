@@ -33,6 +33,7 @@ https://docs.spring.io/spring-data/redis/reference/redis.html?utm_source=chatgpt
 9. Redis 멀티 조회 방법
    - 장바구니 상품에 대한 재고 조회
    - Redis MGET 전달 키 수 제한 확인
+10. Redis 멀티 재고 등록
 
 
 ---
@@ -972,4 +973,40 @@ Redis는 캐시 서버가 아닌 인메모리 데이터 플랫폼이다.
         성능에 영향이 있는 경우는, RTT가 큰 환경, 응답이 수 MB 이상인 경우, 호출 빈도가 초당 수천 이상인 경우이다.
         애플리케이션 레벨에서 직접 확인할 필요는 거의 없지만, 필요하면 wireshark로 확인. (실무에선 거의 안씀)
 
+
+---
+## 10. Redis 멀티 재고 등록   
+1. multiSet()    
+   멀티 저장 방식.
+   1) 장점
+      - Redis 접근을 최소화 해 한번에 데이터를 올리기 때문에 효율적.
+   2) 확인할 점
+      - 동시성 처리    
+        동시에 여러 주문일 들어와서 같은 옵션 재고를 업데이트 가능하다면, Redis단에서 INCRBY / DECRBY 같은 원자 연산을 쓰는 것이 안전.
+        set을 사용하는 경우, 다른 프로세스가 재고를 먼저 감소시키면 마지막 set한 값으로 덮어씌워질 수 있음.
+      - Redis 저장 실패 시 어떻게 할지 정책 필요   
+        트랜잭션을 롤백할 것인지, 실패 로그를 기록할 것인지 결정 필요.    
+        현재 실패 정책은 없지만, redis에 저장되는 재고는 캐시 데이터로 로그 정도를 기록하는 거 나쁘지 않은 것 같다.
+        검토 필요.   
+      - 키값 null 체크      
+        키값이 null 가능성이 있다면, 키 생성 전에 null 방어 로직 필요.
+      - Redis 캐시가 DB보다 최신임을 항상 보장할 수 없어 캐시 만료 정책이나 캐시 미스 시 유 fallback 로직 필요.
+2. INCRBY / DECRBY   
+   Redis에서 key의 value를 현재값에서 원자적으로 증가/감소.    
+   원자성이 보장되어 여러 클라이언트가 동시에 값을 수정해도 안전.
+   1) 키가 없으면 자동 생성   
+      호출 시 키가 없으면 0부터 시작.
+   2) 부정적 재고 방지
+      DECRBY만 사용 시 value가 음수가 될 수 있음.
+      DB 동기화되어 있다면, DB 검증 후 Redis 감소하는 것이 안전.
+   3) 동시성
+      Redis 단에서는 안전하지만, DB와 동기화가 필요하면 DB 트랜잭션 -> REdis 갱신 순으로 처리해야 함.
+   ~~~ 
+    // 재고 2 감소
+    Long remainingStock = redisTemplate.opsForValue().decrement(redisKey, 2);
+    // 재고 5 증가
+    Long newStock = redisTemplate.opsForValue().increment(redisKey, 5);
+   ~~~
+   
+      
    

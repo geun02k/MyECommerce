@@ -15,7 +15,7 @@ public class RequestModifyProductOptionDto {
     private Long id;
 
     @NotBlank(message = "{validation.product.option.code.not.blank}")
-    @Size(min=1, max=100, message = "{validation.product.option.code.size}")
+    @Size(min=1, max=50, message = "{validation.product.option.code.size}")
     @Pattern(regexp = "^[a-zA-Z0-9][a-zA-Z0-9\\-]*$",
             message = "{validation.product.option.code.pattern}")
     private String optionCode;

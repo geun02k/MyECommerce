@@ -22,6 +22,24 @@ public class RedisMultiDataService {
 
     private final RedisSingleDataService redisSingleDataService;
 
+    /** Redis 데이터 원자적 감소 (기존 값에서 특정 수 감소) **/
+    public Long decrementData(RedisNamespaceType nameSpace,
+                              String key,
+                              Long decrementValue) {
+        return redisTemplate.opsForValue().decrement(
+                redisSingleDataService.setKey(nameSpace, key), decrementValue);
+    }
+
+    /** Redis 데이터 목록 삭제 **/
+    public Long deleteMultiData(List<String> keyList) {
+        return redisTemplate.delete(keyList);
+    }
+
+    /** Redis 데이터 목록 저장 **/
+    public void saveMultiData(Map<String, Object> dataMap) {
+         redisTemplate.opsForValue().multiSet(dataMap);
+    }
+
     /** Redis 데이터 목록 조회 **/
     public List<Object> getMultiData(List<String> keyList) {
         return redisTemplate.opsForValue().multiGet(keyList);

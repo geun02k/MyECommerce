@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.*;
@@ -58,6 +59,7 @@ class ProductPolicyTest {
         return ServiceProductOptionDto.builder()
                 .id(null)
                 .optionCode(optionCode)
+                .price(BigDecimal.valueOf(1000))
                 .build();
     }
 
@@ -92,6 +94,7 @@ class ProductPolicyTest {
         ServiceProductOptionDto option = ServiceProductOptionDto.builder()
                 .id(null)
                 .optionCode("optionCode")
+                .price(BigDecimal.valueOf(1000))
                 .build();
         ServiceProductDto production = ServiceProductDto.builder()
                 .id(null)

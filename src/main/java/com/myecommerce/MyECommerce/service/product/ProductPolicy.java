@@ -11,6 +11,7 @@ import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -33,6 +34,8 @@ public class ProductPolicy {
                 member.getId(), productDto.getCode());
         // 옵션 최소 1건 필수 검증
         enforceAtLeastOneOptionPolicy(productDto.getOptions());
+        // 가격은 양수로 제한
+        enforceOptionPricePositivePolicy(productDto.getOptions());
         // 상품옵션목록 중복체크 정책
         enforceOptionCodeUniquenessPolicy(
                 productDto.getCode(), productDto.getOptions());
@@ -62,6 +65,18 @@ public class ProductPolicy {
             List<ServiceProductOptionDto> options) {
         if(options == null || options.isEmpty()) {
             throw new ProductException(OPTION_AT_LEAST_ONE_REQUIRED);
+        }
+    }
+
+    // 가격 제한 정책
+    private void enforceOptionPricePositivePolicy(List<ServiceProductOptionDto> options) {
+        // 가격이 양수가 아니면 예외 발생
+        boolean hasNonPositive = options.stream()
+                .anyMatch(option ->
+                        option.getPrice().compareTo(BigDecimal.ZERO) <= 0);
+
+        if (hasNonPositive) {
+            throw new ProductException(OPTION_PRICE_NOT_POSITIVE);
         }
     }
 

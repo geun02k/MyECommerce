@@ -7,11 +7,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
-@Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
     // 판매자의 동일 상품코드 조회
     Optional<Product> findBySellerAndCode(long id, String code);
@@ -21,6 +20,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     // 상품코드에 일치하는 판매중인 상품 조회
     Optional<Product> findByCodeAndSaleStatus(String code, ProductSaleStatusType status);
+    // 상품ID 목록에 일치하는 판매중 외 상품 목록 조회
+    List<Product> findByIdInAndSaleStatusNot(List<Long> idList,
+                                             ProductSaleStatusType status);
+
+    // 상품 ID 목록 조회
+    List<Product> findByIdIn(List<Long> idList);
 
     // keyword를 포함하는 상품목록조회 - 최신등록순
     Page<Product> findByNameLikeAndSaleStatusAndCategoryOrderByCreateDt(

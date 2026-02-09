@@ -6,9 +6,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
     // 주문에 대한 결제 내역 조회
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<Payment> findLockedAllByOrderId(Long orderId);
+
+    Optional<Payment> findByPgTransactionId(String pgTransactionId);
 }

@@ -18,4 +18,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Order> findLockedByIdAndOrderStatus(Long id, OrderStatusType orderStatus);
 
+    // 생성된 상태의 주문 조회
+    Optional<Order> findByIdAndOrderStatus(Long id, OrderStatusType orderStatus);
+
 }

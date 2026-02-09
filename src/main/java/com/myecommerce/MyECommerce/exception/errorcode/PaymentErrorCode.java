@@ -32,7 +32,11 @@ public enum PaymentErrorCode implements CommonErrorCode {
     PAYMENT_AMOUNT_INCONSISTENCY(HttpStatus.INTERNAL_SERVER_ERROR.value(),
             "error.payment.amount.inconsistency"),
     PAYMENT_ALREADY_COMPLETED(HttpStatus.CONFLICT.value(),
-            "error.payment.already.completed")
+            "error.payment.already.completed"),
+    PG_TRANSACTION_ID_NOT_EXISTS(HttpStatus.BAD_REQUEST.value(),
+            "error.payment.pg.transaction.id.not.exists"),
+    PAYMENT_NOT_APPROVED(HttpStatus.CONFLICT.value(),
+            "error.payment.not.approved")
     ;
 
     private final int statusCode;

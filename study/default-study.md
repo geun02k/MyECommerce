@@ -3518,6 +3518,10 @@ log.info("PAYMENT_START orderId={}", orderId);
       );
       ~~~
 
+### < 웹훅 >
+웹훅(Webhook)은 “다른 서버가 우리 서버에게 특정 이벤트 발생을 알려주기 위해 보내는 HTTP 요청.
+우리가 요청한 결과를 비동기로 받는 통로.
+
 
 ### < PG 웹 훅 응답 안정성 체크 >
 1. 웹훅 중복 수신 처리 
@@ -3677,5 +3681,38 @@ PG 승인 성공해 payment 수정이 완료되었는데 order.paid()에서 예�
         @Transactional(propagation = REQUIRES_NEW)
         public void b() { }
     }
+   ~~~
+
+
+### < 도메인 책임 분리 >
+isDuplicatedPgWebHookRequest()는 Payment Entity의 책임이 아니다.
+하지만 Payment가 “종결 상태인지”를 판단하는 로직 자체는 Payment Entity로 이동하는 게 맞다.
+즉, ***판단 기준은 엔티티, 웹훅 중복 처리라는 행위는 서비스 책임***이다.
+1. 문제 코드   
+   Payment 엔티티: “내 상태가 종결인지”만 알게 한다.    
+   PaymentStatus의 종결 개념이 서비스에 흩어짐.
+   다른 곳에서도 같은 조건이 필요해질 가능성 큼.
+   ~~~
+   private boolean isDuplicatedPgWebHookRequest(PaymentStatusType paymentStatus) {
+      return paymentStatus == APPROVED
+          || paymentStatus == CANCELED
+          || paymentStatus == FAILED;
+   }
+   ~~~
+2. Service: “웹훅을 무시할지”를 결정한다
+   나중에 EXPIRED, TIMEOUT 같은 상태 추가돼도 Payment만 수정하면 되므로 정책 변경에 강해진다.
+   ~~~
+    // Payment Entity 코드
+    public boolean isTerminal() {
+       return this.paymentStatus == APPROVED
+            || this.paymentStatus == CANCELED
+            || this.paymentStatus == FAILED;
+    } 
+   ~~~
+   ~~~
+   // 서비스 코드
+   if (payment.isTerminal()) {
+      return;
+   }
    ~~~
 

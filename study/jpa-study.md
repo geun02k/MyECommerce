@@ -1770,3 +1770,23 @@ Spring Data JPA 내부에서 Repository 인터페이스를 스캔해 프록시 �
 인터페이스에 붙여도 에러는 발생하지 않고 정상 동작은 한다.
 하지만 굳이 안 붙이는 이유는, 중복 의미를 제거하고 개발자가 만든 구현체인지 Spring Data JPA 리포지토리인지 헷갈림을 유발하므로 제거가 권장된다.
 
+
+---
+## 23. repository Lock 유무에 따른 동일한 조회 메서드   
+JPA 메서드 이름에 ForUpdate 같이 지원하지 않는 용어를 붙여서 사용해도 된다.
+아무 효과도 없기 때문에 JPA 동작에 영향이 없다.
+따라서 아래의 두 repository 메서드는 완전히 동일한 쿼리를 반환한다.
+메서드명은 의미 표현용일 뿐이다.
+그래서 관례적으로 사람에게만 의미를 주는 이름을 쓰는 것이지 JPA가 인식하는 건 아니다.
+1. JPA가 메서드 이름을 해석하는 규칙     
+   findBy, Id, And, OrderStatus 외 나머지는 메서드 이름으리 꼬리표일 뿐이다.    
+   단, Top, First, Distincy 같은 경우는 JPA 키워드로 의미가 있으므로 꼬리표로는 사용하지 않도록 한다.
+~~~
+// 락 없음 (조회용)
+Optional<Order> findByIdAndOrderStatus(Long id, OrderStatusType status);
+
+// 락 있음 (상태 변경용)
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+Optional<Order> findByIdAndOrderStatusForUpdate(Long id, OrderStatusType status);
+~~~
+

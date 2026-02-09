@@ -3093,3 +3093,589 @@ Entity의 책임
 3. 컬렉션 Setter 차단
    외부에서 items를 통째로 교체 불가하도록 제거.
 
+
+---
+## 28. DDD Entity
+- 참조: Order.java / OrderItem.java    
+상태, 행위, 규칙, 불변식(invariant) 을 Entity 스스로 가지고 있는 모델.    
+Aggregate Root로서 책임을 가진 Entity.      
+하위 Entity의 생명주기 관리, 연관관계의 진입점, 상태 기반 규칙의 중심이면 Aggregate Root 역할을 수행한다.   
+<br>
+Order는 JPA Entity이면서 동시에 도메인 규칙을 캡슐화한 Aggregate Root이다.
+Service는 흐름만 조율하고, 실제 규칙은 Entity가 스스로 지키도록 설계 가능하게 한다.
+
+1. 생성 경로가 통제됨.    
+   외부에서 마음대로 new/builder 불가.    
+   Entity의 주문 생성 규칙을 거치지 않으면 객체 생성 불가.     
+   생성자를 제거하고 팩토리 메서드롤만 생성 가능하게 함.     
+2. 생태 변경 지점이 제한.    
+   객체가 생성된 후 무분별한 변경을 차단해 불변성에 가까운 구조로 만듦.   
+   setter를 제거하고, 필요한 경우는 별도의 메서드 제공.   
+3. 비즈니스 의미 있는 로직(도메인 규칙)을 Entity가 가짐.    
+   예를 들면 총 금액 계산, 연관관계 설정 같은 도메인 규칙을 가진다.   
+4. 상태 전이 가능여부 판단 및 상태 기반 행위    
+   상태를 가진 객체가 자기 상태 변경 가능 여부를 판단해 변경 해야한다.
+   자기 자신의 상태만 보고 판단 가능한 도메인 규칙에 한정해 책임을 가진다.   
+   1) Policy의 책임
+      - 생성 이전 검증
+      - 외부 리소스(DB, 다른 Aggregate) 기반 검증
+      - “이 요청을 받아도 되는가?”
+   2) Entity의 책임
+      - 생성 이후 상태 검증
+      - 상태 전이 가능 여부 판단
+      - 자기 불변식 유지
+
+
+---
+## 29. 생성자 접근 제한 (JPA, Lombok)
+JPA Entity에서는 기본 생성자가 반드시 필요하다.
+생성자가 없다면 JPA가 Entity를 리플렉션으로 생성할 수 없다.
+프록시 생성 실패하고 런타임 오류로 Entity 로딩이 불가하게 된다.
+JPA는 protected 기본 생성자를 호출하고 프록시 생성에도 문제가 없다.
+
+1. 기본생성자 protected로 제한    
+   - 애플리케이션 코드에서 기본 생성자 호출 불가, 동일 패키지 내에서도 직접 생성 불가.
+   - JPA(Hibernate)는 리플렉션으로 접근 가능해 프록시 생성 문제 없음.
+   - JPA 스펙 상 private 기본 생성자는 허용하지 않기 때문에 공식적으로 안전한 선택은 protected이다.
+   ~~~
+    @Entity
+    @Getter
+    @Builder(access = AccessLevel.PRIVATE)
+    @NoArgsConstructor(access = AccessLevel.PROTECTED)  // 프레임워크(JPA)만을 위한 생성자
+    public class Order {
+    
+        // fields...
+    
+        public static Order createOrder(...) {
+            ...
+        }
+    }   
+   ~~~
+
+2. AllArgsConstructor private으로 제한    
+   AllArgsConstructor 제거 시 Builder에 오류발생.
+   Lombok Builder가 기대하던 생성자가 사려졌기 때문이다.
+   @Builder는 내부적으로 생성자를 호출해 객체를 생성한다. 
+   따라서 호출할 생성자가 없으면 컴파일 에러가 발생한다.
+   팩토리 메서드를 제공해 그 외 생성을 제한 시 만약 빌더를 사용하지 않는다면, 
+   빌더와 함께 제거 가능하다.   
+
+
+
+---
+## 30. DDD Entity
+1. DDD Entity와 상수    
+   Entitypd 정책, 설정 상수는 두면 안된다.
+   하지만 불변식은 Entity가 가져야 한다.
+   '최소 수량=1' 같은 불변식은 Entity에 상수로 존재해도 괜찮다.    
+   private static final 필드는 JPA Entity 생성.영속화에 아무런 영향도 주지 않는다.
+   JPA는 기본적으로 static 필드는 아예 무시하고 인스턴스 필드만 매핑 대상으로 보기 때문이다.
+   따라서 Entity 생성과 상수 필드 선언은 무관하다.    
+   
+
+2. DDD Entity 메서드 전달인자
+   Order가 자연스럽게 다룰 수 있는 대상은 OrderItem, 그 안에 연결된 Product, ProductOption 같은 것들이다.
+   productid 목록 같은 primitive 값들은 도메인을 벗어난 표현이다.
+   Entity가 primitive 집합으로 사고하기 시작하면 절차적 코드가 된다.    
+   Order Entity의 검증은 내가 가진 OrderItem 상태를 기준으로 해야한다.
+   따라서 items 자체에서 정보를 직접 꺼내 검증하는 게 맞다.    
+   ID 같은 특정 정보를 추출해 메서드 파라미터로 전달하는 것은 정보 손실이다.    
+   수량, 옵션, 아이템 단위의 의미는 전부 사라지고 식별자 목록만 남는다.
+   이는 'Order 입장에서 무엇을 주문했는지' 라는 의미가 사라지게 된다.     
+   알고리즘 최적화 관점에서 특정 값을 추출해 전달하는 것은 옳은 판단일 수 있다.
+   하지만, Entity에서 이렇게 집계용 데이터 쿠조를 만들기 시작하면, 검증 로직이 상태 기반이 아닌 구조 기반이 된다.
+   즉, 도메인 언어가 아니라 알고리즘 언어가 되는 것이다.
+
+3. 상태 변경과 데이터 변경     
+   상태 변경 + 데이터 변경을 한 메서드로 묶는 게 도메인적으로 더 안전.   
+
+
+---
+## 30. 중첩 반복문으로 인한 시간복잡도 O(R^2*O) 문제해결
+- 메모리에서 조회 최적화와 Map
+
+---
+## @Transactional과 private
+@Transactional 적용 시 private 선언이 안됨.
+
+---
+## 인터페이스 메서드의 접근 제한자
+public 쓸 필요 없나?
+
+---
+## 결제 설계
+### < 결제 설계 >
+1. 주문 중심 모델
+    - 결제 상태 서진
+    - 주문은 결과를 책임진다.
+2. 정책 명확
+    - 결제 단독 취소는 없다.
+      주문 취소는 곧 결제 취소로 이어진다.    
+      해당 전제로 API 설계가 단순해지고 예외 케이스가 감소한다.
+3. PG 결제 흐름    
+   1) 결제 요청 (PG 결제 세션 생성)    
+      사용자가 결제하기 클릭 시 PG 결제창이 호출되며 아직 승인되지 않고 PG 결제 요청만 된 상태이다.
+      결제 프로세스를 시작했다는 정도까지만 책임진다.   
+      PG API 호출 시 요청의 결과로 트랜잭션 ID, redirect URL만 응답해준다.
+      PG 결제 세션 생성 후 사용자가 실제로 결제할지, 카드 인증이 성공할지, 중간에 결제 창을 닫을지 알 수 없기 때문이다.
+      따라서 결제 금액 등을 반환하지 않는다.    
+      반면 트랜잭션 ID는 결제 세션 식별자로 PG 내부의 결제 흐름을 추적하기 위한 ID이다.
+      우리 서버와 PG, 웹훅의 연결 키로 응답으로 반환한다.    
+      리다이렉션 URL은 PG 결제의 UX 구조 때문에 응답으로 반환해준다.
+      PG가 제공하는 결제창으로 이동시켜야 하고, 결제가 끝나면 우리 서비스로 보내야 하므로 전달한다.
+      하지만, URL 응답을 신뢰할 수는 없다. 사용자가 직접 URL 조작 가능, 성공 페이지로 강제 이동 가능, 중간에 끊어도 이동 가능하기 때문이다.
+      따라서 리다이렉션 결과로 주문과 결제 상태를 변경하면 안되고 단순히 UI 처리용으로만 사용해야 한다.    
+      결제 row를 먼저 저장하는 이유는, PG가 비동기 웹훅을 빠르게 쏘는 경우를 대비하기 위해서이다.   
+   2) 프론트는 리다이렉트 / 응답 (사용자 결제 진행)    
+      PG에서 성공 페이지로 리다이렉트한다.
+      단 위조가 가능해 신뢰 불가하다.
+      이게 PG 결제 요청 시 받는 결과이다.    
+   3) 외부 서버 -> 우리 서버로 PG 웹 훅 (결제 승인 확정) 
+      PG가 우리 서버로 직접 승인 결과를 통지해준다.
+      유일하게 신뢰 가능한 승인 시점으로, 해당 단게에서 주문 결제 상태가 확정되어야 한다.
+      - 결제 요청 시 IN_PROGRESS로 결제상태 변경
+      - PG 응답 시 상태변경 X
+      - PG 웹 훅 요청 시 APPROVED / FAILED로 결제상태 변경
+
+4. 현재의 결제 요청 구조 개선 방법    
+   1) createPayment() 전체가 하나의 트랜잭션으로 설정해, 
+      requestPayment()는 실제로는 TX 밖에서 실행되도록 분리한다. (프록시/구조로 해결)
+      ~~~
+       @Transactional
+       public void createPayment(...) {
+           Payment payment = insertPayment(...);
+           PgResult result = pgClient.requestPayment(payment);
+           payment.assignPgTransactionId(result.getPgTransactionId());
+       }
+      ~~~ 
+   2) 웹훅 처리 테이블 별도 생성    
+      트랜잭션 아이디로 Payment를 조회해 없으면 PendingWebhook 테이블에 저장하고 나중에 매칭해 보정한다.
+   3) 트랜잭션 ID와 우리 서버 결제 식별자 분리     
+      우리가 만드는 결제 식별자를 먼저 만든다.
+      그리고 그걸 PG에 넘겨서 연결고리로 쓴다. 
+
+
+### < 외부 PG API로 결제 요청 >
+1. 외부 API 요청 로직이 포함되어있는 서비스에서 @Transactional    
+   - PG 요청이 외부 IO라서 트랜잭션에 묶기 싫은 경우
+     1) 결제 시작 시 상태 먼저 저장    
+        payment를 먼저 생성해 save + flush 한다.
+     2) PG 요청을 한다.     
+        트랜잭션 밖에서 PG 호출.
+     3) PG 결과 반영을 별도 트랜잭션으로 명확히 분리한다.
+   ~~~
+    public void startPayment(...) {
+        Payment payment = createPayment(...); // @Transactional 적용
+    
+        PgResult pgResult = pgClient.requestPayment(payment); // 외부 API 호출로 @Transactional 미적용
+    
+        payment.startPaymentRequest(pgResult); // @Transactional 적용
+    }
+   ~~~
+
+2. READY와 IN_PROGRESS 상태 사이에 외부 PG API 호출 전 상태가 추가적으로 필요한 이유
+   > 도메인 전제가 즉시호출 + 즉시 응답이라면 READY 하나로 충분히 논리적이다.
+   > 다만, 이는 운영 리스크를 버린 선택이라는 것을 알아야 한다.
+
+   READY 상태만으로 PG 호출 전 상태임이 충분히 표현되지 않는다.
+   개념적인 도메인 정의상으로 READY는 결제 생성되어 아직 승인되지 않은 상태이다.
+   따라서 PG 호출 전 상태로 해석될 여지가 있다.
+   이는 ***READY 상태의 의미가 두가지***가 되는 것을 의미한다.
+   PG를 아직 호출하지 않았다는 의미와, PG를 호출했지만 결과 반영 실패를 의미한다.
+   이 두 상태를 DB 상으로 구분 불가하게 된다.
+   ***이 둘을 구분하지 못하면 재시도 로직 작성 불가, 관리자 수동 처리 불가, 중복 결제의 위험이 있다.***    
+   따라서 외부 시스템을 건드렸는지 여부는 다른 상태로 남기는 것이 좋다.     
+   단, PG 로직이 DB 트랜잭션과 동일한 원자성으로 rollback 가능한 로직이라면 그때는 READY 하나의 상태로 충분하다.
+   하지만 PG는 그게 불가능한 영역이다.
+   그럼에도 불구하고 도메인 정책이 즉시 PG 호출 및 즉시 응답을 전제로 한다면
+   중간 상태값은 필수가 아니다.
+   위에서 이야기하는 것은 일반적인 결제 시스템의 안전 장치를 말하는 것이다.
+   현재 내 구조에서는 Payment 생성하는 같은 유스케이스 안에서 반드시 PG 요청이 이뤄지고 응답을 받아야 다음 상태로 갈 수 있다.
+   이런 흐름이라면, PG 요청했지만 응답을 못 받은 상태를 다시 다룰 필요가 없다.
+   하지만 서버 크래시, GC 스톱, 배포 중 종료, 네트워크 타임아웃, PG 응답 지연 중 하나라도 고려하면 REQUESTING 상태가 추가적으로 필요하다.
+   
+   1) 문제의 코드     
+      1. PG API 호출 성공 시 PG는 결제 시작.
+      2. PG API 호출 후 서버가 다운되면, PG API 호출되었음에도 
+         DB 상태는 IN_PROGRESS로 변경되지 못하고 여전히 READY.
+      3. 반면 ***실제 상태는 PG 결제 진행 중으로 PG 진행 상와 DB의 상태가 어긋나게 된다.***
+      ~~~
+       public void startPayment() {
+           Payment payment = createPayment(); // save (READY)
+           PgResult pgResult = pgClient.requestPayment(payment); // 외부 API
+           payment.startPaymentRequest(pgResult); // IN_PROGRESS
+       }
+      ~~~
+     2) 안전한 구조로 수정    
+        외부 API 호출 전, 후 상태를 DB에 남긴다.
+        1. PG API 호출 전 READY 후, IN_PROGRESS 전인 다른 상태를 저장.
+        2. PG API는 트랜잭션 밖에서 호출.
+        3. PG API에 결제 요청 후 결제 진행중인 최종 상태 IN_PROGRESS 반영. 
+    
+3. 트랜잭션 경계의 문제 (사실 아직 잘 모르겠다.)    
+   아래는 메서드별로 트랜잭션이 쪼개져 있고, 중간에 PG 호출이 끼어있다.
+   만약, PG 호출은 성공했으나, 추후 DB 업데이트가 실패한다면 결제는 됐는데 DB는 반영이 안 된 상태가 발생 가능하다.    
+   따라서 PG 호출을 트랜잭션 안에 두는 건 논쟁의 여지가 있지만, 최소한 결제 결과 반영은 하나의 트랜잭션으로 묶어야 한다.
+   startPayment()에 @Transactional을 거는 것이다.
+   실무에서는 ***비동기와 웹훅으로 더 분리한다.***
+   ~~~
+   public void startPayment(...) {
+      Payment payment = insertPayment(); // @Transactional
+      PgResult pgResult = requestPaymentAtPg(payment); // 외부 호출
+      setPayment(payment, pgResult); // @Transactional
+   }
+   ~~~
+
+4. PG 요청 실패 시 IN_PROGRESS로 가지 않고 재시도 가능하도록 처리    
+   1) 수정을 최소화하는 방법
+      복잡한 재시도 정책이 없는 경우 결제 Entity 생성과 PG 결제 요청을 분리하지 않고 하나의 APi에서 호출가능.
+      ~~~
+       public void startPayment(RequestPaymentDto requestPaymentDto,
+                             Member member) {
+           // 1. 정책검증 / 결제 Entity 반환
+           Payment payment = createPayment(requestPaymentDto, member); // 결제상태 READY
+
+           try {
+               // 2-1. PG 결제대행사에 결제 요청
+               PgResult pgResult = pgClient.requestPayment(payment);
+               // 2-2. 결제 도메인에 PG 요청 결과 반영 (결제번호, 결제상태 셋팅)
+               updatePaymentToInProgress(payment, pgResult);
+
+           } catch (Exception e) {
+               // READY 유지 (의도적으로 아무 것도 안 함)
+               throw e;
+           }
+       }
+      ~~~
+   2) Payment 객체 생성, PG 요청 API 분리   
+      > 결제 Entity(READY)를 먼저 생성하고,
+        그 ID를 기준으로 PG 결제 생성 API를 호출한 뒤,
+        컨트롤러 응답으로 “PG 결제창 리다이렉트 정보”를 내려준다.
+   
+      결제 버튼 클릭 시 POST /payment -> POST /payment/{id}/request -> PG 결제창 다이렉트 수행.    
+      프론트에서 한 번의 클릭했지만 서버에서는 내부적으로 두 단계를 수행한다.   
+      1. API 분리 이점
+         PG 요청 실패 시 복구 가능.
+         READY 상태가 남아있으므로, 다시 호출해 결제 재시도 가능 등.
+         
+
+### < Service, Payment, Order 책임분리 >
+1. Service     
+   흐름 담당.    
+   Service가 금액 검증, PG 결과 해석, 상태 결정, Entity 수정 등 결제 승인 로직을 알지 못하게 해야한다.
+   Service가 결제 로직을 아는 순간 Payment Entity는 데이터 덩어리가 되고,
+   Service는 도메인 로직 집합소가 된다.   
+2. Payment Entity    
+   결제 상태, 금액 검증
+3. Order Entity    
+   주문 상태 전이 규칙 검증    
+
+~~~
+// 기존에 Service 내에서 호출하는 결제 관련 로직
+// Service 로직에서 3개의 메서드 생성 및 호출 필요.
+public void approve(PgResult pgResult) {
+    validateAmount(pgResult);
+    setPgResult(pgResult);
+    this.paymentStatus = PaymentStatusType.APPROVED;
+}
+
+public void fail(PgResult pgResult) {
+    setPgResult(pgResult);
+    this.paymentStatus = PaymentStatusType.FAILED;
+}
+
+private void validateAmount(PgResult pgResult) {
+    if (this.order.getTotalPrice().compareTo(pgResult.getPaidAmount()) != 0) {
+        throw new PaymentException(PAYMENT_AMOUNT_INCONSISTENCY);
+    }
+}
+~~~
+~~~
+// 위 메서드를 Payment Entity로 이전하면 아래와 같이 서비스가 단순해짐
+// 결제는 어떻게 승인되는지를 결정하는 건 Payment의 책임이다.
+if (pgResult.isSuccess()) {
+    payment.approve(pgResult);
+} else {
+    payment.fail(pgResult);
+} 
+~~~
+
+
+### < Order 상태변경 트리거 Payment >
+Payment가 Order 상태 변경을 트리거하는 게 자연스럽다.
+결제가 원인으로 도메인 이벤트를 발생시킨다는 것을 보여준다. 
+결제로 인해 주문이 바뀐다는 표현을 한다.
+
+1. Order 상태 변경    
+   Payment에서 Order 상태 변경을 직접 호출하는 것은 강결합을 발생시킨다.   
+   Aggregate 간 협력은 SErvice에서 조율하는 것이 DDD적으로 깔끔한 방법이다.    
+   Payment 도메인에서 Order 상태 변경을 하지말고 
+   상태변경 메서드는 Order에 두어 DDD 측면의 책임을 명확히하고 Service에서 메서드를 호출해 사용하도록 한다.
+   ~~~
+   order.paidBy(payment);
+   ~~~
+
+
+### < Order, Payment 연관관계 변경 >
+기존 Order와 Payment를 1:1로 두고 Payment 히스토리를 관리할 생각이었다. 
+그런데 결제 실패 후 재시도하는 경우, order에 대한 결제 row가 추가 생성된다는 것을 간과하고 있었다.
+그래서 payment에 마지막 결제 생성 건만 두고 이전 생성 건은 delete 하고,
+결제 생성, 변경 시마다 history를 쌓으려고 했다.
+
+1. Order와 Payment 1:N    
+   Order는 여러 Payment를 가질 수 있지만, 동시에 유효한 결제는 하나로 한다.
+   
+2. Order와 Payment를 1:1로 두지 않고 1:N으로 두는 이유    
+
+3. 권장 방법
+   Order가 Payment를 소유, Payment는 orderId만 들고있는 경우가 보편적이다.   
+
+
+### < Entity와 Policy >
+Entity에는 상태 검증을, Policy에는 규칙 검증을 둬야한다.    
+
+1. Entity 상태 검증
+   - 상태 전이 메서드의 네이밍은 행위 기준으로 통일 할 수 있도록 한다.    
+     누가 호출했는지보다 해당 상태 검증 메서드에서 무슨 일이 일어났는지를 네이밍에 표현하는게 좋다.  
+   ~~~
+   // 잘못됨!! 누가 호출했는지를 메서드 네이밍에 표헌 
+   approveWebHook()
+   failWebHook()
+   
+   // 상태를 어떻게 변경했는지를 네이밍에 표현
+   approve()
+   fail()
+   ~~~
+
+2. 도메인 크기에 비해 과한 PaymentPolicy 분리    
+   1) 문제점     
+      Servie와 Policy 분리는 이론적으로 맞지만 현 재 도메인 크기에 비해 과한 면이 있다.
+      단순한 권한, 소유자 검증만 존재하고, Entity에 대부분의 검증 로직이 존재하기 때문이다.
+      이는 흐름을 오히려 따라가기 어렵게 한다.
+   2) 해결방법   
+      권한, 접근 제어는 Service에서, 도메인 규칙은 Entity에서 수행하도록 한다.
+      판단 로직은 최대한 Entity로 이동하는 것이다.
+
+### < 에러코드 관리 >
+1. 에러코드 네이밍 방법    
+   에러코드는 누가 잘못했는, 그로 인해 무엇이 안 되는지를 표현해야 한다.
+2. 치명적인 에러 관리     
+   주문 금액과 승인된 결제 금액 불일치 같은 치명적인 에러의 경우는 별도의 관리가 필요하다.
+   이는 단순한 비즈니스 에러가 아닌, 시스템 무결성 에러이기 때문이다.     
+   이런 경우는 로그를 출력하고 알람을 발생시켜 즉시 운영자 개입 가능하도록 해야한다.
+
+
+### < 로그 작성법 >
+로그를 문자열 더하기로 작성하지 않고, 파라미터 바인딩으로 작성하도록 한다.
+성능이 더 좋아지고 로그 파싱이 쉬우며 표준이다.
+~~~
+// 파라미터 바인딩
+log.info("PAYMENT_START orderId={}", orderId);
+~~~
+
+1. 어노테이션 별 로그 구현체(?)
+   1) @Slf4j    
+      log 필드는 컴파일 시 Lombok이 자동생성한다.
+      - log.info / warn / error
+   2) @Log4j2
+      - log4j2
+   3) @CommonsLog
+      - commons-logging
+
+2. 나쁜 로그
+   ~~~
+   log.warn("금액이 다릅니다");
+   ~~~
+
+3. 좋은 로그의 기준
+   어떤 일이 발생했는지, 식별자는 무엇인지, 비교값은 무엇인지 등 정보를 제공해 원인 추적이 가능해야한다.
+   1) 치명적 에러
+      ~~~
+      log.error(
+          "PAYMENT_AMOUNT_MISMATCH orderId={}, paymentId={}, expectedAmount={}, paidAmount={}, pgTransactionId={}",
+          order.getId(),
+          payment.getId(),
+          order.getTotalPrice(),
+          pgResult.getPaidAmount(),
+          pgResult.getPgTransactionId()
+      );
+      ~~~
+   2) 정책 위반
+      ~~~
+      log.warn(
+         "PAYMENT_NOT_REQUESTABLE orderId={}, status={}",
+         order.getId(),
+         order.getOrderStatus()
+      );
+      ~~~
+   3) 정상 흐름 추적
+      ~~~
+      log.info(
+         "PAYMENT_APPROVED orderId={}, paymentId={}, amount={}",
+         order.getId(),
+         payment.getId(),
+         payment.getApprovedAmount()
+      );
+      ~~~
+
+
+### < PG 웹 훅 응답 안정성 체크 >
+1. 웹훅 중복 수신 처리 
+2. 이미 승인된 결제에 재 승인 요청 오는 경우
+3. 승인 후 Order가 Paid인 경우
+4. 웹훅 트랜잭션 분리    
+   되돌릴 수 없는 외부 세계의 상태와 내부 실패를 함께 운영하면 안된다.     
+   Order는 처리 실패 하더라도 Payment 승인 데이터 응답 받았으니 안전하게 수정한다.   
+   외부에서 정상 응답을 받았는데 Order 처리를 실패했다고 함께 rollback하지 않는다.
+   Order는 처리 실패 하더라도 서버 내부에서 수정을 재시도 하거나 보정 가능하기 때문에 분리한다.
+5. pg 서명 검증    
+   해당 웹 훅이 진짜 PG가 보낸 게 맞는지 검증하는 것.
+   서명 검증이 없다면 웹 훅 URL만 알면 누구나 결제 승인 위조가 가능하기 때문이다.
+
+
+### < 웹훅과 트랜잭션 락 남용 >
+조회 시 트랜잭션 락을 걸게 되면 결제 시작, 웹 훅, 재시도 시 트래픽이 증가하게 되면 DB 락 경합이 심각해진다.
+PG 웹훅은 락이 아니라 멱등성으로 막아야 한다. 
+
+1. 멱등성 (Idempotency)    
+   같은 요청을 1번 보내든 10번 보내든 결과가 동일한 것.
+   1) pgTransactionId는 유니크
+   2) 상태 체크
+   3) 중복 웹훅 무시
+
+2. 웹훅의 특징
+   - 중복이 오는 것
+   - 순서 보장이 안됨
+   - 승인 결과가 재전송 됨
+
+
+### < 웹 훅 응답 >
+PG는 “HTTP 200 OK를 받을 때까지” 계속 재전송한다.   
+400 / 500 / 예외 → “서버가 못 받았나 보다” → 재시도 폭탄된다.
+따라서 이미 처리된 결제라면 결제 상태와 무관하게 200 OK를 반환해야 한다.
+
+1. 결제 상태에 따른 웹 훅 동작
+   - READY / IN_PROGRESS: 정상 처리
+   - APPROVED / FAILED / CANCELED: 아무 동작 안함 + 200 OK 응답
+
+2. 잘못된 기존 코드
+   ~~~
+        // 1. 중복 웹훅 무시 (멱등성 검증: 동일 요청을 여러번 보내도 결과는 동일해야 함)
+        PaymentStatusType paymentStatus = payment.getPaymentStatus();
+        if (!(paymentStatus == READY || paymentStatus == IN_PROGRESS)) {
+            throw new PaymentException(PaymentErrorCode.PAYMENT_ALREADY_COMPLETED);
+        }
+   ~~~
+
+3. 수정된 코드
+   ~~~
+   // payment.isTerminal() == !(paymentStatus == READY || paymentStatus == IN_PROGRESS)
+   if (payment.isTerminal()) { 
+       log.info("Duplicate webhook ignored. paymentId={}", payment.getId());
+       return; // 200 OK
+   }
+   ~~~
+
+
+### < 웹훅 응답에 대한 결제정보수정 및 주문상태수정 트랜잭션의 분리 >
+PG가 이미 확정한 사실(Payment 승인)은 절대 롤백되지 않게 하자.    
+웹훅 핸들러에 @Transactional 적용 시 
+PG 승인 성공해 payment 수정이 완료되었는데 order.paid()에서 예외가 발생하게 되면 트랜잭션 롤백이 발생하게 된다.
+이를 트랜잭션을 분리해 막는다.    
+웹 훅 입장에서는 이미 처리된 이벤트, 중복 이벤트, 모르는 이벤트는 성공으로 처리해야한다.   
+실패로 응답해야 하는 건 서명 검증 실패, 포맷 자체가 깨진 요청이다.
+
+1. 기존 문제 코드
+   ~~~
+    /** 결제 생성 웹훅 처리 - 결제 완료 **/
+    @Transactional
+    public void handlePgWebHook(PgApprovalResult pgApprovalResult) {
+        // transactionId 조회
+        Payment payment = paymentRepository.findByPgTransactionId(
+                pgApprovalResult.getPgTransactionId())
+                .orElseThrow(() ->
+                        new PaymentException(PG_TRANSACTION_ID_NOT_EXISTS));
+
+        // 중복 웹훅 무시 (멱등성 검증: 동일 요청을 여러번 보내도 결과는 동일해야 함)
+        // payment.isTerminal() == !(paymentStatus == READY || paymentStatus == IN_PROGRESS)
+        if (payment.isTerminal()) { 
+            log.info("Duplicate webhook ignored. paymentId={}", payment.getId());
+            return; // 200 OK
+        }
+
+        // 1. 결제 승인, 실패 반영 (결제에 웹 훅 결과 반영) -> 절대 롤백 되지 않게 수정 필요
+        if (pgApprovalResult.getApprovalStatus() == APPROVED) {
+            payment.approve(pgApprovalResult);
+        } else {
+            payment.fail();
+        }
+
+        // 2. 주문상태 변경 (주문에 웹 훅 결과 반영) -> 실패 가능하도록 수정
+        Long orderId = payment.getOrder().getId();
+        Order order = orderRepository.findByIdAndOrderStatus(orderId, CREATED)
+                .orElseThrow(() -> new PaymentException(ORDER_STATUS_NOT_CREATED));
+        order.paid(payment);
+    }
+   ~~~
+
+2. Order 보정 방법
+   1) 실시간 재시도   
+      Order 변경 실패 시 이벤트를 발행해 재시도 큐.
+   2) 배치 보정   
+      가장 흔한 방법으로 결제는 승인 되었는데 주문은 CREATED인 건은 매일 새벽 정리.
+   3) 운영 알람 및 수동 처리    
+
+
+---
+## @Transactional 속성
+1. propagation    
+   이미 트랜잭션이 있을 때 새 메서드를 어떻게 실행할지 결정.    
+   1) REQUIRED    
+      위 속성을 설정하지 않으면 기본값인 REQUIRED 적용되어 이미 트랜잭션이 있으면 같이 타고, 없으면 새로 만든다.
+   2) REQUIRES_NEW     
+      기존 트랜잭션은 잠시 멈추고, 무조건 새 트랜잭션을 생성한다.
+      ~~~
+      @Transactional(propagation = Propagation.REQUIRES_NEW)
+      ~~~
+      
+2. 같은 클래스 안에서 호출
+   아래의 경우는 프록시를 거치지 않고 자기 자신을 호출한다.
+   그래서 REQUIRES_NEW, rollbackFor 전부 무시된다.
+   ~~~
+   @Service
+   public class PaymentService {
+    
+        @Transactional
+        public void handleWebhook() {
+            approvePayment(); // 내부 호출
+        }
+    
+        @Transactional(propagation = REQUIRES_NEW)
+        public void approvePayment() {
+            ...
+        }
+   }
+   ~~~
+
+3. 다른 Bean 호출 시    
+   다른 Bean을 호출하면 그 Bean의 프록시를 거치기 때문에 @Transactional이 적용된다.   
+   ~~~
+    @Service
+    class AService {
+    
+        private final BService bService;
+    
+        @Transactional
+        public void a() {
+            bService.b(); // 프록시 경유
+        }
+    }
+    
+    @Service
+    class BService {
+    
+        @Transactional(propagation = REQUIRES_NEW)
+        public void b() { }
+    }
+   ~~~
+

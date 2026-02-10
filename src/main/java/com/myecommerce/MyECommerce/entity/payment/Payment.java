@@ -130,12 +130,19 @@ public class Payment extends BaseEntity {
         this.paymentStatus = PaymentStatusType.FAILED; // 승인 실패
     }
 
-    /** 결제 종결 여부 반환 **/
+    /** PaymentStatus - 자기 상태 판단
+     *  결제 종결 여부 반환 **/
     public boolean isTerminal() {
         // 결제승인, 결제취소, 결재실패의 경우 결제 상태 종결
         return this.paymentStatus == APPROVED ||
                 this.paymentStatus == CANCELED ||
                 this.paymentStatus == FAILED;
+    }
+
+    /** PaymentStatus - 자기 상태 판단
+     *  PG 승인 요청 가능 여부 반환 **/
+    public boolean isApproveRequestAvailable() {
+        return !(this.paymentStatus == APPROVED || this.paymentStatus == CANCELED);
     }
 
     // 주문 생성된 경우만 결제가능

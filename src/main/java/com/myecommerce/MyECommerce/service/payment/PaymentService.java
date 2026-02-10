@@ -11,7 +11,6 @@ import com.myecommerce.MyECommerce.exception.PaymentException;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
 import com.myecommerce.MyECommerce.type.PaymentMethodType;
-import com.myecommerce.MyECommerce.type.PaymentStatusType;
 import com.myecommerce.MyECommerce.type.PgProviderType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -118,22 +117,15 @@ public class PaymentService {
     }
 
     // 승인 요청 가능한 결제 반환
-    private Payment filterApproveRequestAvailablePayment(List<Payment> paymentList,
-                                                  PaymentMethodType requestPaymentMethod) {
+    private Payment filterApproveRequestAvailablePayment(
+            List<Payment> paymentList, PaymentMethodType requestPaymentMethod) {
+
         for (Payment payment : paymentList) {
-            PaymentStatusType paymentStatus = payment.getPaymentStatus();
-            PaymentMethodType paymentMethod = payment.getPaymentMethod();
-            PgProviderType pgProvider = payment.getPgProvider();
+            boolean isApproveRequestAvailable =
+                    paymentPolicy.isPaymentAvailablePgRequestAboutRequest(
+                            payment, requestPaymentMethod, pgClient.getProvider());
 
-            // PG 승인 요청 가능한 결제 상태인가?
-            boolean isStatusOfApproveAvailable =
-                    !(paymentStatus == APPROVED || paymentStatus == CANCELED);
-            // 요청 결제방식과 동일한가?
-            boolean isRequestMethod = paymentMethod == requestPaymentMethod;
-            // 회사가 계약한 결제대행사와 동일한가?
-            boolean isPgClient = pgProvider == pgClient.getProvider();
-
-            if(isStatusOfApproveAvailable && isRequestMethod && isPgClient) {
+            if(isApproveRequestAvailable) {
                 return payment;
             }
         }

@@ -3684,7 +3684,7 @@ PG 승인 성공해 payment 수정이 완료되었는데 order.paid()에서 예�
    ~~~
 
 
-### < 도메인 책임 분리 >
+### < 도메인 책임 분리 - 상태 판단 >
 isDuplicatedPgWebHookRequest()는 Payment Entity의 책임이 아니다.
 하지만 Payment가 “종결 상태인지”를 판단하는 로직 자체는 Payment Entity로 이동하는 게 맞다.
 즉, ***판단 기준은 엔티티, 웹훅 중복 처리라는 행위는 서비스 책임***이다.
@@ -3716,3 +3716,126 @@ isDuplicatedPgWebHookRequest()는 Payment Entity의 책임이 아니다.
    }
    ~~~
 
+
+### < 도메인 책임 분리 - 서비스에서 Entity, Policy로 정책 책임 분리 >
+1. Entity가 아닌 Policy에 정책을 두는 이유    
+   아래와 같이 주문에 대한 결제 목록의 '승인 요청 가능한 상태 판단'은 Entity가 아닌 Policy에 둔다.
+   이유는 아래와 같다.
+   - 단건(Entity) 상태 판단이 아님 
+   - 컬렉션 + 외부 컨텍스트(PG Provider) + 요청값을 함께 판단
+   - “행위”가 아니라 “선별 규칙(정책)”에 가깝다.     
+   Entity는 나 자신만 알아야하는데, 여러 결제 중 어떤 것이 적합한지 판단하는 것은 Entity의 책임이 아니다.
+   반면, Policy는 여러 도메인 객체를 놓고 현재 비즈니스 규칙상 가능한 선택지를 결정하므로, Policy에 두면 의미가 또렷해진다.   
+   단건 판단은 Entity, 조합/선별은 Policy에 둔다.
+
+2. 문제 코드    
+   기존 코드는 Service가 너무 많은 판단 책임을 가지고 있었다.
+   단순 조회, 결제 상태 해석, 요청 행위 기준 판단 같은 비즈니스 규칙 판단이 섞여 있음에도 Service 내부에 직접 작성되어 있었다.
+   ~~~
+    // Service 코드
+    // 승인 요청 가능한 결제 반환
+    private Payment filterApproveRequestAvailablePayment(List<Payment> paymentList,
+                                                  PaymentMethodType requestPaymentMethod) {
+        for (Payment payment : paymentList) {
+            PaymentStatusType paymentStatus = payment.getPaymentStatus();
+            PaymentMethodType paymentMethod = payment.getPaymentMethod();
+            PgProviderType pgProvider = payment.getPgProvider();
+
+            // PG 승인 요청 가능한 결제 상태인가? (이거 정책에서 검증하는데 제거 여부 판단하기)
+            boolean isStatusOfApproveAvailable =
+                    !(paymentStatus == APPROVED || paymentStatus == CANCELED);
+            // 요청 결제방식과 동일한가?
+            boolean isRequestMethod = paymentMethod == requestPaymentMethod;
+            // 회사가 계약한 결제대행사와 동일한가?
+            boolean isPgClient = pgProvider == pgClient.getProvider();
+
+            if(isStatusOfApproveAvailable && isRequestMethod && isPgClient) {
+                return payment;
+            }
+        }
+
+        return null;
+    }
+   ~~~
+   
+3. 문제 해결     
+   서비스에서 정책을 분리했다.
+   그리고 Payment의 상태 판단은 Entity로 분리했다.    
+   요청의 차단과 상태에 따른 Entity 선택 역할이 함께하지 않도록 한다.     
+   
+   isTerminal()은 해당 결제가 더 이상 상태 전이를 하지 않는 종결 상태를 의미한다. 
+   따라서 승인(APPROVED), 취소(CANCELED), 실패(FAILED)처럼 이후 어떤 처리도 허용되지 않는 상태들을 묶어 표현할 때 적합하다. 이 기준에 따라 isTerminal()은 “이 결제가 라이프사이클상 이미 끝났는가”를 판단하는 책임을 엔티티가 갖는 것이 맞다.
+   반면 PG 승인 요청 가능 여부는 단순 상태 판단이 아니라 요청 행위 기준의 규칙이므로, 
+   엔티티에는 isApproveRequestAvailable()처럼 자기 상태만을 기준으로 한 판단 메서드만 두고, 
+   여러 결제 간 비교나 외부 조건(PG, 요청 방식 등)이 포함되는 로직은 정책으로 분리하는 것이 좋다. 
+   즉, 엔티티는 “이 상태가 허용되는가”까지만 알고, “어떤 결제를 선택할 것인가”는 정책이 결정하도록 역할을 명확히 나누는 방향이 적절하다.
+
+   ~~~
+    // Service 코드
+    // 승인 요청 가능한 결제 반환
+    private Payment filterApproveRequestAvailablePayment(
+            List<Payment> paymentList, PaymentMethodType requestPaymentMethod) {
+
+        for (Payment payment : paymentList) {
+            boolean isApproveRequestAvailable =
+                    paymentPolicy.isPaymentAvailablePgRequestAboutRequest(
+                            payment, requestPaymentMethod, pgClient.getProvider());
+
+            if(isApproveRequestAvailable) {
+                return payment;
+            }
+        }
+
+        return null;
+    }
+   ~~~
+   ~~~
+    // Policy 코드
+    /** 결제생성 정책 **/
+    public void validateCreate(List<Payment> paymentList,
+                               Order order, Member member) {
+        // 3. DB 조회 필요 도메인 규칙 검증
+        // 본인 외 결제 불가
+        validatePaymentOnlyOwnAccess(order, member);
+        // 결제상태 종결여부 검증
+        validateNoTerminalPayment(paymentList);
+    }
+   
+    // 결제 승인된 경우 결제 생성 불가 (승인, 취소 등 PG 승인된 경우)
+    private void validateNoTerminalPayment(List<Payment> paymentList) {
+        long invalidPaymentCount = paymentList.stream()
+                .filter(payment -> !payment.isTerminal())
+                .count();
+
+        if (invalidPaymentCount > 0) {
+            throw new PaymentException(PAYMENT_ALREADY_COMPLETED);
+        }
+    }
+
+    /** 요청에 대한 승인 가능한 유효한 결제 판단 **/
+    public boolean isPaymentAvailablePgRequestAboutRequest(Payment payment,
+                                                           PaymentMethodType requestPaymentMethod,
+                                                           PgProviderType requestPgProvider) {
+
+        PaymentMethodType paymentMethod = payment.getPaymentMethod();
+        PgProviderType pgProvider = payment.getPgProvider();
+
+        // PG 승인 요청 가능한 결제 상태인가?
+        boolean isStatusOfApproveAvailable = payment.isApproveRequestAvailable();
+        // 요청 결제방식과 동일한가?
+        boolean isRequestMethod = paymentMethod == requestPaymentMethod;
+        // 회사가 계약한 결제대행사와 동일한가?
+        boolean isPgClient = pgProvider == requestPgProvider;
+
+        return isStatusOfApproveAvailable && isRequestMethod && isPgClient;
+    }
+   ~~~
+   ~~~
+    // Payment Entity 코드
+    /** PaymentStatus - 자기 상태 판단
+     *  PG 승인 요청 가능 여부 반환 **/
+    public boolean isApproveRequestAvailable() {
+        return !(this.paymentStatus == APPROVED || this.paymentStatus == CANCELED);
+    }
+   ~~~
+   

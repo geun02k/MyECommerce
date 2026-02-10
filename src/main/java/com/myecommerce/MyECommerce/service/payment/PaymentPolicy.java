@@ -5,6 +5,8 @@ import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.entity.order.Order;
 import com.myecommerce.MyECommerce.entity.payment.Payment;
 import com.myecommerce.MyECommerce.exception.PaymentException;
+import com.myecommerce.MyECommerce.type.PaymentMethodType;
+import com.myecommerce.MyECommerce.type.PgProviderType;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -30,8 +32,10 @@ public class PaymentPolicy {
     public void validateCreate(List<Payment> paymentList,
                                Order order, Member member) {
         // 3. DB 조회 필요 도메인 규칙 검증
+        // 본인 외 결제 불가
         validatePaymentOnlyOwnAccess(order, member);
-        validateApproveRequestAvailablePayment(paymentList);
+        // 결제상태 종결여부 검증
+        validateNoTerminalPayment(paymentList);
     }
 
     // 결제 접근 권한 제한 정책
@@ -62,15 +66,32 @@ public class PaymentPolicy {
     }
 
     // 결제 승인된 경우 결제 생성 불가 (승인, 취소 등 PG 승인된 경우)
-    private void validateApproveRequestAvailablePayment(List<Payment> paymentList) {
-        boolean hasTerminalPayment = paymentList.stream()
-                .anyMatch(payment ->
-                        payment.getPaymentStatus() == APPROVED ||
-                        payment.getPaymentStatus() == CANCELED);
+    private void validateNoTerminalPayment(List<Payment> paymentList) {
+        long invalidPaymentCount = paymentList.stream()
+                .filter(payment -> !payment.isTerminal())
+                .count();
 
-        if (hasTerminalPayment) {
+        if (invalidPaymentCount > 0) {
             throw new PaymentException(PAYMENT_ALREADY_COMPLETED);
         }
+    }
+
+    /** 요청에 대한 승인 가능한 유효한 결제 판단 **/
+    public boolean isPaymentAvailablePgRequestAboutRequest(Payment payment,
+                                                           PaymentMethodType requestPaymentMethod,
+                                                           PgProviderType requestPgProvider) {
+
+        PaymentMethodType paymentMethod = payment.getPaymentMethod();
+        PgProviderType pgProvider = payment.getPgProvider();
+
+        // PG 승인 요청 가능한 결제 상태인가?
+        boolean isStatusOfApproveAvailable = payment.isApproveRequestAvailable();
+        // 요청 결제방식과 동일한가?
+        boolean isRequestMethod = paymentMethod == requestPaymentMethod;
+        // 회사가 계약한 결제대행사와 동일한가?
+        boolean isPgClient = pgProvider == requestPgProvider;
+
+        return isStatusOfApproveAvailable && isRequestMethod && isPgClient;
     }
 
 }

@@ -136,6 +136,47 @@ class PaymentTest {
         return payment;
     }
 
+    /** PG 승인실패된 결제 생성 - 결제상태 FAILED */
+    Payment failedPayment() {
+        // 등록된 주문 (주문 상태는 CREATED)
+        Order order = order();
+        // 요청 결제 방식
+        PaymentMethodType requestMethod = CARD;
+        // 회사와 결제 계약된 PG사
+        PgProviderType pgProvider = pgProvider();
+
+        // 결제 생성 (READY)
+        Payment payment = Payment.createPayment(order, requestMethod, pgProvider);
+        // PG 결제 요청 (READY -> IN_PROGRESS)
+        PgResult pgResult = pgResult();
+        payment.requestPgPayment(pgResult);
+        // PG 결제 승인
+        PgApprovalResult pgApprovalResult = pgApprovalResult(FAILED);
+        payment.fail(pgApprovalResult);
+
+        return payment;
+    }
+
+    /** PG 승인취소된 결제 생성 - 결제상태 CANCELED */
+    Payment canceledPayment() {
+        // 등록된 주문 (주문 상태는 CREATED)
+        Order order = order();
+        // 요청 결제 방식
+        PaymentMethodType requestMethod = CARD;
+        // 회사와 결제 계약된 PG사
+        PgProviderType pgProvider = pgProvider();
+
+        // 결제 생성 (READY)
+        Payment payment = Payment.createPayment(order, requestMethod, pgProvider);
+        // PG 결제 요청 (READY -> IN_PROGRESS)
+        PgResult pgResult = pgResult();
+        payment.requestPgPayment(pgResult);
+        // PG 결제 승인취소 (현재 로직에서 미지원으로 강제변경)
+        ReflectionTestUtils.setField(payment, "paymentStatus", CANCELED);
+
+        return payment;
+    }
+
     /** PG 요청 결과 생성 */
     PgResult pgResult() {
         return PgResult.builder()
@@ -394,6 +435,49 @@ class PaymentTest {
         결제상태 판단 Tests
        ---------------------- */
 
-    // 결제 종결 여부 반환 성공
+    @Test
+    @DisplayName("결제 종결여부 판단 성공 - 결제상태가 결제승인이면 결제과정 종결")
+    void isTerminal_shouldReturnTrue_whenPaymentStatusIsApproved() {
+        // given
+        Payment payment = approvedPayment(); // PG 결제승인된 결제
+        // when
+        boolean isTerminal = payment.isTerminal();
+        // then
+        assertTrue(isTerminal);
+    }
+
+    @Test
+    @DisplayName("결제 종결여부 판단 성공 - 결제상태가 결제실패이면 결제과정 종결")
+    void isTerminal_shouldReturnTrue_whenPaymentStatusIsFailed() {
+        // given
+        Payment payment = failedPayment(); // PG 결제실패한 결제
+        // when
+        boolean isTerminal = payment.isTerminal();
+        // then
+        assertTrue(isTerminal);
+    }
+
+    @Test
+    @DisplayName("결제 종결여부 판단 성공 - 결제상태가 결제취소이면 결제과정 종결")
+    void isTerminal_shouldReturnTrue_whenPaymentStatusIsCanceled() {
+        // given
+        Payment payment = canceledPayment(); // PG 결제취소된 결제
+        // when
+        boolean isTerminal = payment.isTerminal();
+        // then
+        assertTrue(isTerminal);
+    }
+
+    @Test
+    @DisplayName("결제 종결여부 판단 실패 - 결제상태가 결제요청이면 결제과정 미종결")
+    void isTerminal_shouldReturnFalse_whenPaymentStatusIsInProgress() {
+        // given
+        Payment payment = inProgressPayment(); // PG 요청된 결제
+        // when
+        boolean isTerminal = payment.isTerminal();
+        // then
+        assertFalse(isTerminal);
+    }
+
     // PG 결제 요청 가능 상태 여부 반환 성공
 }

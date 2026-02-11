@@ -176,7 +176,7 @@ public class Payment extends BaseEntity {
             // 결제 금액 불일치는 비즈니스 에러가 아닌 사고 -> 로그 출력과 가능하다면 알람 설정
             log.error("Payment amount mismatch. orderId={}, paid={}, expected={}",
                     order.getId(), paidAmount, orderAmount);
-            throw new PaymentException(PAYMENT_AMOUNT_INCONSISTENCY);
+            throw new PaymentException(PAYMENT_AMOUNT_MISMATCH);
         }
     }
 

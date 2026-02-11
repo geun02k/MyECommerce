@@ -324,7 +324,7 @@ class PaymentTest {
         // then
         PaymentException e = assertThrows(PaymentException.class, () ->
                 payment.approve(invalidPgApprovalResult));
-        assertEquals(PAYMENT_AMOUNT_INCONSISTENCY, e.getErrorCode());
+        assertEquals(PAYMENT_AMOUNT_MISMATCH, e.getErrorCode());
     }
 
     @Test

@@ -334,6 +334,22 @@ class PaymentTest {
     }
 
     @Test
+    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 실패 - PG 응답에서 트랜잭션 ID 미존재 시 예외발생")
+    void approve_shouldThrowException_whenPgTransactionIdNotExists() {
+        // given
+        Payment payment = inProgressPayment();
+        PgApprovalResult invalidPgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(null) // PG 트랜잭션 ID 미존재
+                .build();
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                payment.approve(invalidPgApprovalResult));
+        assertEquals(PG_RESPONSE_TRANSACTION_ID_NOT_EXISTS, e.getErrorCode());
+    }
+
+    @Test
     @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 실패 - PG 승인 응답의 트랜잭션 ID 불일치 시 예외발생")
     void approve_shouldThrowException_whenPgTransactionIdMismatches() {
         // given
@@ -399,6 +415,22 @@ class PaymentTest {
 
         // then
         assertEquals(FAILED, payment.getPaymentStatus()); // 결제 승인 실패
+    }
+
+    @Test
+    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 실패 - PG 응답에서 트랜잭션 ID 미존재 시 예외발생")
+    void fail_shouldThrowException_whenPgTransactionIdNotExists() {
+        // given
+        Payment payment = inProgressPayment();
+        PgApprovalResult invalidPgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(null) // PG 트랜잭션 ID 미존재
+                .build();
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                payment.fail(invalidPgApprovalResult));
+        assertEquals(PG_RESPONSE_TRANSACTION_ID_NOT_EXISTS, e.getErrorCode());
     }
 
     @Test

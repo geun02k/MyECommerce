@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.util.List;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.ORDER_STATUS_NOT_CREATED;
+import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.*;
 import static com.myecommerce.MyECommerce.type.PaymentMethodType.CARD;
 import static com.myecommerce.MyECommerce.type.PaymentStatusType.*;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
@@ -211,9 +211,50 @@ class PaymentTest {
         assertEquals(pgResult.getPgTransactionId(), payment.getPgTransactionId());
     }
 
-    // 결제 상태 IN_PROGRESS로 전이 불가 - PG 결제 응답 미존재 시
-    // 결제 상태 IN_PROGRESS로 전이 불가 - PG 결제 응답의 트랜잭션 ID 미존재 시
-    // 결제 상태 IN_PROGRESS로 전이 불가 - 기존 결제 상태가 READY가 아닌 경우
+    @Test
+    @DisplayName("결제상태 READY -> IN_PROGRESS 전이 실패 - PG 결제 응답 미존재 시 예외발생")
+    void requestPgPayment_shouldThrowException_whenPgRequestResultNotExists() {
+        // given
+        // 결제 객체 생성 (결제상태 READY)
+        Payment payment = readyPayment();
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                payment.requestPgPayment(null)); // PG 결제요청 응답 없으므로 null 전달
+        assertEquals(PG_REQUEST_FAILED, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("결제상태 READY -> IN_PROGRESS 전이 실패 - PG 결제 응답의 트랜잭션 ID 미존재 시 예외발생")
+    void requestPgPayment_shouldThrowException_whenTransactionIdNotExistsAtPgRequestResult() {
+        // 결제 객체 생성 (결제상태 READY)
+        Payment payment = readyPayment();
+        // PG 요청 결과
+        PgResult invalidPgResult = PgResult.builder()
+                .pgTransactionId(null) // 트랜잭션 ID 미존재
+                .build();
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                payment.requestPgPayment(invalidPgResult));
+        assertEquals(PG_RESPONSE_TRANSACTION_ID_NOT_EXISTS, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("결제상태 READY -> IN_PROGRESS 전이 실패 - 기존 결제 상태가 READY가 아니면 예외발생")
+    void requestPgPayment_shouldThrowException_whenOriginalPaymentStatusIsNotReady() {
+        // given
+        Payment invalidPayment = approvedPayment(); // 기존 결제 상태 APPROVED
+        PgResult pgResult = pgResult();
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                invalidPayment.requestPgPayment(pgResult));
+        assertEquals(PAYMENT_STATUS_NOT_READY, e.getErrorCode());
+    }
 
     @Test
     @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 성공 - PG 결제 승인 성공 시 승인상태로 변경 및 지불금액, 부가세 저장")

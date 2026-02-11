@@ -89,7 +89,32 @@ class PaymentTest {
         return paidOrder;
     }
 
-    /** PG 승인된 결제 생성 */
+    /** 결제 객체 생성 - 결제상태 READY */
+    Payment readyPayment() {
+        // 등록된 주문 (주문 상태는 CREATED)
+        Order order = order();
+        // 요청 결제 방식
+        PaymentMethodType requestMethod = CARD;
+        // 회사와 결제 계약된 PG사
+        PgProviderType pgProvider = pgProvider();
+
+        // 결제 객체 생성
+        return Payment.createPayment(order, requestMethod, pgProvider);
+    }
+
+    /** PG 요청한 결제 객체 생성 - 결제상태 IN_PROGRESS */
+    Payment inProgressPayment() {
+        // 결제 객체 생성
+        Payment payment = readyPayment();
+        // PG 요청 결과
+        PgResult pgResult = pgResult();
+        // 결제 객체에 PG 요청 결과 반영
+        payment.requestPgPayment(pgResult);
+
+        return payment;
+    }
+
+    /** PG 승인된 결제 생성 - 결제상태 APPROVED */
     Payment approvedPayment() {
         // 등록된 주문 (주문 상태는 CREATED)
         Order order = order();
@@ -163,4 +188,85 @@ class PaymentTest {
         assertEquals(ORDER_STATUS_NOT_CREATED, e.getErrorCode()); // 주문이 CREATED인 경우만 객체 생성 가능
     }
 
+    /* ----------------------
+        결제상태 전이 Tests
+       ---------------------- */
+
+    @Test
+    @DisplayName("결제상태 READY -> IN_PROGRESS 전이 성공 - PG 요청 응답 반환 시 결제 요청상태로 변경 및 트랜잭션 ID 저장")
+    void requestPgPayment_shouldChangeInProgressPaymentStatus_whenPaymentStatusIsReady() {
+        // given
+        // 결제 객체 생성 (결제상태 READY)
+        Payment payment = readyPayment();
+        // PG 요청 결과
+        PgResult pgResult = PgResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .build();
+
+        // when
+        payment.requestPgPayment(pgResult);
+
+        // then
+        assertEquals(IN_PROGRESS, payment.getPaymentStatus());
+        assertEquals(pgResult.getPgTransactionId(), payment.getPgTransactionId());
+    }
+
+    // 결제 상태 IN_PROGRESS로 전이 불가 - PG 결제 응답 미존재 시
+    // 결제 상태 IN_PROGRESS로 전이 불가 - PG 결제 응답의 트랜잭션 ID 미존재 시
+    // 결제 상태 IN_PROGRESS로 전이 불가 - 기존 결제 상태가 READY가 아닌 경우
+
+    @Test
+    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 성공 - PG 결제 승인 성공 시 승인상태로 변경 및 지불금액, 부가세 저장")
+    void approve_shouldChangeApprovedPaymentStatusAndSetApprovedAmountAndVat_whenPaymentStatusIsInProgress() {
+        // given
+        // PG 결제 진행중인 결제 객체
+        Payment payment = inProgressPayment();
+        // PG 승인 결과
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .approvalStatus(APPROVED) // PG 승인
+                .paidAmount(new BigDecimal("10000"))
+                .vatAmount(new BigDecimal("1000"))
+                .build();
+
+        // when
+        payment.approve(pgApprovalResult);
+
+        // then
+        assertEquals(APPROVED, payment.getPaymentStatus()); // 결제 승인
+        assertEquals(pgApprovalResult.getPaidAmount(), payment.getApprovedAmount());
+        assertEquals(pgApprovalResult.getVatAmount(), payment.getVatAmount());
+    }
+
+    // 결제 상태 APPROVED로 전이 불가 - 기존 결제 상태가 IN_PROGRESS 상태가 아닐 때
+    // 결제 상태 APPROVED로 전이 불가 - 주문, 결제 금액 불일치
+
+    @Test
+    @DisplayName("결제상태 IN_PROGRESS -> FAILED 전이 성공 - PG 승인 실패 시 결제 승인실패 상태로 변경")
+    void fail_shouldChangeFailedPaymentStatus_whenPaymentStatusIsInProgress() {
+        // given
+        Payment payment = inProgressPayment();
+        // PG 승인 결과
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .approvalStatus(FAILED) // PG 승인 실패
+                .paidAmount(new BigDecimal("10000"))
+                .vatAmount(new BigDecimal("1000"))
+                .build();
+
+        // when
+        payment.fail(pgApprovalResult);
+
+        // then
+        assertEquals(FAILED, payment.getPaymentStatus()); // 결제 승인 실패
+    }
+
+    // 결제 상태 FAILED로 전이 불가 - 기존 결제 상태가 IN_PROGRESS 상태가 아닐 때
+
+    /* ----------------------
+        결제상태 판단 Tests
+       ---------------------- */
+
+    // 결제 종결 여부 반환 성공
+    // PG 결제 요청 가능 상태 여부 반환 성공
 }

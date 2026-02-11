@@ -479,5 +479,37 @@ class PaymentTest {
         assertFalse(isTerminal);
     }
 
-    // PG 결제 요청 가능 상태 여부 반환 성공
+    @Test
+    @DisplayName("PG 승인요청 가능여부 판단 성공 - 결제상태가 결제취소이면 승인요청 가능")
+    void isApproveRequestAvailable_shouldReturnTrue_whenPaymentStatusIsFailed() {
+        // given
+        Payment payment = failedPayment();
+        // when
+        boolean isApproveRequestAvailable = payment.isApproveRequestAvailable();
+        // then
+        assertTrue(isApproveRequestAvailable);
+    }
+
+    @Test
+    @DisplayName("PG 승인요청 가능여부 판단 실패 - 결제상태가 결제승인이면 승인요청 불가 판단")
+    void isApproveRequestAvailable_shouldReturnFalse_whenPaymentStatusIsApproved() {
+        // given
+        Payment payment = approvedPayment();
+        // when
+        boolean isApproveRequestAvailable = payment.isApproveRequestAvailable();
+        // then
+        assertFalse(isApproveRequestAvailable);
+    }
+
+    @Test
+    @DisplayName("PG 승인요청 가능여부 판단 실패 - 결제상태가 결제취소이면 승인요청 불가 판단")
+    void isApproveRequestAvailable_shouldReturnFalse_whenPaymentStatusIsCanceled() {
+        // given
+        Payment payment = canceledPayment();
+        // when
+        boolean isApproveRequestAvailable = payment.isApproveRequestAvailable();
+        // then
+        assertFalse(isApproveRequestAvailable);
+    }
+
 }

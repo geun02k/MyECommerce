@@ -152,7 +152,7 @@ public class PaymentService {
         if (pgApprovalResult.getApprovalStatus() == APPROVED) {
             payment.approve(pgApprovalResult); // 결제 완료
         } else {
-            payment.fail(); // 재결제 시도가능
+            payment.fail(pgApprovalResult); // 재결제 시도가능
         }
     }
 

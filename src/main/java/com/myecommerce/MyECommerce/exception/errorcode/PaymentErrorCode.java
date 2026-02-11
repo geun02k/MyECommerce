@@ -36,7 +36,9 @@ public enum PaymentErrorCode implements CommonErrorCode {
     PG_TRANSACTION_ID_NOT_EXISTS(HttpStatus.BAD_REQUEST.value(),
             "error.payment.pg.transaction.id.not.exists"),
     PAYMENT_NOT_APPROVED(HttpStatus.CONFLICT.value(),
-            "error.payment.not.approved")
+            "error.payment.not.approved"),
+    PG_TRANSACTION_ID_MISMATCH(HttpStatus.CONFLICT.value(),
+            "error.payment.pg.transaction.id.mismatch"),
     ;
 
     private final int statusCode;

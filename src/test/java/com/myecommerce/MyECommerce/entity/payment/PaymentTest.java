@@ -8,13 +8,12 @@ import com.myecommerce.MyECommerce.entity.order.OrderItem;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.exception.PaymentException;
-import com.myecommerce.MyECommerce.service.payment.PgClient;
-import com.myecommerce.MyECommerce.service.payment.TestPgClientImpl;
 import com.myecommerce.MyECommerce.type.PaymentMethodType;
 import com.myecommerce.MyECommerce.type.PaymentStatusType;
 import com.myecommerce.MyECommerce.type.PgProviderType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -51,8 +50,7 @@ class PaymentTest {
 
     /** PG 결제대행사 반환 */
     PgProviderType pgProvider() {
-        PgClient pgClient = new TestPgClientImpl();
-        return pgClient.getProvider();
+        return PgProviderType.MOCK_PG;
     }
 
     /** 주문 생성 */
@@ -202,8 +200,8 @@ class PaymentTest {
        ---------------------- */
 
     @Test
-    @DisplayName("결제 객체 생성 성공")
-    void createPayment_shouldPaymentStatusIsReady_whenOrderStatusIsCreated() {
+    @DisplayName("결제 객체 생성 성공 - 주문이 CREATED이면 결제 생성")
+    void createPayment_shouldCreatePayment_whenOrderStatusIsCreated() {
         // given
         // 등록된 주문 (주문 상태는 CREATED)
         Order order = order();
@@ -218,15 +216,15 @@ class PaymentTest {
 
         // then
         assertEquals(order, payment.getOrder());
-        assertNotNull(payment.getPaymentCode());
         assertEquals(requestMethod, payment.getPaymentMethod());
         assertEquals(pgProvider, payment.getPgProvider());
+        assertTrue(payment.getPaymentCode().startsWith(order.getOrderNumber()));
         assertEquals(READY, payment.getPaymentStatus()); // 결제 생성 상태
     }
 
     @Test
-    @DisplayName("결제 객체 생성 실패 - 주문상태가 CREATED(주문생성)가 아닌 경우 예외발생")
-    void createPayment_shouldNotCreatePayment_whenOrderStatusNotCreated() {
+    @DisplayName("결제 객체 생성 실패 - 주문상태가 CREATED가 아닌 경우 예외발생")
+    void createPayment_shouldThrowException_whenOrderStatusNotCreated() {
         // given
         // 등록된 주문 (주문 상태는 PAID)
         Order invalidOrder = paidOrder();
@@ -247,8 +245,8 @@ class PaymentTest {
        ---------------------- */
 
     @Test
-    @DisplayName("결제상태 READY -> IN_PROGRESS 전이 성공 - PG 요청 응답 반환 시 결제 요청상태로 변경 및 트랜잭션 ID 저장")
-    void requestPgPayment_shouldChangeInProgressPaymentStatus_whenPaymentStatusIsReady() {
+    @DisplayName("READY -> IN_PROGRESS 성공 - PG 요청 성공 시 상태는 IN_PROGRESS로 변경")
+    void requestPgPayment_shouldChangeToInProgress_whenPgRequestSucceeds() {
         // given
         // 결제 객체 생성 (결제상태 READY)
         Payment payment = readyPayment();
@@ -266,8 +264,8 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 READY -> IN_PROGRESS 전이 실패 - PG 결제 응답 미존재 시 예외발생")
-    void requestPgPayment_shouldThrowException_whenPgRequestResultNotExists() {
+    @DisplayName("READY -> IN_PROGRESS 실패 - PG 결제 응답 미존재 시 결제요청 실패")
+    void requestPgPayment_shouldThrowException_whenPgResponseIsNull() {
         // given
         // 결제 객체 생성 (결제상태 READY)
         Payment payment = readyPayment();
@@ -280,8 +278,8 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 READY -> IN_PROGRESS 전이 실패 - PG 결제 응답의 트랜잭션 ID 미존재 시 예외발생")
-    void requestPgPayment_shouldThrowException_whenTransactionIdNotExistsAtPgRequestResult() {
+    @DisplayName("READY -> IN_PROGRESS 실패 - PG 결제 응답의 트랜잭션 ID 미존재 시 결제요청 실패")
+    void requestPgPayment_shouldThrowException_whenTransactionIdIsNull() {
         // 결제 객체 생성 (결제상태 READY)
         Payment payment = readyPayment();
         // PG 요청 결과
@@ -297,7 +295,7 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 READY -> IN_PROGRESS 전이 실패 - 기존 결제 상태가 READY가 아니면 예외발생")
+    @DisplayName("READY -> IN_PROGRESS 실패 - 기존 결제 상태가 READY가 아니면 결제요청 실패")
     void requestPgPayment_shouldThrowException_whenOriginalPaymentStatusIsNotReady() {
         // given
         Payment invalidPayment = approvedPayment(); // 기존 결제 상태 APPROVED
@@ -311,8 +309,8 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 성공 - PG 결제 승인 성공 시 승인상태로 변경 및 지불금액, 부가세 저장")
-    void approve_shouldChangeApprovedPaymentStatusAndSetApprovedAmountAndVat_whenPaymentStatusIsInProgress() {
+    @DisplayName("IN_PROGRESS -> APPROVED 성공 - PG 결제 승인 성공 시 상태는 APPROVED로 변경")
+    void approve_shouldChangeToApproved_whenPgApprovalSucceeds() {
         // given
         // PG 결제 진행중인 결제 객체
         Payment payment = inProgressPayment();
@@ -334,7 +332,7 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 실패 - PG 응답에서 트랜잭션 ID 미존재 시 예외발생")
+    @DisplayName("IN_PROGRESS -> APPROVED 실패 - PG 응답에서 트랜잭션 ID 미존재 시 결제승인 실패")
     void approve_shouldThrowException_whenPgTransactionIdNotExists() {
         // given
         Payment payment = inProgressPayment();
@@ -350,7 +348,7 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 실패 - PG 승인 응답의 트랜잭션 ID 불일치 시 예외발생")
+    @DisplayName("IN_PROGRESS -> APPROVED 실패 - 트랜잭션 ID 불일치 시 결제승인 실패")
     void approve_shouldThrowException_whenPgTransactionIdMismatches() {
         // given
         Payment payment = inProgressPayment(); // PG 트랜잭션 ID = pgTransactionId
@@ -366,7 +364,7 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 실패 - 기존 결제 상태가 IN_PROGRESS 상태가 아니면 예외발생")
+    @DisplayName("IN_PROGRESS -> APPROVED 실패 - 기존 결제 상태가 IN_PROGRESS 상태가 아니면 결제승인 실패")
     void approve_shouldThrowException_whenOriginalPaymentStatusIsNotInProgress() {
         // given
         Payment invalidPayment = approvedPayment(); // 승인된 결제
@@ -380,8 +378,8 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 실패 - 주문, 결제 금액 불일치 시 예외발생")
-    void approve_shouldThrowException_whenOrderAmountAndPaidAmountAreConsistency() {
+    @DisplayName("IN_PROGRESS -> APPROVED 실패 - 결제 금액 불일치 시 결제승인 실패")
+    void approve_shouldThrowException_whenPaidAmountMismatch() {
         // given
         Payment payment = inProgressPayment(); // 주문금액 10000
         PgApprovalResult invalidPgApprovalResult = PgApprovalResult.builder()
@@ -398,8 +396,8 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 IN_PROGRESS -> FAILED 전이 성공 - PG 승인 실패 시 결제 승인실패 상태로 변경")
-    void fail_shouldChangeFailedPaymentStatus_whenPaymentStatusIsInProgress() {
+    @DisplayName("IN_PROGRESS -> FAILED 성공 - PG 결제승인 실패 시 상태는 FAILED로 변경")
+    void fail_shouldChangeToFailed_whenPgRequestSucceeds() {
         // given
         Payment payment = inProgressPayment();
         // PG 승인 결과
@@ -418,7 +416,7 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 실패 - PG 응답에서 트랜잭션 ID 미존재 시 예외발생")
+    @DisplayName("IN_PROGRESS -> FAILED 실패 - PG 응답에서 트랜잭션 ID 미존재 시 결제실패 불가")
     void fail_shouldThrowException_whenPgTransactionIdNotExists() {
         // given
         Payment payment = inProgressPayment();
@@ -434,7 +432,7 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 IN_PROGRESS -> FAILED 전이 실패 - PG 승인 응답의 트랜잭션 ID 불일치 시 예외발생")
+    @DisplayName("IN_PROGRESS -> FAILED 실패 - 트랜잭션 ID 불일치 시 결제실패 불가")
     void fail_shouldThrowException_whenPgTransactionIdMismatches() {
         // given
         Payment payment = inProgressPayment(); // PG 트랜잭션 ID = pgTransactionId
@@ -450,7 +448,7 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("결제상태 IN_PROGRESS -> FAILED 전이 실패 - 기존 결제 상태가 IN_PROGRESS 상태가 아니면 예외발생")
+    @DisplayName("IN_PROGRESS -> FAILED 실패 - 기존 결제 상태가 IN_PROGRESS 상태가 아니면 결제실패 불가")
     void fail_shouldThrowException_whenOriginalPaymentStatusIsNotInProgress() {
         // given
         Payment invalidPayment = approvedPayment(); // 승인된 결제

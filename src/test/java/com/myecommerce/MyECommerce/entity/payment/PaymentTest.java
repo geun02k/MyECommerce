@@ -347,7 +347,35 @@ class PaymentTest {
         assertEquals(FAILED, payment.getPaymentStatus()); // 결제 승인 실패
     }
 
-    // 결제 상태 FAILED로 전이 불가 - 기존 결제 상태가 IN_PROGRESS 상태가 아닐 때
+    @Test
+    @DisplayName("결제상태 IN_PROGRESS -> FAILED 전이 실패 - PG 승인 응답의 트랜잭션 ID 불일치 시 예외발생")
+    void fail_shouldThrowException_whenPgTransactionIdMismatches() {
+        // given
+        Payment payment = inProgressPayment(); // PG 트랜잭션 ID = pgTransactionId
+        PgApprovalResult invalidPgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId("invalidPgTransactionId") // PG 트랜잭션 ID = invalidPgTransactionId
+                .build();
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                payment.fail(invalidPgApprovalResult));
+        assertEquals(PG_TRANSACTION_ID_MISMATCH, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("결제상태 IN_PROGRESS -> FAILED 전이 실패 - 기존 결제 상태가 IN_PROGRESS 상태가 아니면 예외발생")
+    void fail_shouldThrowException_whenOriginalPaymentStatusIsNotInProgress() {
+        // given
+        Payment invalidPayment = approvedPayment(); // 승인된 결제
+        PgApprovalResult pgApprovalResult = pgApprovalResult();
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                invalidPayment.fail(pgApprovalResult));
+        assertEquals(PAYMENT_STATUS_NOT_IN_PROGRESS, e.getErrorCode());
+    }
 
     /* ----------------------
         결제상태 판단 Tests

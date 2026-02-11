@@ -125,20 +125,32 @@ class PaymentTest {
 
         // 결제 생성 (READY)
         Payment payment = Payment.createPayment(order, requestMethod, pgProvider);
-        // PG 결제 요청 (READY -> IN_)
-        PgResult pgResult = PgResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .build();
+        // PG 결제 요청 (READY -> IN_PROGRESS)
+        PgResult pgResult = pgResult();
         payment.requestPgPayment(pgResult);
         // PG 결제 승인
-        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
-                .approvalStatus(APPROVED)
-                .paidAmount(new BigDecimal("10000"))
-                .build();
+        PgApprovalResult pgApprovalResult = pgApprovalResult();
         payment.approve(pgApprovalResult);
 
         return payment;
     }
+
+    /** PG 요청 결과 생성 */
+    PgResult pgResult() {
+        return PgResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .build();
+    }
+
+    /** PG 승인 결과 생성 */
+    PgApprovalResult pgApprovalResult() {
+        return PgApprovalResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .approvalStatus(APPROVED)
+                .paidAmount(new BigDecimal("10000"))
+                .build();
+    }
+
     /* ------------------
         Helper Method
        ------------------ */

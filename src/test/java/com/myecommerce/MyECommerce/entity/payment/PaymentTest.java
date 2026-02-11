@@ -11,6 +11,7 @@ import com.myecommerce.MyECommerce.exception.PaymentException;
 import com.myecommerce.MyECommerce.service.payment.PgClient;
 import com.myecommerce.MyECommerce.service.payment.TestPgClientImpl;
 import com.myecommerce.MyECommerce.type.PaymentMethodType;
+import com.myecommerce.MyECommerce.type.PaymentStatusType;
 import com.myecommerce.MyECommerce.type.PgProviderType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -129,7 +130,7 @@ class PaymentTest {
         PgResult pgResult = pgResult();
         payment.requestPgPayment(pgResult);
         // PG 결제 승인
-        PgApprovalResult pgApprovalResult = pgApprovalResult();
+        PgApprovalResult pgApprovalResult = pgApprovalResult(APPROVED);
         payment.approve(pgApprovalResult);
 
         return payment;
@@ -143,10 +144,10 @@ class PaymentTest {
     }
 
     /** PG 승인 결과 생성 */
-    PgApprovalResult pgApprovalResult() {
+    PgApprovalResult pgApprovalResult(PaymentStatusType approvalStatus) {
         return PgApprovalResult.builder()
                 .pgTransactionId("pgTransactionId")
-                .approvalStatus(APPROVED)
+                .approvalStatus(approvalStatus)
                 .paidAmount(new BigDecimal("10000"))
                 .build();
     }
@@ -312,7 +313,7 @@ class PaymentTest {
     void approve_shouldThrowException_whenOriginalPaymentStatusIsNotInProgress() {
         // given
         Payment invalidPayment = approvedPayment(); // 승인된 결제
-        PgApprovalResult pgApprovalResult = pgApprovalResult();
+        PgApprovalResult pgApprovalResult = pgApprovalResult(APPROVED);
 
         // when
         // then
@@ -380,7 +381,7 @@ class PaymentTest {
     void fail_shouldThrowException_whenOriginalPaymentStatusIsNotInProgress() {
         // given
         Payment invalidPayment = approvedPayment(); // 승인된 결제
-        PgApprovalResult pgApprovalResult = pgApprovalResult();
+        PgApprovalResult pgApprovalResult = pgApprovalResult(APPROVED);
 
         // when
         // then

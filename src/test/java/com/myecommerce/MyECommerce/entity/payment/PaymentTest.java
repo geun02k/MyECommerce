@@ -279,8 +279,53 @@ class PaymentTest {
         assertEquals(pgApprovalResult.getVatAmount(), payment.getVatAmount());
     }
 
-    // 결제 상태 APPROVED로 전이 불가 - 기존 결제 상태가 IN_PROGRESS 상태가 아닐 때
-    // 결제 상태 APPROVED로 전이 불가 - 주문, 결제 금액 불일치
+    @Test
+    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 실패 - PG 승인 응답의 트랜잭션 ID 불일치 시 예외발생")
+    void approve_shouldThrowException_whenPgTransactionIdMismatches() {
+        // given
+        Payment payment = inProgressPayment(); // PG 트랜잭션 ID = pgTransactionId
+        PgApprovalResult invalidPgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId("invalidPgTransactionId") // PG 트랜잭션 ID = invalidPgTransactionId
+                .build();
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                payment.approve(invalidPgApprovalResult));
+        assertEquals(PG_TRANSACTION_ID_MISMATCH, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 실패 - 기존 결제 상태가 IN_PROGRESS 상태가 아니면 예외발생")
+    void approve_shouldThrowException_whenOriginalPaymentStatusIsNotInProgress() {
+        // given
+        Payment invalidPayment = approvedPayment(); // 승인된 결제
+        PgApprovalResult pgApprovalResult = pgApprovalResult();
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                invalidPayment.approve(pgApprovalResult));
+        assertEquals(PAYMENT_STATUS_NOT_IN_PROGRESS, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("결제상태 IN_PROGRESS -> APPROVED 전이 실패 - 주문, 결제 금액 불일치 시 예외발생")
+    void approve_shouldThrowException_whenOrderAmountAndPaidAmountAreConsistency() {
+        // given
+        Payment payment = inProgressPayment(); // 주문금액 10000
+        PgApprovalResult invalidPgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .approvalStatus(APPROVED)
+                .paidAmount(new BigDecimal("50000")) // 결제금액 50000
+                .build();
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                payment.approve(invalidPgApprovalResult));
+        assertEquals(PAYMENT_AMOUNT_INCONSISTENCY, e.getErrorCode());
+    }
 
     @Test
     @DisplayName("결제상태 IN_PROGRESS -> FAILED 전이 성공 - PG 승인 실패 시 결제 승인실패 상태로 변경")

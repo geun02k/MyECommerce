@@ -108,8 +108,10 @@ public class Payment extends BaseEntity {
     /** PaymentStatus - 승인성공 상태 전이
      *  PG 결제 웹훅 승인결과 반영 **/
     public void approve(PgApprovalResult pgResult) {
+        // Transaction ID 미존재 시 상태 변경 불가
+        validatePgTransactionIdNotNull(pgResult.getPgTransactionId());
         // Transaction ID 불일치 시 상태 변경 불가
-        validatePgTransactionId(pgResult.getPgTransactionId());
+        validatePgTransactionIdMismatch(pgResult.getPgTransactionId());
 
         // PG 승인 대기 중일 때만 상태 변경 가능
         if (this.paymentStatus != IN_PROGRESS) {
@@ -128,8 +130,10 @@ public class Payment extends BaseEntity {
     /** PaymentStatus - 승인성공 상태 전이
      *  PG 결제 웹훅 실패 **/
     public void fail(PgApprovalResult pgResult) {
+        // Transaction ID 미존재 시 상태 변경 불가
+        validatePgTransactionIdNotNull(pgResult.getPgTransactionId());
         // Transaction ID 불일치 시 상태 변경 불가
-        validatePgTransactionId(pgResult.getPgTransactionId());
+        validatePgTransactionIdMismatch(pgResult.getPgTransactionId());
 
         // PG 승인 대기 중일 때만 상태 변경 가능
         if (this.paymentStatus != IN_PROGRESS) {
@@ -161,8 +165,15 @@ public class Payment extends BaseEntity {
         }
     }
 
+    // Transaction ID 미존재 시 상태 변경 불가
+    private void validatePgTransactionIdNotNull(String pgTransactionId) {
+        if (pgTransactionId == null) {
+            throw new PaymentException(PG_RESPONSE_TRANSACTION_ID_NOT_EXISTS);
+        }
+    }
+
     // Transaction ID 불일치 시 상태 변경 불가
-    private void validatePgTransactionId(String requestPgTransactionId) {
+    private void validatePgTransactionIdMismatch(String requestPgTransactionId) {
         if (!this.pgTransactionId.equals(requestPgTransactionId)) {
             throw new PaymentException(PG_TRANSACTION_ID_MISMATCH);
         }

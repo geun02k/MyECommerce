@@ -2995,3 +2995,42 @@ PaymentStatus enum에 CANCELED 상태가 정의되어 있고 도메인 규칙상
    중요한 점은 이 방식은 일반 애플리케이션 로직에서는 사용되지 않고 테스트 코드에서만 사용된다는 점이며, 
    이는 도메인 무결성을 유지하면서 테스트 유연성을 확보하기 위한 의도된 사용 방식이다.      
 
+
+---
+## 31. 코드의 분기
+아래의 코드의 분기는 딱 2개 뿐이다.   
+true는 예외 발생, false느 통과한다.   
+READY / IN_PROGRESS는 동일분기, APPROVED / CANCELED 도 동일분기이다.    
+분기별 테스트는 최소 하나씩 작성하는 게 좋다.
+하지만 READY / IN_PROGRESS 중 하나의 상태만 테스트한 반면,
+APPROVED / CANCELED 상태 두가지를 모두 테스트코드를 작성하는 것은 분기 문제가 아니라 리스크 관리 문제 때문이다.   
+누군가 나중에 코드를 변경할 수 있기 때문에 사전에 방지하는 것이다.
+READY / IN_PROGRESS의 경우는 아직 결제가 종결되지 않았다는 도메인적 의미를 가지지만,
+APPROVED / CANCELED은 둘 다 approve 불가지만 비즈니스 의미가 다르다.
+따라서 정책 테스트에서는 둘 다 검증하는 게 안전하다.   
+Entity에서의 테스트코드는 로직 정확성 검증용, 정책 테스트에서는 규칙 적용 검증용이기 때문이다.
+
+~~~
+// PaymentPolicy 코드
+    // 결제 승인된 경우 결제 생성 불가 (승인, 취소 등 PG 승인된 경우)
+    private void validatePaymentAlreadyApproved(List<Payment> paymentList) {
+        long invalidPaymentCount = paymentList.stream()
+                .filter(payment -> !payment.isApproveRequestAvailable()) // 결제 완료되어 결제불가
+                .count();
+
+        if (invalidPaymentCount > 0) {
+            throw new PaymentException(PAYMENT_ALREADY_COMPLETED);
+        }
+    }
+~~~
+~~~
+// Payment 코드
+    /** PaymentStatus - 자기 상태 판단
+     *  PG 승인 요청 가능 여부 반환 **/
+    public boolean isApproveRequestAvailable() {
+        return !(this.paymentStatus == APPROVED || this.paymentStatus == CANCELED);
+    }
+
+~~~
+
+

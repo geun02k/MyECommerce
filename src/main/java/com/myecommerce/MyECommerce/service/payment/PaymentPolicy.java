@@ -14,7 +14,6 @@ import java.util.List;
 import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.*;
 import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.MEMBER_NOT_LOGGED_IN;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
-import static com.myecommerce.MyECommerce.type.PaymentStatusType.*;
 
 @Component
 public class PaymentPolicy {
@@ -34,8 +33,8 @@ public class PaymentPolicy {
         // 3. DB 조회 필요 도메인 규칙 검증
         // 본인 외 결제 불가
         validatePaymentOnlyOwnAccess(order, member);
-        // 결제상태 종결여부 검증
-        validateNoTerminalPayment(paymentList);
+        // 결제 승인여부 검증
+        validatePaymentAlreadyApproved(paymentList);
     }
 
     // 결제 접근 권한 제한 정책
@@ -66,12 +65,12 @@ public class PaymentPolicy {
     }
 
     // 결제 승인된 경우 결제 생성 불가 (승인, 취소 등 PG 승인된 경우)
-    private void validateNoTerminalPayment(List<Payment> paymentList) {
-        long invalidPaymentCount = paymentList.stream()
-                .filter(payment -> !payment.isTerminal())
-                .count();
+    private void validatePaymentAlreadyApproved(List<Payment> paymentList) {
+        boolean hasAlreadyApproved = paymentList.stream()
+                .anyMatch(payment ->
+                        !payment.isApproveRequestAvailable()); // 결제 완료되어 결제불가
 
-        if (invalidPaymentCount > 0) {
+        if (hasAlreadyApproved) {
             throw new PaymentException(PAYMENT_ALREADY_COMPLETED);
         }
     }

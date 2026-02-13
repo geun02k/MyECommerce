@@ -3340,3 +3340,56 @@ mock()은 실제 객체 대신 사용하는 가짜 객체다.
 단, 핵심 기준은 하나다.
 정상 흐름 테스트는 내부 구현이 아니라 “외부 계약(Contract)”만 검증한다.
 
+
+### < 전달인자 비교 eq()와 argThat() >
+1. 문제점
+   eq()는 객체 동일성 비교로, new ArrayList<>() 반환처럼 내부 구현이 바뀌면 테스트 실패.
+   지금은 emptyList이지만, 만약 객체를 비교한다면, 내부 필드 틀려도 통과하는 문제가 발생할 수 있다.   
+   ~~~
+        verify(paymentPolicy).validateCreate(
+                eq(Collections.emptyList()), eq(order), eq(member));
+   ~~~
+2. 문제해결     
+   리스트 내용 검증하도록 수정.    
+   eq()로 하는 객체 검증보다 argThat()을 사용한 속성 검증을 통해 인스턴스가 달라도 통과하도록 해 테스트 안정성 높임.
+   ~~~
+   verify(paymentPolicy).validateCreate(
+        argThat(List::isEmpty),
+        eq(order),
+        eq(member)
+   );
+   ~~~
+3. 외부 api 호출과 payload 검증    
+   외부 API 호출 테스트에서 가장 중요한 건 외부에 보낸 데이터가 정확한가이다.
+   외부 API 테스트 = 전달 데이터 검증 테스트는 필수이다.
+   ~~~
+       // PG 요청여부 검증 (외부 api 호출)
+        verify(pgClient).requestPayment(argThat(p ->
+                p.getOrder().equals(order)
+                && p.getPaymentMethod() == requestPaymentMethod
+                && p.getPgProvider() == pgProvider
+                && p.getPgTransactionId().equals(pgTransactionId)
+                && p.getPaymentStatus() == READY
+        ));
+   ~~~
+
+
+### < 실행순서 검증 >
+어떤 로직은 순서가 틀리면 버그이다.
+따라서 메서드 호출 순서가 정확한지 확인하는 테스트가 필요하다.   
+순서가 비즈니스 규칙일 경우에만 사용하고 남발하지 않도록 한다.
+
+1. 실행 순서 검증(InOrder)    
+   Mockito에서 제공하는 기능.    
+   호출 여부 뿐 아니라 메서드 호출 순서까지 검증.
+   ~~~
+   // mock1.method1() 다음 mock2.method2() 호출됨을 검증.
+   InOrder inOrder = inOrder(mock1, mock2);
+
+   inOrder.verify(mock1).method1();
+   inOrder.verify(mock2).method2();
+   ~~~
+
+2. 조회를 순서 검증에서 제외하는 이유     
+   조회는 “결과를 만들기 위한 준비 단계”이고
+   순서 검증은 “상태를 바꾸는 핵심 단계”만 검증.

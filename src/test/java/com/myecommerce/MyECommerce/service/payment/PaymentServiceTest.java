@@ -20,6 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -35,9 +36,9 @@ import static com.myecommerce.MyECommerce.type.PaymentStatusType.IN_PROGRESS;
 import static com.myecommerce.MyECommerce.type.PaymentStatusType.READY;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -88,7 +89,7 @@ class PaymentServiceTest {
                 .build();
     }
 
-    /** 생성된 주문 */
+    /** 등록된 주문 */
     Order order(Member member) {
         ProductOption productOption = productOption();
         OrderItem orderItem = OrderItem.createOrderItem(productOption, 1);
@@ -130,12 +131,12 @@ class PaymentServiceTest {
     }
 
     /* -------------------------
-        결제 생성 정상 흐름 Tests
+        결제생성 정상 시나리오 Tests
        ------------------------- */
 
     @Test
-    @DisplayName("결제생성 성공 - 정상 결제 요청 시 결제상태 IN_PROGRESS 응답") // 결제 생성 흐름 정상 시나리오
-    void startPayment_shouldInProgressResponse_whenValid() {
+    @DisplayName("결제생성 정상 시나리오 - 정상 결제 요청 시 결제상태 IN_PROGRESS 응답")
+    void startPayment_shouldInProgressResponse_whenValidRequest() {
         // given
         Long requestOrderId = 1L;
         String pgTransactionId = "pgTransactionId";
@@ -209,8 +210,6 @@ class PaymentServiceTest {
         // 요청 결제에 대한 주문
         Order order = order(member);
 
-        // PG 결제대행사 반환
-        given(pgClient.getProvider()).willReturn(pgProvider);
         // 요청 결제에 대한 주문 조회
         given(orderRepository.findLockedByIdAndOrderStatus(
                 requestOrderId, OrderStatusType.CREATED))
@@ -227,9 +226,8 @@ class PaymentServiceTest {
         // then
         // 정책 실행여부 검증
         verify(paymentPolicy).preValidateCreate(eq(member));
-        // TODO: eq()로 하는 객체 검증보다 argThat()을 사용한 속성 검증을 통해 인스턴스가 달라도 통과하도록 해 테스트 안정성 높임.
         verify(paymentPolicy).validateCreate(
-                eq(Collections.emptyList()), eq(order), eq(member));
+                argThat(List::isEmpty), eq(order), eq(member));
     }
 
     @Test
@@ -328,15 +326,24 @@ class PaymentServiceTest {
         // 신규 결제 생성 및 저장
         given(paymentRepository.save(any())).willReturn(savedPayment);
         // PG 결제대행사에 결제 요청
-        given(pgClient.requestPayment(any())).willReturn(pgResult);
+        given(pgClient.requestPayment(argThat(p ->
+                p.getOrder().equals(order)
+                        && p.getPaymentMethod() == requestPaymentMethod
+                        && p.getPgProvider() == pgProvider
+                        && p.getPaymentStatus() == READY
+        ))).willReturn(pgResult);
 
         // when
         ResponsePaymentDto response =
                 paymentService.startPayment(request, member);
 
         // then
-        // PG 요청여부 검증 (외부 api 호출)
-        verify(pgClient).requestPayment(eq(savedPayment));
+        // 호출 순서 검증
+        InOrder inOrder = inOrder(paymentPolicy, paymentRepository, pgClient);
+        inOrder.verify(paymentPolicy).preValidateCreate(member);
+        inOrder.verify(paymentPolicy).validateCreate(any(), eq(order), eq(member));
+        inOrder.verify(paymentRepository).save(any());
+        inOrder.verify(pgClient).requestPayment(any());
         // PG 요청 후 응답 검증
         assertEquals(requestOrderId, response.getOrderId());
         assertEquals(pgResult.getPgTransactionId(), response.getPgResult().getPgTransactionId());

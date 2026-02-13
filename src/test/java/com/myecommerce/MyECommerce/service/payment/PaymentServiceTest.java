@@ -7,18 +7,15 @@ import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.entity.order.Order;
 import com.myecommerce.MyECommerce.entity.order.OrderItem;
-import com.myecommerce.MyECommerce.entity.payment.Payment;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
-import com.myecommerce.MyECommerce.type.OrderStatusType;
 import com.myecommerce.MyECommerce.type.PgProviderType;
 import io.jsonwebtoken.lang.Collections;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,21 +28,16 @@ import java.util.Optional;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.PaymentMethodType.CARD;
 import static com.myecommerce.MyECommerce.type.PaymentStatusType.IN_PROGRESS;
-import static com.myecommerce.MyECommerce.type.PaymentStatusType.READY;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTest {
 
     @Mock
     PgClient pgClient;
-
-    @Mock
-    PaymentPolicy paymentPolicy;
 
     @Mock
     OrderRepository orderRepository;
@@ -100,16 +92,18 @@ class PaymentServiceTest {
         Helper Method
        ------------------ */
 
-    /* ----------------------
-        결제 생성 Tests
-       ---------------------- */
+    /* -------------------------
+        결제 생성 정상 흐름 Tests
+       ------------------------- */
 
     @Test
-    @DisplayName("결제생성 성공 - 결제 객체 생성 및 PG 결제 요청") // 결제 생성 흐름 정상 시나리오
-    void startPayment_shouldCreatePaymentAndPgRequest_whenValid() {
+    @DisplayName("결제생성 성공 - 정상 결제 요청 시 결제상태 IN_PROGRESS 응답") // 결제 생성 흐름 정상 시나리오
+    void startPayment_shouldInProgressResponse_whenValid() {
         // given
-        // 요청 결제 정보
         Long requestOrderId = 1L;
+        String pgTransactionId = "pgTransactionId";
+        String redirectUrl = "redirectUrl";
+        // 요청 결제 정보
         RequestPaymentDto request = RequestPaymentDto.builder()
                 .orderId(requestOrderId)
                 .paymentMethod(CARD)
@@ -121,51 +115,33 @@ class PaymentServiceTest {
         PgProviderType pgProvider = PgProviderType.MOCK_PG;
         // 요청 결제에 대한 주문
         Order order = order(member);
-        // 저장된 신규 결제
-        Payment savedPayment = Payment.createPayment(order, CARD, pgProvider);
-        // PG 결제 요청 응답
+        // PG 결제대행사에 결제 요청
         PgResult pgResult = PgResult.builder()
-                .pgTransactionId("pgTransactionId")
+                .pgTransactionId(pgTransactionId)
+                .redirectUrl(redirectUrl)
                 .build();
 
         // PG 결제대행사 반환
         given(pgClient.getProvider()).willReturn(pgProvider);
         // 요청 결제에 대한 주문 조회
-        given(orderRepository.findLockedByIdAndOrderStatus(
-                requestOrderId, OrderStatusType.CREATED))
+        given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
                 .willReturn(Optional.of(order));
         // 주문에 대한 기존 결제내역 미존재
-        given(paymentRepository.findLockedAllByOrderId(requestOrderId))
+        given(paymentRepository.findLockedAllByOrderId(any()))
                 .willReturn(Collections.emptyList());
         // 신규 결제 생성 및 저장
-        given(paymentRepository.save(any())).willReturn(savedPayment);
+        given(paymentRepository.save(any()))
+                .willAnswer(invocationOnMock ->
+                        invocationOnMock.getArgument(0));
         // PG 결제대행사에 결제 요청
-        given(pgClient.requestPayment(savedPayment))
-                .willReturn(pgResult);
+        given(pgClient.requestPayment(any())).willReturn(pgResult);
 
         // when
         ResponsePaymentDto response =
                 paymentService.startPayment(request, member);
 
         // then
-        // 정책 실행여부 검증
-        verify(paymentPolicy).preValidateCreate(member);
-        verify(paymentPolicy).validateCreate(Collections.emptyList(), order, member);
-        // PG 요청여부 검증 (외부 api 호출)
-        verify(pgClient).requestPayment(savedPayment);
-        // 결제 저장여부 검증
-        ArgumentCaptor<Payment> paymentArgCaptor = ArgumentCaptor.forClass(Payment.class);
-        verify(paymentRepository).save(paymentArgCaptor.capture());
-
-        // Payment 저장 전, 신규 생성된 결제객체 검증
-        Payment capturedPayment = paymentArgCaptor.getValue();
-        assertEquals(order, capturedPayment.getOrder());
-        assertEquals(request.getPaymentMethod(), capturedPayment.getPaymentMethod());
-        assertEquals(pgProvider, capturedPayment.getPgProvider());
-        assertNotNull(capturedPayment.getPaymentCode()); // paymentCode 규칙 검증은 Payment Entity에서 검증 (paymentCode 생성 규칙 바뀌면 Service 테스트가 깨지기 때문)
-        assertEquals(READY, capturedPayment.getPaymentStatus()); // 결제 생성 상태
-
-        // PG 요청 후 응답 검증
+        // PG 요청 후 응답 검증 (API 사용자 입장에서 반드시 필요한 결과만 검증)
         assertEquals(requestOrderId, response.getOrderId());
         assertEquals(IN_PROGRESS, response.getPaymentStatus()); // 결제 상태 PG 요청으로 변경
         assertEquals(pgResult.getPgTransactionId(), response.getPgResult().getPgTransactionId());

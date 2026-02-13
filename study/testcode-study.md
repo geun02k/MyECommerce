@@ -3079,3 +3079,264 @@ Mockito에서 verify()는 times()를 명시하지 않으면 기본값이 1회 �
    verify(paymentPolicy).preValidateCreate(member);
    ~~~
 
+
+### < 정상 시나리오 테스트 역할별 분리 >
+1. 문제점    
+   현재 정상 시나리오 테스트 하나로 흐름을 모두 검증하고 있다.
+   즉, 검증 범위가 너무 넓다.    
+   이는 사실상 단위 테스트가 아니라 Mockito로 흉내 낸 통합 테스트이다.    
+   현재 테스트는 아래의 책임을 동시에 검증하고 있다.
+   - 정책 검증 호출
+   - 주문 조회
+   - 결제 생성
+   - 결제 저장
+   - PG 호출
+   - 상태 변경
+   - 응답 DTO 생성
+   ~~~
+    @Test
+    @DisplayName("결제생성 성공 - 결제 객체 생성 및 PG 결제 요청")
+    void startPayment_shouldCreatePaymentAndPgRequest_whenValid() {
+        // given
+        // 요청 결제 정보
+        Long requestOrderId = 1L;
+        RequestPaymentDto request = RequestPaymentDto.builder()
+                .orderId(requestOrderId)
+                .paymentMethod(CARD)
+                .build();
+        // 결제 요청 고객
+        Member member = customer();
+
+        // PG 결제대행사
+        PgProviderType pgProvider = PgProviderType.MOCK_PG;
+        // 요청 결제에 대한 주문
+        Order order = order(member);
+        // 저장된 신규 결제
+        Payment savedPayment = Payment.createPayment(order, CARD, pgProvider);
+        // PG 결제 요청 응답
+        PgResult pgResult = PgResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .build();
+
+        // PG 결제대행사 반환
+        given(pgClient.getProvider()).willReturn(pgProvider);
+        // 요청 결제에 대한 주문 조회
+        given(orderRepository.findLockedByIdAndOrderStatus(
+                requestOrderId, OrderStatusType.CREATED))
+                .willReturn(Optional.of(order));
+        // 주문에 대한 기존 결제내역 미존재
+        given(paymentRepository.findLockedAllByOrderId(requestOrderId))
+                .willReturn(Collections.emptyList());
+        // 신규 결제 생성 및 저장
+        given(paymentRepository.save(any())).willReturn(savedPayment);
+        // PG 결제대행사에 결제 요청
+        given(pgClient.requestPayment(savedPayment))
+                .willReturn(pgResult);
+
+        // when
+        ResponsePaymentDto response =
+                paymentService.startPayment(request, member);
+
+        // then
+        // 정책 실행여부 검증
+        verify(paymentPolicy).preValidateCreate(member);
+        verify(paymentPolicy).validateCreate(Collections.emptyList(), order, member);
+        // PG 요청여부 검증 (외부 api 호출)
+        verify(pgClient).requestPayment(savedPayment);
+        // 결제 저장여부 검증
+        ArgumentCaptor<Payment> paymentArgCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentArgCaptor.capture());
+
+        // Payment 저장 전, 신규 생성된 결제객체 검증
+        Payment capturedPayment = paymentArgCaptor.getValue();
+        assertEquals(order, capturedPayment.getOrder());
+        assertEquals(request.getPaymentMethod(), capturedPayment.getPaymentMethod());
+        assertEquals(pgProvider, capturedPayment.getPgProvider());
+        assertNotNull(capturedPayment.getPaymentCode()); // paymentCode 규칙 검증은 Payment Entity에서 검증 (paymentCode 생성 규칙 바뀌면 Service 테스트가 깨지기 때문)
+        assertEquals(READY, capturedPayment.getPaymentStatus()); // 결제 생성 상태
+
+        // PG 요청 후 응답 검증
+        assertEquals(requestOrderId, response.getOrderId());
+        assertEquals(IN_PROGRESS, response.getPaymentStatus()); // 결제 상태 PG 요청으로 변경
+        assertEquals(pgResult.getPgTransactionId(), response.getPgResult().getPgTransactionId());
+        assertEquals(pgResult.getRedirectUrl(), response.getPgResult().getRedirectUrl());
+    }
+   ~~~
+   
+2. 해결방법    
+   하나의 테스트에서 결제 생성, 정책 검증, 저장, PG 호출, 상태 변경, 응답 검증까지 전부 확인하고 있는데, 
+   이렇게 되면 테스트 하나가 서비스 전체 흐름을 동시에 책임지게 된다.  
+   그러면 내부 구현이 조금만 바뀌어도 테스트가 연쇄적으로 깨진다. 
+   좋은 테스트는 로직이 아니라 책임 단위를 검증해야 한다.   
+   따라서 현재 정상 시나리오 테스트를 분해해야 한다.
+   1) startPayment() 내부 책임
+      - 결제 생성
+      - PG 요청
+      - 결과 반영 및 응답 반환
+
+   2) 전체 정상 흐름 테스트    
+      테스트의 목적은 딱 하나다.
+      사용자 입장에서 기능이 정상 동작하는가?   
+      따라서 여기서는 내부 검증을 거의 하지 않는다.    
+      내부 구현 검증이 아닌 기능 동작 검증이기 때문이다.
+      ~~~
+      @Test
+      void 결제_정상_흐름() {
+         ResponsePaymentDto response =
+         paymentService.startPayment(request, member);
+   
+         assertEquals(IN_PROGRESS, response.getPaymentStatus());
+      }
+      ~~~
+   
+   3) 결제 생성 책임 테스트    
+      결제가 생성되고 저장되는지만 검증.   
+      ~~~
+      @Test
+      void 결제_생성된다() {
+          // given
+          Member member = customer();
+          Order order = order(member);
+   
+          given(pgClient.getProvider()).willReturn(PgProviderType.MOCK_PG);
+          given(orderRepository.findLockedByIdAndOrderStatus(1L, OrderStatusType.CREATED))
+                  .willReturn(Optional.of(order));
+          given(paymentRepository.findLockedAllByOrderId(1L))
+                  .willReturn(Collections.emptyList());
+   
+          // when
+          paymentService.startPayment(
+                  RequestPaymentDto.builder().orderId(1L).paymentMethod(CARD).build(),
+                  member
+          );
+   
+          // then
+          verify(paymentRepository).save(any());
+      }
+      ~~~
+      
+   4) 정책 호출 테스트   
+      정책이 실행되는지만 검증
+      ~~~
+      @Test
+      void 정책이_호출된다() {
+          Member member = customer();
+          Order order = order(member);
+   
+          given(pgClient.getProvider()).willReturn(PgProviderType.MOCK_PG);
+          given(orderRepository.findLockedByIdAndOrderStatus(1L, OrderStatusType.CREATED))
+                  .willReturn(Optional.of(order));
+          given(paymentRepository.findLockedAllByOrderId(1L))
+                  .willReturn(Collections.emptyList());
+   
+          paymentService.startPayment(
+                  RequestPaymentDto.builder().orderId(1L).paymentMethod(CARD).build(),
+                  member
+          );
+   
+          verify(paymentPolicy).preValidateCreate(member);
+          verify(paymentPolicy).validateCreate(any(), eq(order), eq(member));
+      }
+      ~~~
+   
+   5) PG 요청 테스트    
+      PG 호출되는지만 확인.
+      ~~~
+      @Test
+      void PG요청_보낸다() {
+          Member member = customer();
+          Order order = order(member);
+          Payment payment = Payment.createPayment(order, CARD, PgProviderType.MOCK_PG);
+   
+          given(pgClient.getProvider()).willReturn(PgProviderType.MOCK_PG);
+          given(orderRepository.findLockedByIdAndOrderStatus(1L, OrderStatusType.CREATED))
+                  .willReturn(Optional.of(order));
+          given(paymentRepository.findLockedAllByOrderId(1L))
+                  .willReturn(Collections.emptyList());
+          given(paymentRepository.save(any())).willReturn(payment);
+          given(pgClient.requestPayment(any())).willReturn(PgResult.builder().build());
+   
+          paymentService.startPayment(
+                  RequestPaymentDto.builder().orderId(1L).paymentMethod(CARD).build(),
+                  member
+          );
+   
+          verify(pgClient).requestPayment(any());
+      }
+      ~~~
+
+   6) 응답값 테스트    
+      반환 DTO만 검증.
+      ~~~
+      @Test
+      void 응답값_정상() {
+          Member member = customer();
+          Order order = order(member);
+          Payment payment = Payment.createPayment(order, CARD, PgProviderType.MOCK_PG);
+   
+          PgResult result = PgResult.builder()
+               .pgTransactionId("tx")
+               .redirectUrl("url")
+               .build();
+   
+          given(pgClient.getProvider()).willReturn(PgProviderType.MOCK_PG);
+          given(orderRepository.findLockedByIdAndOrderStatus(1L, OrderStatusType.CREATED))
+                  .willReturn(Optional.of(order));
+          given(paymentRepository.findLockedAllByOrderId(1L))
+                  .willReturn(Collections.emptyList());
+          given(paymentRepository.save(any())).willReturn(payment);
+          given(pgClient.requestPayment(any())).willReturn(result);
+   
+          ResponsePaymentDto response =
+               paymentService.startPayment(
+                       RequestPaymentDto.builder().orderId(1L).paymentMethod(CARD).build(),
+                       member
+               );
+   
+          assertEquals(IN_PROGRESS, response.getPaymentStatus());
+          assertEquals("tx", response.getPgResult().getPgTransactionId());
+      }
+      ~~~
+      
+3. 테스트를 분해하는 이유    
+   기존 구조에서는 Payment 내부 로직이 바뀌면 테스트 하나가 아니라 전체 테스트가 깨진다. 
+   하지만 책임별 테스트로 나누면 특정 로직만 영향을 받는다. 
+   예를 들어 결제 상태 변경 로직이 수정되면 상태 테스트만 실패한다. 
+   나머지는 그대로 통과한다. 
+   이것이 테스트 유지보수성의 핵심이다.
+
+
+### < 서비스 테스트에서 mock()과 willAnswer() 이해하기 >
+목적 → 테스트를 구현이 아니라 행동과 결과 중심으로 유지
+이 원칙만 유지하면 테스트가 커져도 깨지지 않고 유지보수가 쉬워진다.    
+
+서비스 단위 테스트에서 중요한 원칙은 테스트 대상 로직만 검증하고 외부 의존성은 통제하는 것이다. 
+이때 사용하는 것이 mock()과 willAnswer() 같은 Mockito 기능이다.   
+
+mock()은 실제 객체 대신 사용하는 가짜 객체다. 
+예를 들어 주문 조회 결과만 필요하고 주문 내부 로직은 중요하지 않다면 
+실제 Order를 생성할 필요 없이 mock 객체를 만들어 필요한 값만 반환하도록 설정하면 된다. 
+이렇게 하면 테스트가 불필요한 도메인 생성 로직에 의존하지 않아 더 단순하고 안정적이 된다.    
+
+1. willAnswer()    
+   - 호출 인자 기반 동적 응답 설정     
+   mock 메서드가 호출됐을 때 전달된 인자 기반으로 동적으로 응답을 만들고 싶을 때 사용한다. 
+   대표적인 예가 repository.save()이다. 
+   실제 JPA save는 전달된 엔티티를 그대로 반환하는데, 
+   일반 willReturn()을 쓰면 항상 고정 객체만 반환하게 되어 실제 동작과 달라질 수 있다. 
+   이때 willAnswer(invocation -> invocation.getArgument(0))처럼 작성하면 
+   save에 전달된 객체를 그대로 반환하게 되어 실제 저장 동작을 자연스럽게 흉내낼 수 있다.
+
+2. invocation    
+   mock 호출 정보를 담은 객체이고, getArgument(0)은 첫 번째 파라미터를 꺼내는 메서드다. 
+   즉 위 코드는 “save에 전달된 객체를 그대로 반환하라”는 의미다.
+
+3. mock()   
+   테스트 대상이 아닌 의존 객체를 단순화하기 위한 도구
+
+   
+### < 정상 흐름 테스트에서 어디까지 검증해야 할까? >
+지금 고민 방향은 아주 좋다. 결론부터 말하면 맞다. IN_PROGRESS만 검증하는 건 최소 검증 기준이고, 실제로는 “외부에 약속한 결과 값”까지는 검증하는 게 좋다.
+단, 핵심 기준은 하나다.
+정상 흐름 테스트는 내부 구현이 아니라 “외부 계약(Contract)”만 검증한다.
+

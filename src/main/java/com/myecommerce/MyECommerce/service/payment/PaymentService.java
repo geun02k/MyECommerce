@@ -109,8 +109,8 @@ public class PaymentService {
 
         if (payment == null) {
             // 결제 생성
-            payment = Payment.createPayment(order, paymentMethod, pgProvider);
-            paymentRepository.save(payment);
+            Payment newPayment = Payment.createPayment(order, paymentMethod, pgProvider);
+            payment = paymentRepository.save(newPayment);
         }
 
         return payment;

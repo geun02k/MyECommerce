@@ -3034,3 +3034,48 @@ Entity에서의 테스트코드는 로직 정확성 검증용, 정책 테스트�
 ~~~
 
 
+---
+## 32. PaymentServiceTest 구조개선
+### < given절 >
+1. 좋지 않은 given    
+   읽는 사람이 Builder 내부 구조 해석해야 함.
+   ~~~
+   Member member = Member.builder()
+       .userId("customer")
+       .roles(List.of(MemberAuthority.builder())
+       .build(); 
+   ~~~
+
+2. 좋은 given    
+   읽는 순간 의미 이해되어야 함.
+   1) 기존 생각     
+      given 데이터를 픽스쳐로 외부로 빼버리면 데이터를 보러 픽스쳐 메서드로 이동해야하니까 더 읽기 어려운 구조가 되는 것이라고 생각했다.
+      그래서 요청 데이터들은 픽스쳐로 빼지 않았다.    
+   2) 픽스쳐 메서드로 빼야하는 것    
+      fixture는 무조건 빼는 게 아니라 "의미없는 데이터만" 빼는 것이다.
+      즉, 테스트 의도와 상관없는 값을 빼는 것이다.
+      따라서 요청 데이터는 테스트 코드 안에 유지하는 것이 맞다.
+   ~~~
+   Member member = fixture.member();
+   Order order = fixture.order(member);
+   PgResult pgResult = fixture.pgResult();
+   ~~~
+
+3. PaymentService 정상흐름 테스트에서 요청값     
+   둘 다 요청값이지만 request는 핵심 입력값이고 member는 현재 테스트에서는 핵심 입력값이 아니다.
+   reqeust는 결과를 바꾸는 값인 반면, member는 정책 검증 통과용 객체로 결과를 변경하지 않기 때문이다.   
+   따라서 request는 유지, member는 픽스쳐로 빼는 것이 가독성 측면에서 좋다.
+
+   
+### < verify() >
+Mockito에서 verify()는 times()를 명시하지 않으면 기본값이 1회 호출 검증하므로 생략가능.
+기본값이 1이니까, times(1)을 쓰게 되면 노이즈일 뿐이다.
+1. 기존 코드
+   ~~~
+   verify(paymentPolicy, times(1)).preValidateCreate(member);
+   ~~~
+2. 수정한 코드   
+   ~~~
+   verify(paymentPolicy).preValidateCreate(member);
+   ~~~
+

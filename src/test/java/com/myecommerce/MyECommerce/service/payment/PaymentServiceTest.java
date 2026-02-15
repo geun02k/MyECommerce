@@ -101,6 +101,17 @@ class PaymentServiceTest {
         return order;
     }
 
+    /** 저장된 결제 (id 추가) */
+    Payment savedPayment(Order order,
+                         PaymentMethodType requestPaymentMethod,
+                         PgProviderType pgProvider) {
+        Payment savedPayment = Payment.createPayment(
+                order, requestPaymentMethod, pgProvider);
+        ReflectionTestUtils.setField(savedPayment, "id", 10L);
+
+        return savedPayment;
+    }
+
     /** 고객 권한 */
     MemberAuthority customerRole() {
         return MemberAuthority.builder()
@@ -111,6 +122,29 @@ class PaymentServiceTest {
     /* ------------------
         Helper Method
        ------------------ */
+
+    void givenPgProvider(PgProviderType pgProvider) {
+        given(pgClient.getProvider()).willReturn(pgProvider);
+    }
+
+    void givenOrders(Order order) {
+        given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
+                .willReturn(Optional.of(order));
+    }
+
+    void givenEmptyPayments() {
+        given(paymentRepository.findLockedAllByOrderId(any()))
+                .willReturn(Collections.emptyList());
+    }
+
+    void givenPaymentSaved(Payment savedPayment) {
+        given(paymentRepository.save(any())).willReturn(savedPayment);
+    }
+
+    void givenRequestPayment (Payment savedPayment,
+                              PgApiResponse<PgResult> pgApiResponse) {
+        given(pgClient.requestPayment(savedPayment)).willReturn(pgApiResponse);
+    }
 
     /** 실행가능상태 준비 - 신규 payment 저장 및 PG 결제 요청 mocking */
     void givenPaymentPersistSucceeds() {
@@ -365,6 +399,59 @@ class PaymentServiceTest {
     // 결제생성 책임 - 응답값 검증
     // 응답 로직이 단순하고 정상 흐름에서 핵심 응답 검증했기에 불필요
     // 같은 책임 두 번 테스트하면 유지보수 비용만 증가
+
+    /* ---------------------------
+        결제생성 PG 응답 분기 Tests
+       --------------------------- */
+
+    // PG 요청 응답 분기 - PG 요청 성공 응답 시 결제상태 IN_PROGRESS로 변경
+    // -> 정상 시나리오에서 간접 검증으로 제외
+
+    @Test
+    @DisplayName("PG 요청 응답 분기 - PG 요청 실패 응답 시 결제상태 READY 유지")
+    void startPayment_shouldKeepReadyStatus_whenPgResponseFailed() {
+        Long requestOrderId = 1L;
+        PaymentMethodType requestPaymentMethod = CARD;
+        PgProviderType pgProvider = PgProviderType.MOCK_PG;
+
+        // 요청 결제 정보
+        RequestPaymentDto request = RequestPaymentDto.builder()
+                .orderId(requestOrderId)
+                .paymentMethod(requestPaymentMethod)
+                .build();
+        // 결제 요청 고객
+        Member member = customer();
+
+        // 요청 결제에 대한 주문 (PG 결제 실패를 위해 주문금액 0원)
+        Order invalidOrder = order(member);
+        ReflectionTestUtils.setField(invalidOrder, "totalPrice", BigDecimal.ZERO);
+        // 저장된 신규 결제
+        Payment savedPayment = savedPayment(invalidOrder, requestPaymentMethod, pgProvider);
+        // PG 결제 요청 응답 (결제 실패 응답)
+        PgApiResponse<PgResult> pgApiResponse = PgApiResponse.fail(
+                "INVALID_AMOUNT", "결제 금액이 올바르지 않습니다.");
+
+        givenPgProvider(pgProvider); // PG 결제대행사 반환
+        givenOrders(invalidOrder); // 요청 결제에 대한 주문 조회
+        givenEmptyPayments(); // 주문에 대한 기존 결제내역 미존재
+        givenPaymentSaved(savedPayment); // 신규 결제 생성 및 저장
+        givenRequestPayment(savedPayment, pgApiResponse); // PG 결제대행사에 결제 요청
+
+        // when
+        ResponsePaymentDto response = paymentService.startPayment(request, member);
+
+        // then
+        // PG 결제 실패 응답 검증
+        assertEquals(requestOrderId, response.getOrderId());
+        assertEquals(savedPayment.getId(), response.getPaymentId());
+        assertEquals(savedPayment.getPaymentStatus(), response.getPaymentStatus());
+        assertEquals(pgApiResponse.getError().getCode(), response.getFailCode());
+        assertNotNull(response.getFailMessage());
+        assertEquals(READY, response.getPaymentStatus());
+    }
+
+    // PG 요청 응답 분기 - PG 요청 실패 시 예외발생
+    // -> Service 책임 아니므로 제외
 
     /* ----------------------------
         결제생성 실패 Tests

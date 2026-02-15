@@ -10,6 +10,7 @@ import com.myecommerce.MyECommerce.entity.order.OrderItem;
 import com.myecommerce.MyECommerce.entity.payment.Payment;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
+import com.myecommerce.MyECommerce.exception.PaymentException;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
 import com.myecommerce.MyECommerce.type.OrderStatusType;
@@ -30,6 +31,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.*;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.PaymentMethodType.CARD;
 import static com.myecommerce.MyECommerce.type.PaymentStatusType.IN_PROGRESS;
@@ -38,8 +40,7 @@ import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTest {
@@ -97,6 +98,13 @@ class PaymentServiceTest {
         Order order = Order.createOrder(List.of(orderItem), member);
         ReflectionTestUtils.setField(order, "id", 1L);
         return order;
+    }
+
+    /** 고객 권한 */
+    MemberAuthority customerRole() {
+        return MemberAuthority.builder()
+                .authority(CUSTOMER)
+                .build();
     }
 
     /* ------------------
@@ -355,16 +363,99 @@ class PaymentServiceTest {
     // 응답 로직이 단순하고 정상 흐름에서 핵심 응답 검증했기에 불필요
     // 같은 책임 두 번 테스트하면 유지보수 비용만 증가
 
-    // 주문된 조회가 없는데 결제 요청한 경우 실패 테스트
-    // 사전 정책 검증 실패 테스트
-    // 조회 후 정책 검증 실패 테스트
-    // PG 결제대행사 요청 문제 발생 시 IN_PROGRESS로 변경되지 않음을 테스트
+    /* ----------------------------
+        결제생성 실패 Tests
+       ---------------------------- */
 
+    @Test
+    @DisplayName("결제생성 실패 - 사전 정책 검증 실패 시 예외발생")
+    void startPayment_shouldThrowException_whenPreValidate() {
+        // given
+        RequestPaymentDto request = RequestPaymentDto.builder().build();
+        Member invalidMember = Member.builder()
+                .roles(Collections.emptyList()) // 고객 권한 없음
+                .build();
 
-    // 2. 메서드를 정책으로 이동해 테스트 진행여부 판단할 것
-    // PG 결제 종료된 경우 실패 테스트
-    // 요청 결제 방식과 다른 경우 실패 테스트
-    // 결제 대행사 정보가 동일하지 않은 경우 실패 테스트
+        // 사전 정책 실행 시 예외발생
+        doThrow(new PaymentException(PAYMENT_CUSTOMER_ONLY))
+                .when(paymentPolicy)
+                .preValidateCreate(eq(invalidMember));
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                paymentService.startPayment(request, invalidMember));
+        assertEquals(PAYMENT_CUSTOMER_ONLY, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("결제생성 실패 - DB 조회 후 정책 검증 실패 시 예외발생")
+    void startPayment_shouldThrowException_whenValidateAfterSearch() {
+        // given
+        final Long requestOrderId = 1L;
+        final Long requestMemberId = 5L;
+        final Long orderMemberId = 7L;
+        // 요청 결제 정보
+        RequestPaymentDto request = RequestPaymentDto.builder()
+                .orderId(requestOrderId)
+                .paymentMethod(CARD)
+                .build();
+        // 결제 요청 고객
+        Member requestMember = Member.builder()
+                .id(requestMemberId)
+                .roles(List.of(customerRole()))
+                .build();
+        // 주문한 고객
+        Member orderMember = Member.builder()
+                .id(orderMemberId)
+                .roles(List.of(customerRole()))
+                .build();
+        // 요청 결제에 대한 주문
+        Order order = order(orderMember);
+
+        // 요청 결제에 대한 주문 조회
+        given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
+                .willReturn(Optional.of(order));
+        // 주문에 대한 기존 결제내역 미존재
+        given(paymentRepository.findLockedAllByOrderId(any()))
+                .willReturn(Collections.emptyList());
+
+        // 정책 실행 시 예외발생
+        doThrow(new PaymentException(PAYMENT_ACCESS_AVAILABLE_ONLY_BUYER))
+                .when(paymentPolicy)
+                .validateCreate(argThat(List::isEmpty),
+                                argThat(o -> o.getId().equals(requestOrderId)
+                                        && o.getBuyer().getId().equals(orderMemberId)),
+                                argThat(m -> m.getId().equals(requestMemberId)));
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                paymentService.startPayment(request, requestMember));
+        assertEquals(PAYMENT_ACCESS_AVAILABLE_ONLY_BUYER, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("결제생성 실패 - 결제 요청에 대한 주문 미존재 시 예외발생")
+    void startPayment_shouldThrowException_whenNotExistsOrder() {
+        // given
+        // 요청 결제 정보
+        RequestPaymentDto request = RequestPaymentDto.builder()
+                .orderId(1L)
+                .paymentMethod(CARD)
+                .build();
+        // 결제 요청 고객
+        Member member = customer();
+
+        // 요청 결제에 대한 주문 미존재
+        given(orderRepository.findLockedByIdAndOrderStatus(eq(1L), eq(CREATED)))
+                .willReturn(Optional.empty());
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                paymentService.startPayment(request, member));
+        assertEquals(PAYMENT_ORDER_NOT_EXISTS, e.getErrorCode());
+    }
 
     /* ----------------------
         결제 승인 웹훅 Tests

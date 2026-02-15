@@ -112,6 +112,16 @@ class PaymentServiceTest {
         return savedPayment;
     }
 
+    /** PG 요청 성공응답 */
+    PgApiResponse<PgResult> pgApiResponseOfRequest() {
+        // PG 결제대행사에 결제 요청
+        PgResult pgResult = PgResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .redirectUrl("redirectUrl")
+                .build();
+        return PgApiResponse.success(pgResult);
+    }
+
     /** 고객 권한 */
     MemberAuthority customerRole() {
         return MemberAuthority.builder()
@@ -127,7 +137,7 @@ class PaymentServiceTest {
         given(pgClient.getProvider()).willReturn(pgProvider);
     }
 
-    void givenOrders(Order order) {
+    void givenOrderOfPayment(Order order) {
         given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
                 .willReturn(Optional.of(order));
     }
@@ -231,7 +241,54 @@ class PaymentServiceTest {
         assertEquals(pgResult.getRedirectUrl(), response.getRedirectUrl());
     }
 
-    // + 기존 결제 중 승인 가능한 결제가 있을 경우 결제 재사용 테스트
+    @Test
+    @DisplayName("결제생성 정상 시나리오 - 기존 결제내역 중 동일 결제방식, 결제사에 대한 결제 존재 시 재사용")
+    void startPayment_shouldReUsePayment_whenAlreadyExistsPayment() {
+        // given
+        Long requestOrderId = 1L;
+        PaymentMethodType requestPaymentMethod = PaymentMethodType.CARD;
+        PgProviderType pgProvider = PgProviderType.MOCK_PG;
+        // 요청 결제 정보
+        RequestPaymentDto request = RequestPaymentDto.builder()
+                .orderId(requestOrderId)
+                .paymentMethod(requestPaymentMethod)
+                .build();
+        // 결제 요청 고객
+        Member member = customer();
+
+        // 요청 결제에 대한 주문
+        Order order = order(member);
+        // 기존 결제 내역
+        Payment existingPayment = Payment.createPayment(
+                order, requestPaymentMethod, pgProvider);
+        ReflectionTestUtils.setField(existingPayment, "id", 10L);
+
+        givenPgProvider(pgProvider); // PG 결제대행사 반환
+        givenOrderOfPayment(order); // 요청 결제에 대한 주문 조회
+        // 주문에 대한 기존 결제내역 미존재
+        given(paymentRepository.findLockedAllByOrderId(any()))
+                .willReturn(List.of(existingPayment));
+        // 기존 PG 결제 요청 가능 여부 반환
+        given(paymentPolicy.isPaymentAvailablePgRequestAboutRequest(any(), any(), any()))
+                .willReturn(true);
+        // PG 결제대행사에 결제 요청
+        given(pgClient.requestPayment(any())).willReturn(pgApiResponseOfRequest());
+
+        // when
+        paymentService.startPayment(request, member);
+
+        // then
+        // 기존 결제 조회 여부 검증
+        verify(paymentRepository).findLockedAllByOrderId(requestOrderId);
+        // 기존 결제를 이용하므로, 신규 결제 저장되지 않음을 검증
+        verify(paymentRepository, never()).save(any());
+        // 기존 결제내역의 PG 요청 가능 여부 검증
+        verify(paymentPolicy).isPaymentAvailablePgRequestAboutRequest(
+                existingPayment, requestPaymentMethod, pgProvider);
+        // 기존 결제내역의 PG 요청 여부 검증
+        verify(pgClient).requestPayment(existingPayment);
+        // 결제 재사용 로직으로 응답이 달라질 가능성은 없으므로, 응답 검증 제외
+    }
 
     /* ----------------------------
         결제생성 책임 행위 검증 Tests
@@ -432,7 +489,7 @@ class PaymentServiceTest {
                 "INVALID_AMOUNT", "결제 금액이 올바르지 않습니다.");
 
         givenPgProvider(pgProvider); // PG 결제대행사 반환
-        givenOrders(invalidOrder); // 요청 결제에 대한 주문 조회
+        givenOrderOfPayment(invalidOrder); // 요청 결제에 대한 주문 조회
         givenEmptyPayments(); // 주문에 대한 기존 결제내역 미존재
         givenPaymentSaved(savedPayment); // 신규 결제 생성 및 저장
         givenRequestPayment(savedPayment, pgApiResponse); // PG 결제대행사에 결제 요청

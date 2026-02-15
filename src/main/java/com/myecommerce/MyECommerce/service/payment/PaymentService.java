@@ -44,14 +44,7 @@ public class PaymentService {
             updatePaymentToInProgress(payment, pgResponse.getData());
         }
 
-        return ResponsePaymentDto.builder()
-                .paymentId(payment.getId())
-                .orderId(payment.getOrder().getId())
-                .paymentStatus(payment.getPaymentStatus())
-                .redirectUrl(pgResponse.getData() != null ? pgResponse.getData().getRedirectUrl() : null)
-                .failCode(pgResponse.getError() != null ? pgResponse.getError().getCode() : null)
-                .failMessage(pgResponse.getError() != null ? pgResponse.getError().getMessage(): null)
-                .build();
+        return ResponsePaymentDto.from(payment, pgResponse);
     }
 
     /** 결제 생성 웹훅 처리 - 결제 상태 변경해 결제 종료 **/

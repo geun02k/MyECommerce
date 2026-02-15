@@ -18,8 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.ORDER_STATUS_NOT_CREATED;
-import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.PG_TRANSACTION_ID_NOT_EXISTS;
+import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.*;
 import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
 import static com.myecommerce.MyECommerce.type.PaymentStatusType.*;
 
@@ -94,7 +93,7 @@ public class PaymentService {
         // 주문 조회 (비관적 락)
         Order order = orderRepository
                 .findLockedByIdAndOrderStatus(orderId, CREATED)
-                .orElseThrow();
+                .orElseThrow(() -> new PaymentException(PAYMENT_ORDER_NOT_EXISTS));
 
         // 결제 다건 조회 (비관적 락)
         List<Payment> paymentList =

@@ -1,5 +1,6 @@
 package com.myecommerce.MyECommerce.service.payment;
 
+import com.myecommerce.MyECommerce.dto.payment.PgApiResponse;
 import com.myecommerce.MyECommerce.dto.payment.PgResult;
 import com.myecommerce.MyECommerce.dto.payment.RequestPaymentDto;
 import com.myecommerce.MyECommerce.dto.payment.ResponsePaymentDto;
@@ -123,8 +124,9 @@ class PaymentServiceTest {
                 .pgTransactionId("pgTransactionId")
                 .redirectUrl("redirectUrl")
                 .build();
+        PgApiResponse<PgResult> pgApiResponse = PgApiResponse.success(pgResult);
         // PG 결제대행사에 결제 요청
-        given(pgClient.requestPayment(any())).willReturn(pgResult);
+        given(pgClient.requestPayment(any())).willReturn(pgApiResponse);
     }
 
     /** 실행가능상태 준비 - PG 결제 요청 mocking */
@@ -134,8 +136,9 @@ class PaymentServiceTest {
                 .pgTransactionId("pgTransactionId")
                 .redirectUrl("redirectUrl")
                 .build();
+        PgApiResponse<PgResult> pgApiResponse = PgApiResponse.success(pgResult);
         // PG 결제대행사에 결제 요청
-        given(pgClient.requestPayment(any())).willReturn(pgResult);
+        given(pgClient.requestPayment(any())).willReturn(pgApiResponse);
     }
 
     /* -------------------------
@@ -166,6 +169,7 @@ class PaymentServiceTest {
                 .pgTransactionId(pgTransactionId)
                 .redirectUrl(redirectUrl)
                 .build();
+        PgApiResponse<PgResult> pgApiResponse = PgApiResponse.success(pgResult);
 
         // PG 결제대행사 반환
         given(pgClient.getProvider()).willReturn(pgProvider);
@@ -180,7 +184,7 @@ class PaymentServiceTest {
                 .willAnswer(invocationOnMock ->
                         invocationOnMock.getArgument(0));
         // PG 결제대행사에 결제 요청
-        given(pgClient.requestPayment(any())).willReturn(pgResult);
+        given(pgClient.requestPayment(any())).willReturn(pgApiResponse);
 
         // when
         ResponsePaymentDto response =
@@ -190,8 +194,7 @@ class PaymentServiceTest {
         // PG 요청 후 응답 검증 (API 사용자 입장에서 반드시 필요한 결과만 검증)
         assertEquals(requestOrderId, response.getOrderId());
         assertEquals(IN_PROGRESS, response.getPaymentStatus()); // 결제 상태 PG 요청으로 변경
-        assertEquals(pgResult.getPgTransactionId(), response.getPgResult().getPgTransactionId());
-        assertEquals(pgResult.getRedirectUrl(), response.getPgResult().getRedirectUrl());
+        assertEquals(pgResult.getRedirectUrl(), response.getRedirectUrl());
     }
 
     // + 기존 결제 중 승인 가능한 결제가 있을 경우 결제 재사용 테스트
@@ -322,6 +325,7 @@ class PaymentServiceTest {
                 .pgTransactionId(pgTransactionId)
                 .redirectUrl(redirectUrl)
                 .build();
+        PgApiResponse<PgResult> pgApiResponse = PgApiResponse.success(pgResult);
 
         // PG 결제대행사 반환
         given(pgClient.getProvider()).willReturn(pgProvider);
@@ -339,7 +343,7 @@ class PaymentServiceTest {
                         && p.getPaymentMethod() == requestPaymentMethod
                         && p.getPgProvider() == pgProvider
                         && p.getPaymentStatus() == READY
-        ))).willReturn(pgResult);
+        ))).willReturn(pgApiResponse);
 
         // when
         ResponsePaymentDto response =
@@ -354,8 +358,7 @@ class PaymentServiceTest {
         inOrder.verify(pgClient).requestPayment(any());
         // PG 요청 후 응답 검증
         assertEquals(requestOrderId, response.getOrderId());
-        assertEquals(pgResult.getPgTransactionId(), response.getPgResult().getPgTransactionId());
-        assertEquals(pgResult.getRedirectUrl(), response.getPgResult().getRedirectUrl());
+        assertEquals(pgResult.getRedirectUrl(), response.getRedirectUrl());
         assertEquals(IN_PROGRESS, response.getPaymentStatus()); // 결제 상태 PG 요청으로 변경
     }
 

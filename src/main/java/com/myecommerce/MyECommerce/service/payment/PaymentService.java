@@ -1,9 +1,6 @@
 package com.myecommerce.MyECommerce.service.payment;
 
-import com.myecommerce.MyECommerce.dto.payment.PgApprovalResult;
-import com.myecommerce.MyECommerce.dto.payment.PgResult;
-import com.myecommerce.MyECommerce.dto.payment.RequestPaymentDto;
-import com.myecommerce.MyECommerce.dto.payment.ResponsePaymentDto;
+import com.myecommerce.MyECommerce.dto.payment.*;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.order.Order;
 import com.myecommerce.MyECommerce.entity.payment.Payment;
@@ -39,24 +36,21 @@ public class PaymentService {
         // 1. 정책검증 / 결제 Entity 반환
         Payment payment = createPayment(requestPaymentDto, member); // 결제상태 READY
 
-        PgResult pgResult;
-        try {
-            // 2-1. PG 결제대행사에 결제 요청
-            pgResult = pgClient.requestPayment(payment);
+        // 2-1. PG 결제대행사에 결제 요청
+        PgApiResponse<PgResult> pgResponse = pgClient.requestPayment(payment);
+        if (pgResponse.isSuccess()) {
             // 2-2. 결제 도메인에 PG 요청 결과 반영 (결제번호, 결제상태 셋팅)
-            updatePaymentToInProgress(payment, pgResult);
-
-        } catch (Exception e) {
-            // READY 유지 (의도적으로 아무 것도 안 함)
-            // TODO: 예외처리 방법 변경 고민 필요
-            throw e;
+            // 결제상태 READY -> IN_PROGRESS로 변경
+            updatePaymentToInProgress(payment, pgResponse.getData());
         }
 
         return ResponsePaymentDto.builder()
                 .paymentId(payment.getId())
                 .orderId(payment.getOrder().getId())
                 .paymentStatus(payment.getPaymentStatus())
-                .pgResult(pgResult)
+                .redirectUrl(pgResponse.getData() != null ? pgResponse.getData().getRedirectUrl() : null)
+                .failCode(pgResponse.getError() != null ? pgResponse.getError().getCode() : null)
+                .failMessage(pgResponse.getError() != null ? pgResponse.getError().getMessage(): null)
                 .build();
     }
 

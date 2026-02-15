@@ -15,6 +15,10 @@ public class ResponsePaymentDto { // 결제를 계속 진행할 수 있는 수�
 
     private PaymentStatusType paymentStatus;
 
-    private PgResult pgResult;
+    private String redirectUrl;
+
+    private String failCode;
+
+    private String failMessage;
 
 }

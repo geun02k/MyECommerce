@@ -23,9 +23,9 @@ import static com.myecommerce.MyECommerce.type.PaymentStatusType.*;
 @RequiredArgsConstructor
 public class PaymentService {
 
-    private final PaymentPolicy paymentPolicy;
-
     private final PgClient pgClient;
+
+    private final PaymentTxService paymentTxService;
 
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
@@ -34,14 +34,14 @@ public class PaymentService {
     public ResponsePaymentDto startPayment(RequestPaymentDto requestPaymentDto,
                                            Member member) {
         // 1. 정책검증 / 결제 Entity 반환
-        Payment payment = createPayment(requestPaymentDto, member); // 결제상태 READY
+        Payment payment = paymentTxService.createPayment(requestPaymentDto, member); // 결제상태 READY
 
         // 2-1. PG 결제대행사에 결제 요청
         PgApiResponse<PgResult> pgResponse = pgClient.requestPayment(payment);
         if (pgResponse.isSuccess()) {
             // 2-2. 결제 도메인에 PG 요청 결과 반영 (결제번호, 결제상태 셋팅)
             // 결제상태 READY -> IN_PROGRESS로 변경
-            updatePaymentToInProgress(payment, pgResponse.getData());
+            paymentTxService.updatePaymentToInProgress(payment, pgResponse.getData());
         }
 
         return ResponsePaymentDto.from(payment, pgResponse);
@@ -64,65 +64,6 @@ public class PaymentService {
 
         // 주문상태 변경 (웹 훅 결과 반영)
         updatePaidOrderStatus(payment);
-    }
-
-    // 정책검증 후 결제 Entity 생성
-    @Transactional
-    protected Payment createPayment(RequestPaymentDto requestPaymentDto,
-                                    Member member) {
-        // 사전 정책 검증
-        paymentPolicy.preValidateCreate(member);
-
-        PaymentMethodType paymentMethod = requestPaymentDto.getPaymentMethod();
-        Long orderId = requestPaymentDto.getOrderId();
-        PgProviderType pgProvider = pgClient.getProvider();
-
-        // 주문 조회 (비관적 락)
-        Order order = orderRepository
-                .findLockedByIdAndOrderStatus(orderId, CREATED)
-                .orElseThrow(() -> new PaymentException(PAYMENT_ORDER_NOT_EXISTS));
-
-        // 결제 다건 조회 (비관적 락)
-        List<Payment> paymentList =
-                paymentRepository.findLockedAllByOrderId(orderId);
-
-        // 조회 후 정책 검증
-        paymentPolicy.validateCreate(paymentList, order, member);
-
-        // PG 승인 요청 가능한 결제 단건 추출
-        Payment payment = filterApproveRequestAvailablePayment(
-                paymentList, paymentMethod);
-
-        if (payment == null) {
-            // 결제 생성
-            Payment newPayment = Payment.createPayment(order, paymentMethod, pgProvider);
-            payment = paymentRepository.save(newPayment);
-        }
-
-        return payment;
-    }
-
-    // 승인 요청 가능한 결제 반환
-    private Payment filterApproveRequestAvailablePayment(
-            List<Payment> paymentList, PaymentMethodType requestPaymentMethod) {
-
-        for (Payment payment : paymentList) {
-            boolean isApproveRequestAvailable =
-                    paymentPolicy.isPaymentAvailablePgRequestAboutRequest(
-                            payment, requestPaymentMethod, pgClient.getProvider());
-
-            if(isApproveRequestAvailable) {
-                return payment;
-            }
-        }
-
-        return null;
-    }
-
-    // 결제 도메인에 PG 요청 결과 반영 (결제번호, 결제상태 셋팅)
-    @Transactional
-    protected void updatePaymentToInProgress(Payment payment, PgResult pgResult) {
-        payment.requestPgPayment(pgResult); // 결제상태 IN_PROGRESS
     }
 
     // transactionId로 결제(Payment) 객체 조회

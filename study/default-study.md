@@ -3998,3 +3998,80 @@ PG 입장에서 카드 잔액 부족, 비밀번호 오류, 한도 초과 등은 
    이유는 DTO가 스스로 “어떤 데이터가 들어오면 어떤 응답 구조가 되는지”를 알고 있도록 만들 수 있기 때문입니다. 
    이렇게 하면 서비스는 단순히 메서드 호출만 하면 되고, 응답 구성 규칙은 DTO 내부에 캡슐화됩니다.
 
+
+### < 동시성 문제 해결 >
+1. 테스트 코드에서 발생한 오류     
+   ~~~
+   org.springframework.dao.InvalidDataAccessApiUsageException: 
+   Query requires transaction be in progress, 
+   but no transaction is known to be in progress
+   ~~~
+   발생한 오류 메시지 “Query requires transaction be in progress” 는 
+   해당 쿼리가 트랜잭션이 활성화된 상태에서만 실행될 수 있는데 
+   현재 실행 시점에는 트랜잭션이 존재하지 않는다는 뜻이다.     
+   그런데 테스트 실행 시 해당 쿼리가 트랜잭션이 없는 상태에서 실행된다. 
+   즉, 트랜잭션이 적용됐다고 생각했지만 실제로는 적용되지 않은 상태인 것이다. 
+   이 오류는 특히 PESSIMISTIC_WRITE, FOR UPDATE 같은 DB 락 쿼리를 사용할 때 
+   반드시 발생하는 전형적인 트랜잭션 누락 문제다.
+
+2. 문제의 코드     
+   문제의 원인은 ***트랜잭션이 선언된 메서드를 같은 클래스 내부에서 직접 호출했기 때문이다.***
+   ***Spring의 @Transactional 은 프록시 객체를 통해 호출될 때만 동작***하는데, 
+   동일 클래스 내부 메서드 호출은 프록시를 거치지 않고 this.method() 형태로 실행된다. 
+   따라서 @Transactional 이 선언되어 있어도 실제 실행 시에는 트랜잭션이 열리지 않는다.
+   아래의 경우, createPayment() 는 트랜잭션 없이 실행된다.
+   ~~~
+    @Service
+    public class PaymentService {
+    
+        public void startPayment(Long orderId) {
+            createPayment(orderId); // 내부 호출 → 프록시 안 탐
+        }
+    
+        @Transactional
+        public void createPayment(Long orderId) {
+            orderRepository.findLockedById(orderId); // 여기서 예외 발생
+        }
+    }
+   ~~~
+
+3. 해결 방법    
+   해결 방법은 트랜잭션이 필요한 메서드를 반드시 다른 클래스에 분리하여 프록시 호출이 일어나도록 만드는 것이다. 
+   즉, 트랜잭션 책임을 가진 서비스를 별도로 두고 기존 서비스는 흐름 제어 역할만 담당하도록 구조를 나누면 된다.
+   ~~~
+    @Service
+    @RequiredArgsConstructor
+    public class PaymentTxService {
+    
+        private final OrderRepository orderRepository;
+    
+        @Transactional
+        public Order loadOrderWithLock(Long orderId) {
+            return orderRepository.findLockedById(orderId)
+                    .orElseThrow();
+        }
+    }
+   ~~~
+   ~~~
+    @Service
+    @RequiredArgsConstructor
+    public class PaymentService {
+    
+        private final PaymentTxService txService;
+    
+        public void startPayment(Long orderId) {
+            Order order = txService.loadOrderWithLock(orderId); // 프록시 호출됨
+        }
+    }
+   ~~~
+
+4. 다른 해결 방법   
+   다른 방법도 존재하지만 대부분 임시 해결책이거나 유지보수성이 떨어진다.
+   한 가지 방법은 TransactionTemplate 을 사용하는 것이다.
+   이 방식은 코드 블록 단위로 트랜잭션을 직접 열 수 있으므로 내부 호출 문제를 우회할 수 있지만 선언적 트랜잭션의 장점이 사라지고 코드 가독성이 나빠진다.
+   ~~~
+   transactionTemplate.execute(status -> {
+       return createPaymentLogic(orderId);
+   });
+   ~~~
+ 

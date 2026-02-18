@@ -3393,3 +3393,51 @@ mock()은 실제 객체 대신 사용하는 가짜 객체다.
 2. 조회를 순서 검증에서 제외하는 이유     
    조회는 “결과를 만들기 위한 준비 단계”이고
    순서 검증은 “상태를 바꾸는 핵심 단계”만 검증.
+
+
+---
+## 동시성 테스트
+### < 기존 코드에서 발생한 문제 >
+@BeforeEach에서 저장한 데이터를 @AfterEach에서 삭제할 때 TransientObjectException 발생
+1. 원인    
+   Payment → Order 참조 때문에 삭제 시 flush 시점에서 Hibernate가 transient reference로 판단.   
+   동시성 테스트에서는 클래스 단위 @Transactional 적용 불가 → AfterEach에서 수동 삭제 필요.
+2. 결과    
+   삭제 순서와 flush 타이밍 관리가 복잡해지고 테스트 코드 꼬임.    
+
+### < 테스트 목적별 클래스 분리 필요성 >
+한 클래스에서 섞으면 트랜잭션 정책 충돌과 테스트 관리 복잡 발생    
+1. 통합 테스트: 서비스/리포지토리 단일 스레드 검증, 트랜잭션 롤백 활용 가능
+2. 동시성 테스트: Race condition/락 경쟁 등 멀티스레드 검증, 스레드별 독립 트랜잭션 필요
+
+### < 분리 시 문제 해결 >
+각 테스트 목적에 맞는 트랜잭션 구조로 테스트 안정화, 코드 간결화.
+1. 통합 테스트     
+   클래스 단위 @Transactional 적용 → 롤백으로 데이터 자동 정리, transient exception 없음
+2. 동시성 테스트     
+   BeforeEach/AfterEach에서 독립 트랜잭션으로 생성/삭제, Payment → Order 순서 지킴 → transient exception 방지
+
+
+### < 동시성 테스트에서 발생한 문제와 원인 >
+1. TransientObjectException
+   1) 원인: 영속화되지 않은 엔티티를 참조하거나 삭제 시 flush 시점에서 Hibernate가 transient reference로 판단
+   2) 대표 케이스: Payment → Order 참조, AfterEach에서 Order를 먼저 삭제하려고 시도
+   3) 해결
+      - 삭제 순서 조정: Payment → Order → Product → Member
+      - BeforeEach/AfterEach를 독립 트랜잭션으로 묶기 (TransactionTemplate)
+      - 테스트 메서드 전체 @Transactional 사용 불가 시 수동 관리
+
+2. onstraintViolationException / Unique 제약 조건 위반
+   1) 원인: 여러 스레드가 동시에 같은 unique 컬럼 값을 insert
+   2) 대표 케이스: paymentCode 또는 pgTransactionId 생성 시 중복
+   3) 해결
+      - 동시성 안전한 ID 생성: UUID 또는 DB 시퀀스 활용
+      - 테스트에서 중복 요청 시 예외 발생 기대치 명시 (assertThrows)
+
+3. LazyInitializationException
+   1) 원인: 영속성 컨텍스트가 없는 상태에서 LAZY 로딩 시도
+   2) 대표 케이스: Payment → Order LAZY 관계 접근, AfterEach에서 트랜잭션 없이 삭제
+   3) 해결
+      - BeforeEach/AfterEach를 TransactionTemplate 등 트랜잭션 안에서 수행
+      - 필요 시 Fetch Join 사용하거나 LAZY 강제 초기화 (Hibernate.initialize())
+

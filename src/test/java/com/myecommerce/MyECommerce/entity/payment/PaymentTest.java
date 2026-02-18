@@ -510,36 +510,48 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("PG 승인요청 가능여부 판단 성공 - 결제상태가 결제취소이면 승인요청 가능")
-    void isApproveRequestAvailable_shouldReturnTrue_whenPaymentStatusIsFailed() {
+    @DisplayName("PG 요청 가능여부 판단 성공 - 결제상태가 준비이면 PG 요청 가능")
+    void isPgRequestAvailable_shouldReturnTrue_whenPaymentStatusIsReady() {
         // given
-        Payment payment = failedPayment();
+        Payment payment = readyPayment();
         // when
-        boolean isApproveRequestAvailable = payment.isApproveRequestAvailable();
+        boolean isPgRequestAvailable = payment.isPgRequestAvailable();
+        // then
+        assertTrue(isPgRequestAvailable);
+    }
+
+    @Test
+    @DisplayName("PG 요청 가능여부 판단 실패 - 결제상태가 준비가 아니면 PG 요청 불가능")
+    void isPgRequestAvailable_shouldReturnFalse_whenPaymentStatusIsNotReady() {
+        // given
+        Payment payment = inProgressPayment();
+        // when
+        boolean isPgRequestAvailable = payment.isPgRequestAvailable();
+        // then
+        assertFalse(isPgRequestAvailable);
+    }
+
+    @Test
+    @DisplayName("PG 승인요청 가능여부 판단 성공 - 결제상태가 승인대기중이면 승인요청 가능")
+    void isPgApproveRequestAvailable_shouldReturnTrue_whenPaymentStatusIsInProgress() {
+        // given
+        Payment payment = inProgressPayment();
+        // when
+        boolean isApproveRequestAvailable = payment.isPgApproveRequestAvailable();
         // then
         assertTrue(isApproveRequestAvailable);
     }
 
     @Test
     @DisplayName("PG 승인요청 가능여부 판단 실패 - 결제상태가 결제승인이면 승인요청 불가 판단")
-    void isApproveRequestAvailable_shouldReturnFalse_whenPaymentStatusIsApproved() {
+    void isPgApproveRequestAvailable_shouldReturnFalse_whenPaymentStatusIsApproved() {
         // given
         Payment payment = approvedPayment();
         // when
-        boolean isApproveRequestAvailable = payment.isApproveRequestAvailable();
+        boolean isApproveRequestAvailable = payment.isPgApproveRequestAvailable();
         // then
         assertFalse(isApproveRequestAvailable);
     }
 
-    @Test
-    @DisplayName("PG 승인요청 가능여부 판단 실패 - 결제상태가 결제취소이면 승인요청 불가 판단")
-    void isApproveRequestAvailable_shouldReturnFalse_whenPaymentStatusIsCanceled() {
-        // given
-        Payment payment = canceledPayment();
-        // when
-        boolean isApproveRequestAvailable = payment.isApproveRequestAvailable();
-        // then
-        assertFalse(isApproveRequestAvailable);
-    }
-
+    //  TODO: 승인여부 판단 테스트 작성
 }

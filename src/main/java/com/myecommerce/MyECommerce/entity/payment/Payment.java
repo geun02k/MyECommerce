@@ -97,7 +97,7 @@ public class Payment extends BaseEntity {
         }
 
         // READY 상태에서만 PG 결제요청 가능
-        if (this.paymentStatus != READY) {
+        if (!isPgRequestAvailable()) {
            throw new PaymentException(PAYMENT_STATUS_NOT_READY);
         }
 
@@ -114,7 +114,7 @@ public class Payment extends BaseEntity {
         validatePgTransactionIdMismatch(pgResult.getPgTransactionId());
 
         // PG 승인 대기 중일 때만 상태 변경 가능
-        if (this.paymentStatus != IN_PROGRESS) {
+        if (!isPgApproveRequestAvailable()) {
             throw new PaymentException(PAYMENT_STATUS_NOT_IN_PROGRESS);
         }
 
@@ -136,7 +136,7 @@ public class Payment extends BaseEntity {
         validatePgTransactionIdMismatch(pgResult.getPgTransactionId());
 
         // PG 승인 대기 중일 때만 상태 변경 가능
-        if (this.paymentStatus != IN_PROGRESS) {
+        if (!isPgApproveRequestAvailable()) {
             throw new PaymentException(PAYMENT_STATUS_NOT_IN_PROGRESS);
         }
 
@@ -153,9 +153,21 @@ public class Payment extends BaseEntity {
     }
 
     /** PaymentStatus - 자기 상태 판단
+     *  PG 요청 가능 여부 반환 **/
+    public boolean isPgRequestAvailable() {
+        return this.paymentStatus == READY;
+    }
+
+    /** PaymentStatus - 자기 상태 판단
      *  PG 승인 요청 가능 여부 반환 **/
-    public boolean isApproveRequestAvailable() {
-        return !(this.paymentStatus == APPROVED || this.paymentStatus == CANCELED);
+    public boolean isPgApproveRequestAvailable() {
+        return this.paymentStatus == IN_PROGRESS;
+    }
+
+    /** PaymentStatus - 자기 상태 판단
+     *  PG 승인 여부 반환 **/
+    public boolean isApproved() {
+        return this.paymentStatus == APPROVED || this.paymentStatus == CANCELED;
     }
 
     // 주문 생성된 경우만 결제가능

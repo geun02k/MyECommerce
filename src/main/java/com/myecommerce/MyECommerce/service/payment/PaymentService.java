@@ -7,13 +7,9 @@ import com.myecommerce.MyECommerce.entity.payment.Payment;
 import com.myecommerce.MyECommerce.exception.PaymentException;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
-import com.myecommerce.MyECommerce.type.PaymentMethodType;
-import com.myecommerce.MyECommerce.type.PgProviderType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.*;
 import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
@@ -41,7 +37,8 @@ public class PaymentService {
         if (pgResponse.isSuccess()) {
             // 2-2. 결제 도메인에 PG 요청 결과 반영 (결제번호, 결제상태 셋팅)
             // 결제상태 READY -> IN_PROGRESS로 변경
-            paymentTxService.updatePaymentToInProgress(payment, pgResponse.getData());
+            payment = paymentTxService.updatePaymentToInProgress(
+                    payment.getId(), pgResponse.getData());
         }
 
         return ResponsePaymentDto.from(payment, pgResponse);

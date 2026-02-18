@@ -33,7 +33,6 @@ import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -101,13 +100,13 @@ class PaymentServiceTest {
     }
 
     /** PG 요청 성공응답 */
-    PgApiResponse<PgResult> pgApiResponseOfRequest() {
+    PgApiResponse<PgResult> pgApiResponseOfFail() {
         // PG 결제대행사에 결제 요청
         PgResult pgResult = PgResult.builder()
                 .pgTransactionId("pgTransactionId")
                 .redirectUrl("redirectUrl")
                 .build();
-        return PgApiResponse.success(pgResult);
+        return PgApiResponse.fail("errorCode", "에러메시지");
     }
 
     /** 고객 권한 */
@@ -127,16 +126,16 @@ class PaymentServiceTest {
     }
 
     /** 결제 도메인에 PG 요청 결과 반영 (트랜잭션ID, 결제상태 셋팅) */
-    void givenUpdatePaymentToInProgress() {
-        willAnswer(invocation -> {
-            Payment payment = invocation.getArgument(0);
-            PgResult data = invocation.getArgument(1);
-            ReflectionTestUtils.setField(
-                    payment, "paymentStatus", IN_PROGRESS);
-            ReflectionTestUtils.setField(
-                    payment, "pgTransactionId", data.getPgTransactionId());
-            return null;
-        }).given(paymentTxService).updatePaymentToInProgress(any(), any());
+    void givenUpdatePaymentToInProgress(Payment savedPayment, PgResult pgResult) {
+        Payment updatedPayment = Payment.createPayment(
+                savedPayment.getOrder(),
+                savedPayment.getPaymentMethod(),
+                savedPayment.getPgProvider());
+        ReflectionTestUtils.setField(updatedPayment, "id", savedPayment.getId());
+        updatedPayment.requestPgPayment(pgResult);
+
+        given(paymentTxService.updatePaymentToInProgress(any(), any()))
+                .willReturn(updatedPayment);
     }
 
     /* ---------------------------
@@ -158,7 +157,7 @@ class PaymentServiceTest {
         // 결제 요청 고객
         Member member = customer();
 
-        // 결제
+        // 신규 저장된 결제
         Payment savedPayment = Payment.createPayment(
                 order(member), requestPaymentMethod, pgProvider);
         ReflectionTestUtils.setField(savedPayment, "id", 10L);
@@ -168,6 +167,13 @@ class PaymentServiceTest {
                 .redirectUrl("redirectUrl")
                 .build();
         PgApiResponse<PgResult> pgApiResponse = PgApiResponse.success(pgResult);
+        // 다른 트랜잭션에서 조회되어 수정된 결제
+        Payment updatedPayment = Payment.createPayment(
+                savedPayment.getOrder(),
+                savedPayment.getPaymentMethod(),
+                savedPayment.getPgProvider());
+        ReflectionTestUtils.setField(updatedPayment, "id", savedPayment.getId());
+        updatedPayment.requestPgPayment(pgResult); // READY -> IN_PROGRESS로 변경
 
         // 정책 검증 및 결제 Entity 반환
         given(paymentTxService.createPayment(any(), any()))
@@ -175,15 +181,8 @@ class PaymentServiceTest {
         // PG 결제대행사에 결제 요청
         given(pgClient.requestPayment(any())).willReturn(pgApiResponse);
         // 결제 도메인에 PG 요청 결과 반영 (결제번호, 결제상태 셋팅)
-        willAnswer(invocation -> {
-            Payment payment = invocation.getArgument(0);
-            PgResult data = invocation.getArgument(1);
-            ReflectionTestUtils.setField(
-                    payment, "paymentStatus", IN_PROGRESS);
-            ReflectionTestUtils.setField(
-                    payment, "pgTransactionId", data.getPgTransactionId());
-            return null;
-        }).given(paymentTxService).updatePaymentToInProgress(any(), any());
+        given(paymentTxService.updatePaymentToInProgress(any(), any()))
+                .willReturn(updatedPayment);
 
         // when
         ResponsePaymentDto response =
@@ -223,7 +222,7 @@ class PaymentServiceTest {
                 order, requestPaymentMethod, pgProvider);
         ReflectionTestUtils.setField(savedPayment, "id", 10L);
         // PG 결제대행사에 결제 요청 결과
-        PgApiResponse<PgResult> pgApiResponse = pgApiResponseOfRequest();
+        PgApiResponse<PgResult> pgApiResponse = pgApiResponseOfFail();
 
         // 정책 검증 및 결제 Entity 반환
         given(paymentTxService.createPayment(any(), any()))
@@ -284,7 +283,7 @@ class PaymentServiceTest {
                         && p.getPaymentStatus() == READY
         ))).willReturn(pgApiResponse);
         // 결제 도메인에 PG 요청 결과 반영 (트랜잭션ID, 결제상태 셋팅)
-        givenUpdatePaymentToInProgress();
+        givenUpdatePaymentToInProgress(savedPayment, pgResult);
 
         // when
         ResponsePaymentDto response =

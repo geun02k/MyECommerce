@@ -67,8 +67,14 @@ public class PaymentTxService {
 
     /** 결제 도메인에 PG 요청 결과 반영 (결제번호, 결제상태 셋팅) **/
     @Transactional
-    protected void updatePaymentToInProgress(Payment payment, PgResult pgResult) {
-        payment.requestPgPayment(pgResult); // 결제상태 IN_PROGRESS
+    protected Payment updatePaymentToInProgress(Long paymentId, PgResult pgResult) {
+        // 결제 다건 조회 (비관적 락)
+        Payment targetPayment = paymentRepository.findLockedById(paymentId)
+                .orElseThrow();
+        // 결제상태 IN_PROGRESS로 변경
+        targetPayment.requestPgPayment(pgResult);
+        // 상태변경한 Payment 반환
+        return targetPayment;
     }
 
     // 승인 요청 가능한 결제 반환

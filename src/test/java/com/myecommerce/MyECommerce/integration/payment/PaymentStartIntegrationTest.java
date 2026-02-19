@@ -13,8 +13,6 @@ import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.service.payment.PaymentService;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +20,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -35,6 +32,7 @@ import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
+@Transactional
 @ActiveProfiles("test")
 @Import(TestAuditingConfig.class)
 public class PaymentStartIntegrationTest {
@@ -45,38 +43,13 @@ public class PaymentStartIntegrationTest {
     @Autowired
     private MemberRepository memberRepository;
     @Autowired
-    private OrderRepository orderRepository;
-
+    private ProductRepository productRepository;
     @Autowired
-    private TransactionTemplate transactionTemplate;
+    private OrderRepository orderRepository;
 
     /* ------------------
         Test Fixtures
        ------------------ */
-
-    private Member savedCustomer;
-    private Order savedOrder;
-    @Autowired
-    private ProductRepository productRepository;
-
-    @BeforeEach
-    void setUp() {
-        // 결제를 위한 회원 등록
-        savedCustomer = saveCustomer();
-        // 결제를 위한 주문 등록
-        savedOrder = saveOrder();
-    }
-
-    @AfterEach
-    void cleanUp() {
-        transactionTemplate.executeWithoutResult(status -> {
-            Long productId = savedOrder.getItems().get(0).getProduct().getId();
-
-            orderRepository.deleteById(savedOrder.getId());
-            productRepository.deleteById(productId);
-            memberRepository.deleteById(savedCustomer.getId());
-        });
-    }
 
     /* ------------------
         Helper Methods
@@ -101,7 +74,7 @@ public class PaymentStartIntegrationTest {
     }
 
     /** 주문 등록 */
-    Order saveOrder() {
+    Order saveOrder(Member member) {
         // 상품등록
         Product savedProduct = saveProduct();
         ProductOption savedOption = savedProduct.getOptions().get(0);
@@ -111,7 +84,7 @@ public class PaymentStartIntegrationTest {
                 OrderItem.createOrderItem(savedOption, 1);
 
         // 주문 생성 및 등록
-        Order order = Order.createOrder(List.of(orderItem), savedCustomer);
+        Order order = Order.createOrder(List.of(orderItem), member);
         return orderRepository.save(order);
     }
 
@@ -139,19 +112,23 @@ public class PaymentStartIntegrationTest {
     }
 
     /* ------------------
-        결제생성 Test
+        결제시작 Test
        ------------------ */
 
     @Test
-    @DisplayName("결제생성 성공 - IN_PROGRESS 결제상태 및 PG 결제정보 반환")
-    @Transactional // 테스트 끝나면 자동 롤백
+    @DisplayName("결제시작 성공 - IN_PROGRESS 결제상태 및 PG 결제정보 반환")
     void startPayment_shouldReturnPgInfo_whenValidRequest() {
         // given
+        // 결제를 위한 회원
+        Member member = saveCustomer();
+        // 결제를 위한 주문 등록
+        Order savedOrder  = saveOrder(member);
+
+        // 결제 요청
         RequestPaymentDto request = RequestPaymentDto.builder()
                 .orderId(savedOrder.getId())
                 .paymentMethod(CARD)
                 .build();
-        Member member = savedCustomer;
 
         // when
         ResponsePaymentDto response =

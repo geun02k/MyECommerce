@@ -52,8 +52,8 @@ public class PaymentTxService {
         // 조회 후 정책 검증
         paymentPolicy.validateCreate(paymentList, order, member);
 
-        // PG 승인 요청 가능한 결제 단건 추출
-        Payment payment = filterApproveRequestAvailablePayment(
+        // PG 요청 가능한 결제 단건 추출
+        Payment payment = filterPgRequestAvailablePayment(
                 paymentList, paymentMethod);
 
         if (payment == null) {
@@ -77,16 +77,16 @@ public class PaymentTxService {
         return targetPayment;
     }
 
-    // 승인 요청 가능한 결제 반환
-    private Payment filterApproveRequestAvailablePayment(
+    // PG 요청 가능한 결제 반환
+    private Payment filterPgRequestAvailablePayment(
             List<Payment> paymentList, PaymentMethodType requestPaymentMethod) {
 
         for (Payment payment : paymentList) {
-            boolean isApproveRequestAvailable =
+            boolean isPgRequestAvailable =
                     paymentPolicy.isPaymentAvailablePgRequestAboutRequest(
                             payment, requestPaymentMethod, pgClient.getProvider());
 
-            if(isApproveRequestAvailable) {
+            if(isPgRequestAvailable) {
                 return payment;
             }
         }

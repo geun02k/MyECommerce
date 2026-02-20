@@ -21,9 +21,10 @@ public class WebHookController {
      * PG 결제 요청 응답 웹훅 post /api/webhook/pg/approval
      **/
     @PostMapping("/pg/approval")
-    @PreAuthorize("hasAnyAuthority('CUSTOMER')")
     public ResponseEntity<Void> handlePgApprovalWebhook(
             @RequestBody PgApprovalResult pgApprovalResult) {
+
+        // TODO: 웹훅 보안을 위해 PG 서명 검증 필수
 
         paymentService.handlePgWebHook(pgApprovalResult);
 

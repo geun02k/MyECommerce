@@ -59,8 +59,10 @@ public class PaymentService {
         // 결제 승인, 실패 처리
         updatePaymentApprove(payment, pgApprovalResult);
 
-        // 주문상태 변경 (웹 훅 결과 반영)
-        updatePaidOrderStatus(payment);
+        // 결제 완료된 경우 주문상태 변경 (웹 훅 결과 반영)
+         if(payment.getPaymentStatus().equals(APPROVED)) {
+             updatePaidOrderStatus(payment);
+         }
     }
 
     // transactionId로 결제(Payment) 객체 조회

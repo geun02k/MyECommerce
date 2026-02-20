@@ -1,9 +1,6 @@
 package com.myecommerce.MyECommerce.service.payment;
 
-import com.myecommerce.MyECommerce.dto.payment.PgApiResponse;
-import com.myecommerce.MyECommerce.dto.payment.PgResult;
-import com.myecommerce.MyECommerce.dto.payment.RequestPaymentDto;
-import com.myecommerce.MyECommerce.dto.payment.ResponsePaymentDto;
+import com.myecommerce.MyECommerce.dto.payment.*;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.entity.order.Order;
@@ -11,6 +8,8 @@ import com.myecommerce.MyECommerce.entity.order.OrderItem;
 import com.myecommerce.MyECommerce.entity.payment.Payment;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
+import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
+import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
 import com.myecommerce.MyECommerce.type.PaymentMethodType;
 import com.myecommerce.MyECommerce.type.PgProviderType;
 import org.junit.jupiter.api.DisplayName;
@@ -24,11 +23,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
+import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
+import static com.myecommerce.MyECommerce.type.OrderStatusType.PAID;
 import static com.myecommerce.MyECommerce.type.PaymentMethodType.CARD;
-import static com.myecommerce.MyECommerce.type.PaymentStatusType.IN_PROGRESS;
-import static com.myecommerce.MyECommerce.type.PaymentStatusType.READY;
+import static com.myecommerce.MyECommerce.type.PaymentStatusType.*;
+import static com.myecommerce.MyECommerce.type.PgProviderType.MOCK_PG;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -43,6 +45,11 @@ class PaymentServiceTest {
 
     @Mock
     PaymentTxService paymentTxService;
+
+    @Mock
+    OrderRepository orderRepository;
+    @Mock
+    PaymentRepository paymentRepository;
 
     @InjectMocks
     PaymentService paymentService;
@@ -87,6 +94,14 @@ class PaymentServiceTest {
         ReflectionTestUtils.setField(order, "id", 1L);
         return order;
     }
+    Order order() {
+        ProductOption productOption = productOption();
+        OrderItem orderItem = OrderItem.createOrderItem(productOption, 1);
+
+        Order order = Order.createOrder(List.of(orderItem), customer());
+        ReflectionTestUtils.setField(order, "id", 1L);
+        return order;
+    }
 
     /** 저장된 결제 (id 추가) */
     Payment savedPayment(Order order,
@@ -99,7 +114,17 @@ class PaymentServiceTest {
         return savedPayment;
     }
 
-    /** PG 요청 성공응답 */
+    /** PG 요청한 결제 */
+    Payment inProgressPayment(Order order) {
+        PgResult pgRequestResult = pgResult();
+
+        Payment payment = savedPayment(order, CARD, MOCK_PG);
+        payment.requestPgPayment(pgRequestResult); // 결제상태 = IN_PROGRESS
+
+        return payment;
+    }
+
+    /** PG 요청 실패응답 */
     PgApiResponse<PgResult> pgApiResponseOfFail() {
         // PG 결제대행사에 결제 요청
         PgResult pgResult = PgResult.builder()
@@ -107,6 +132,13 @@ class PaymentServiceTest {
                 .redirectUrl("redirectUrl")
                 .build();
         return PgApiResponse.fail("errorCode", "에러메시지");
+    }
+
+    /** PG 요청에 대한 응답 */
+    PgResult pgResult() {
+        return PgResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .build();
     }
 
     /* ------------------
@@ -402,12 +434,81 @@ class PaymentServiceTest {
     // PG 요청 응답 분기 - PG 요청 실패 시 예외발생
     // -> Service 책임 아니므로 제외
 
-    /* ----------------------
-        결제 승인 웹훅 Tests
-       ---------------------- */
+    /* ----------------------------------
+        PG 결제승인 웹훅 정상 시나리오 Tests
+       ---------------------------------- */
 
-    // PG 결제 승인 웹훅 성공 테스트
-    // PG 결제 실패 웹훅 성공 테스트
-    // 종결된 결제 웹훅 재요청 무시 성공 테스트
+    @Test
+    @DisplayName("PG 결제승인 웹훅 성공 - 트랜잭션ID에 맞는 결제 존재 시 결제 승인")
+    void handlePgWebHook_shouldApprovePayment_whenExistsTransactionId() {
+        // given
+        String pgTransactionId = "pgTransactionId";
+        BigDecimal paidAmount = new BigDecimal(10000);
+        // PG 결제승인 요청에 대한 웹훅 응답
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(APPROVED) // PG 결제 승인
+                .paidAmount(paidAmount)
+                .build();
+
+        // 결제 대한 주문
+        Order order = order();
+        // 주문에 대한 PG 요청된 결제
+        Payment payment = inProgressPayment(order);
+
+        // PG 트랜잭션 ID와 일치하는 결제 조회
+        given(paymentRepository.findByPgTransactionId(any()))
+                .willReturn(Optional.of(payment));
+        // 결제완료되지 않은 주문 조회
+        given(orderRepository.findByIdAndOrderStatus(any(), eq(CREATED)))
+                .willReturn(Optional.of(order));
+
+        // when
+        paymentService.handlePgWebHook(pgApprovalResult);
+
+        // then
+        // 결제, 주문 상태 및 값 변경을 위한 조회 필수 검증
+        verify(paymentRepository).findByPgTransactionId(eq(pgTransactionId));
+        verify(orderRepository).findByIdAndOrderStatus(any(), any());
+        // 변경, 중요값 검증
+        assertEquals(pgTransactionId, payment.getPgTransactionId());
+        assertEquals(paidAmount, payment.getApprovedAmount());
+        assertEquals(APPROVED, payment.getPaymentStatus()); // 결제 승인완료
+        assertEquals(PAID, order.getOrderStatus()); // 주문 결제완료
+    }
+
+    @Test
+    @DisplayName("PG 결제승인 웹훅 성공 - 트랜잭션ID에 맞는 결제 존재 시 결제 실패")
+    void handlePgWebHook_shouldFailPayment_whenExistsTransactionId() {
+        // given
+        String pgTransactionId = "pgTransactionId";
+        // PG 결제승인 요청에 대한 웹훅 응답
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(FAILED) // PG 결제 실패
+                .build();
+
+        // 결제 대한 주문
+        Order order = order();
+        // 주문에 대한 PG 요청된 결제
+        Payment payment = inProgressPayment(order);
+
+        // PG 트랜잭션 ID와 일치하는 결제 조회
+        given(paymentRepository.findByPgTransactionId(any()))
+                .willReturn(Optional.of(payment));
+
+        // when
+        paymentService.handlePgWebHook(pgApprovalResult);
+
+        // then
+        // 결제 상태 및 값 변경을 위한 조회 필수 검증
+        verify(paymentRepository).findByPgTransactionId(eq(pgTransactionId));
+        // 주문 상태변경을 위한 주문 미조회 검증
+        verify(orderRepository, never()).findByIdAndOrderStatus(any(), any());
+        // 변경, 중요값 검증
+        assertEquals(pgTransactionId, payment.getPgTransactionId());
+        assertEquals(FAILED, payment.getPaymentStatus()); // 결제 승인완료
+        assertEquals(CREATED, order.getOrderStatus()); // 주문완료 상태 유지
+    }
 
 }

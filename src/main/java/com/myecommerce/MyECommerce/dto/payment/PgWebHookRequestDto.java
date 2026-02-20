@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PgApprovalResult {
+public class PgWebHookRequestDto {
 
     private String pgTransactionId;
 
@@ -25,14 +25,4 @@ public class PgApprovalResult {
 
     private LocalDateTime approvalAt;
 
-    /** PG 요청 DTO -> 내부 전달 DTO로 변환 **/
-    public static PgApprovalResult from(PgWebHookRequestDto requestDto) {
-        return PgApprovalResult.builder()
-                .pgTransactionId(requestDto.getPgTransactionId())
-                .paidAmount(requestDto.getPaidAmount())
-                .vatAmount(requestDto.getVatAmount())
-                .approvalStatus(requestDto.getApprovalStatus())
-                .approvalAt(requestDto.getApprovalAt())
-                .build();
-    }
 }

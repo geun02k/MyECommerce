@@ -124,6 +124,18 @@ class PaymentServiceTest {
         return payment;
     }
 
+    /** PG 승인된 결제 */
+    Payment approvedPayment(Order order) {
+        PgResult pgRequestResult = pgResult();
+        PgApprovalResult pgApprovalResult = pgApprovalResult();
+
+        Payment payment = savedPayment(order, CARD, MOCK_PG);
+        payment.requestPgPayment(pgRequestResult); // 결제상태 = IN_PROGRESS
+        payment.approve(pgApprovalResult); // 결제상태 = APPROVED
+
+        return payment;
+    }
+
     /** PG 요청 실패응답 */
     PgApiResponse<PgResult> pgApiResponseOfFail() {
         // PG 결제대행사에 결제 요청
@@ -138,6 +150,15 @@ class PaymentServiceTest {
     PgResult pgResult() {
         return PgResult.builder()
                 .pgTransactionId("pgTransactionId")
+                .build();
+    }
+
+    /** PG 요청에 대한 응답 */
+    PgApprovalResult pgApprovalResult() {
+        return PgApprovalResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .approvalStatus(APPROVED)
+                .paidAmount(new BigDecimal(10000))
                 .build();
     }
 
@@ -510,5 +531,90 @@ class PaymentServiceTest {
         assertEquals(FAILED, payment.getPaymentStatus()); // 결제 승인완료
         assertEquals(CREATED, order.getOrderStatus()); // 주문완료 상태 유지
     }
+
+    /* ----------------------------------
+        PG 결제승인 웹훅 멱등성 보장 Tests
+       ---------------------------------- */
+
+    @Test
+    @DisplayName("PG 결제승인 웹훅 멱등성 보장 - 종결된 결제에 대해 승인완료 재요청 시 웹훅 무시")
+    void handlePgWebHook_shouldNotChange_whenReRequestSamePaymentStatus() {
+        // given
+        String pgTransactionId = "pgTransactionId";
+        // PG 결제승인 요청에 대한 웹훅 응답
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(APPROVED) // PG 승인완료
+                .build();
+
+        // 결제 대한 주문
+        Order order = order();
+        // 주문에 대한 PG 요청된 결제
+        Payment payment = approvedPayment(order);
+
+        // PG 트랜잭션 ID와 일치하는 결제 조회
+        given(paymentRepository.findByPgTransactionId(any()))
+                .willReturn(Optional.of(payment));
+
+        // when
+        paymentService.handlePgWebHook(pgApprovalResult);
+
+        // then
+        // 주문 상태변경을 위한 주문 미조회 검증
+        verify(orderRepository, never()).findByIdAndOrderStatus(any(), any());
+        // 상태값 미변경 검증 (멱등성 검증)
+        assertEquals(pgTransactionId, payment.getPgTransactionId());
+        assertEquals(APPROVED, payment.getPaymentStatus()); // 기존 PG 결제승인 상태유지
+        assertEquals(CREATED, order.getOrderStatus()); // 주문완료 상태유지
+    }
+
+    @Test
+    @DisplayName("PG 결제승인 웹훅 멱등성 보장 - 종결된 결제에 대한 다른 승인상태로 재요청 시 웹훅 무시로 상태역전 방지")
+    void handlePgWebHook_shouldNotChange_whenReRequestDifferentPaymentStatus() {
+        // given
+        String pgTransactionId = "pgTransactionId";
+        // PG 결제승인 요청에 대한 웹훅 응답
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(FAILED) // PG 승인실패
+                .build();
+
+        // 결제 대한 주문
+        Order order = order();
+        // 주문에 대한 PG 요청된 결제
+        Payment payment = approvedPayment(order);
+
+        // PG 트랜잭션 ID와 일치하는 결제 조회
+        given(paymentRepository.findByPgTransactionId(any()))
+                .willReturn(Optional.of(payment));
+
+        // when
+        paymentService.handlePgWebHook(pgApprovalResult);
+
+        // then
+        // 주문 상태변경을 위한 주문 미조회 검증
+        verify(orderRepository, never()).findByIdAndOrderStatus(any(), any());
+        // 상태값 미변경 검증 (멱등성 검증)
+        assertEquals(pgTransactionId, payment.getPgTransactionId());
+        assertEquals(APPROVED, payment.getPaymentStatus()); // 기존 PG 결제승인 상태유지
+        assertEquals(CREATED, order.getOrderStatus()); // 주문완료 상태유지
+    }
+
+    /* ----------------------------------
+        PG 결제승인 웹훅 책임 행위 검증 Tests
+       ---------------------------------- */
+
+    // transactionId에 대한 결제 조회 책임 검증
+    // 주문상태 변경 책임 검증
+
+    /* ----------------------------------
+        PG 결제승인 웹훅 실패 Tests
+       ---------------------------------- */
+
+    // 트랜잭션 ID에 대한 결제 미존재 시 예외발생
+    // 결제완료된 주문이면 예외발생
+
+    // 금액 검증, TransactionId 검증, 상태 전이 검증 등의 경우
+    // PaymentTest에 이미 존재하므로, 이미 검증된 책임에 대해서는 검증 제외
 
 }

@@ -3396,7 +3396,7 @@ mock()은 실제 객체 대신 사용하는 가짜 객체다.
 
 
 ---
-## 동시성 테스트
+## 33. 동시성 테스트
 ### < 기존 코드에서 발생한 문제 >
 @BeforeEach에서 저장한 데이터를 @AfterEach에서 삭제할 때 TransientObjectException 발생
 1. 원인    
@@ -3440,4 +3440,43 @@ mock()은 실제 객체 대신 사용하는 가짜 객체다.
    3) 해결
       - BeforeEach/AfterEach를 TransactionTemplate 등 트랜잭션 안에서 수행
       - 필요 시 Fetch Join 사용하거나 LAZY 강제 초기화 (Hibernate.initialize())
+
+
+---
+## 34. 테스트 가독성과 검증
+### < 행위검증과 상태검증 >
+둘이 동시에 존재하는 건 과한 검증이다.
+- 상태 검증이 있으면 행위 검증은 제거.
+- 행위 검증이 있으면 상태 검증 제거.
+
+### < 중복검증 >
+이미 테스트한 내용을 일부만 다시 검증하는 것은 불필요하다.
+
+### < verify()로 검증 필요 여부 >
+그럼 반환값이 없는 경우에는 호출여부로 판단하는 것이고, 
+구현 방법 자체를 검증하는 것은 테스트를 구현에 의존적으로 만들기 때문에 권장되지 않는다.    
+verify()가 구현 검증인 문서화 역할을 하는 경우는 남겨두는 것이 좋다.
+예를 들면, verify(findOrder...) 가 존재한다면 조회 → 승인 처리 흐름임을 한 눈에 알 수 있기 때문이다.
+
+### < 테스트 데이터의 핵심 상태만 표현 >
+상태와 이유를 표현하는 메서드명을 가진 픽스쳐를 사용해 핵심 상태만 보이고 나머지는 숨기겨 가독성을 높이도록 한다.   
+검증값이 에러니까 세부값 숨김.
+~~~
+    @Test
+    @DisplayName("CREATED -> PAID 실패 - 주문 완료상태가 아니면 주문 결제완료 실패")
+    void paid_shouldThrowException_whenOrderIsNotCreated() {
+        Order alreadyPaidOrder = alreadyPaidOrder();
+        Payment approvedPayment = payment(alreadyPaidOrder);
+
+        // when
+        // then
+        OrderException e = assertThrows(OrderException.class, () ->
+                alreadyPaidOrder.paid(approvedPayment));
+        assertEquals(ORDER_STATUS_NOT_CREATED, e.getErrorCode());
+    }
+~~~
+
+
+### < 픽스쳐 메서드명 >
+fixture는 상태가 아니라 행위를 표현하는 게 좋음.
 

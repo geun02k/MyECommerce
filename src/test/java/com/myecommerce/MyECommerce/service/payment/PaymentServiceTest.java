@@ -8,6 +8,7 @@ import com.myecommerce.MyECommerce.entity.order.OrderItem;
 import com.myecommerce.MyECommerce.entity.payment.Payment;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
+import com.myecommerce.MyECommerce.exception.PaymentException;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
 import com.myecommerce.MyECommerce.type.PaymentMethodType;
@@ -25,6 +26,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.ORDER_STATUS_NOT_CREATED;
+import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.PG_TRANSACTION_ID_NOT_EXISTS;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
 import static com.myecommerce.MyECommerce.type.OrderStatusType.PAID;
@@ -592,8 +595,6 @@ class PaymentServiceTest {
         paymentService.handlePgWebHook(pgApprovalResult);
 
         // then
-        // 주문 상태변경을 위한 주문 미조회 검증
-        verify(orderRepository, never()).findByIdAndOrderStatus(any(), any());
         // 상태값 미변경 검증 (멱등성 검증)
         assertEquals(pgTransactionId, payment.getPgTransactionId());
         assertEquals(APPROVED, payment.getPaymentStatus()); // 기존 PG 결제승인 상태유지
@@ -604,15 +605,71 @@ class PaymentServiceTest {
         PG 결제승인 웹훅 책임 행위 검증 Tests
        ---------------------------------- */
 
-    // transactionId에 대한 결제 조회 책임 검증
-    // 주문상태 변경 책임 검증
+    // PG 결제승인 웹훅 책임 - transactionId에 대한 결제 정상 조회 검증
+    // 정상 시나리오 등에서 검증 완료되어 불필요
+
+    // PG 결제승인 웹훅 책임 - 주문 상태변경 책임 검증
+    // 정상 시나리오에서의 일부 값을 다시 검증하므로 불필요
 
     /* ----------------------------------
         PG 결제승인 웹훅 실패 Tests
        ---------------------------------- */
 
-    // 트랜잭션 ID에 대한 결제 미존재 시 예외발생
-    // 결제완료된 주문이면 예외발생
+    @Test
+    @DisplayName("PG 결제승인 웹훅 실패 - 트랜잭션 ID에 대한 결제 미존재 시 예외발생")
+    void handlePgWebHook_shouldThrowException_whenNotExistsTransactionId() {
+        // given
+        String pgTransactionId = "pgTransactionId";
+        // PG 결제승인 요청에 대한 웹훅 응답
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .build();
+
+        // PG 트랜잭션 ID와 일치하는 결제 조회
+        given(paymentRepository.findByPgTransactionId(any()))
+                .willReturn(Optional.empty());
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                paymentService.handlePgWebHook(pgApprovalResult));
+        assertEquals(PG_TRANSACTION_ID_NOT_EXISTS, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("PG 결제승인 웹훅 실패 - 이미 결제완료된 주문에 대한 결제 승인요청 시 예외발생")
+    void handlePgWebHook_shouldThrowException_whenAlreadyPaidOrder() {
+        String pgTransactionId = "pgTransactionId";
+        BigDecimal paidAmount = new BigDecimal(10000);
+        // PG 결제승인 요청에 대한 웹훅 응답
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(APPROVED) // PG 결제 승인
+                .paidAmount(paidAmount)
+                .build();
+
+        // 결제 대한 주문
+        Order order = order();
+        // 주문에 대한 PG 요청된 결제
+        Payment payment = inProgressPayment(order);
+
+        // 이미 다른 승인된 결제로 주문이 결제 완료된 상태로 변경
+        Payment alreadyApprovedPayment = approvedPayment(order);
+        order.paid(alreadyApprovedPayment);
+
+        // PG 트랜잭션 ID와 일치하는 결제 조회
+        given(paymentRepository.findByPgTransactionId(any()))
+                .willReturn(Optional.of(payment));
+        // 결제완료되지 않은 주문 조회
+        given(orderRepository.findByIdAndOrderStatus(any(), eq(CREATED)))
+                .willReturn(Optional.empty());
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                paymentService.handlePgWebHook(pgApprovalResult));
+        assertEquals(ORDER_STATUS_NOT_CREATED, e.getErrorCode());
+    }
 
     // 금액 검증, TransactionId 검증, 상태 전이 검증 등의 경우
     // PaymentTest에 이미 존재하므로, 이미 검증된 책임에 대해서는 검증 제외

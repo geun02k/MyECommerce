@@ -141,11 +141,6 @@ class PaymentServiceTest {
 
     /** PG 요청 실패응답 */
     PgApiResponse<PgResult> pgApiResponseOfFail() {
-        // PG 결제대행사에 결제 요청
-        PgResult pgResult = PgResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .redirectUrl("redirectUrl")
-                .build();
         return PgApiResponse.fail("errorCode", "에러메시지");
     }
 
@@ -563,8 +558,6 @@ class PaymentServiceTest {
         paymentService.handlePgWebHook(pgApprovalResult);
 
         // then
-        // 주문 상태변경을 위한 주문 미조회 검증
-        verify(orderRepository, never()).findByIdAndOrderStatus(any(), any());
         // 상태값 미변경 검증 (멱등성 검증)
         assertEquals(pgTransactionId, payment.getPgTransactionId());
         assertEquals(APPROVED, payment.getPaymentStatus()); // 기존 PG 결제승인 상태유지

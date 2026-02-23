@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
@@ -197,6 +198,7 @@ public class PaymentPgApiTest {
                 .approvalStatus(APPROVED) // 승인완료
                 .paidAmount(new BigDecimal("10000"))
                 .vatAmount(new BigDecimal("1000"))
+                .approvalAt(LocalDateTime.now())
                 .build();
 
         // when
@@ -230,6 +232,7 @@ public class PaymentPgApiTest {
         PgWebHookRequestDto request = PgWebHookRequestDto.builder()
                 .pgTransactionId("pgTransactionId")
                 .approvalStatus(FAILED) // 승인실패
+                .approvalAt(LocalDateTime.now())
                 .build();
 
         // when
@@ -267,6 +270,7 @@ public class PaymentPgApiTest {
         PgWebHookRequestDto request = PgWebHookRequestDto.builder()
                 .pgTransactionId("pgTransactionId")
                 .approvalStatus(APPROVED)
+                .approvalAt(LocalDateTime.now())
                 .build();
 
         // when

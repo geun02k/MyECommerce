@@ -5,6 +5,7 @@ import com.myecommerce.MyECommerce.dto.payment.PgWebHookRequestDto;
 import com.myecommerce.MyECommerce.service.payment.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,7 +23,7 @@ public class WebHookController {
      **/
     @PostMapping("/pg/approval")
     public ResponseEntity<Void> handlePgApprovalWebhook(
-            @RequestBody PgWebHookRequestDto request) {
+            @RequestBody @Validated PgWebHookRequestDto request) {
 
         // TODO: 웹훅 보안을 위해 PG 서명 검증 필수
 

@@ -43,6 +43,7 @@ import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -296,7 +297,62 @@ public class PaymentPgApiTest {
        ------------------------- */
 
     // 외부 PG가 잘못된 요청 보낼 수도 있어서 반드시 필요
-    // -> 트랜잭션ID에 대한 결제 미존재 시 404 NotFound 반환
+    @Test
+    @DisplayName("PG 결제승인 웹훅 실패 - 트랜잭션ID에 대한 결제 미존재 시 404 NotFound 반환")
+    void handlePgApprovalWebhook_shouldReturn404_whenNotExistsTransactionId() throws Exception {
+        // given
+        // 결제
+        Order order = createCreatedOrder();
+        // 주문에 대한 PG 결제요청한 결제생성
+        createInProgressPayment(order); // 트랜잭션ID = pgTransactionId인 결제
 
-    // 잘못된 승인상태 요청 시 400 BadRequest 반환
+        // PG 승인 응답 (존재하지 않는 트랜잭션ID에 대한 승인 응답)
+        PgWebHookRequestDto request = PgWebHookRequestDto.builder()
+                .pgTransactionId("not_existing_transactionId")
+                .approvalStatus(APPROVED)
+                .approvalAt(LocalDateTime.now())
+                .build();
+
+        // when
+        // then
+        // 요청에 대한 수행 불가로 404 NotFound 응답
+        mockMvc.perform(post("/api/webhook/pg/approval")
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("PG_TRANSACTION_ID_NOT_EXISTS"));
+
+        // 결제상태 미변경 검증
+        Payment resultPayment = paymentRepository.findByPgTransactionId("pgTransactionId").orElseThrow();
+        assertEquals(IN_PROGRESS, resultPayment.getPaymentStatus()); // 결제상태 IN_PROGRESS 유지
+
+        // 주문상태 미변경 검증
+        Long resultOrderId = resultPayment.getOrder().getId();
+        Order resultOrder = orderRepository.findById(resultOrderId).orElseThrow();
+        assertEquals(CREATED, resultOrder.getOrderStatus()); // 주문상태 CREATED 유지
+    }
+
+    @Test
+    @DisplayName("PG 결제승인 웹훅 실패 - 잘못된 승인상태 요청 시 400 BadRequest 반환")
+    void handlePgApprovalWebhook_shouldReturn400_whenInvalidApprovalStatus() throws Exception {
+        // given
+        // PG 승인 응답
+        String invalidJson = """ 
+            {
+                "pgTransactionId": "pgTransactionId",
+                "approvalStatus": "INVALID_STATUS",
+                "approvalAt": "2025-01-01T10:00:00"
+            }
+        """;
+        // when
+        // then
+        // 입력값 검증 실패 시 400 BadRequest
+        mockMvc.perform(post("/api/webhook/pg/approval")
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidJson)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("INVALID_VALUE"));
+    }
 }

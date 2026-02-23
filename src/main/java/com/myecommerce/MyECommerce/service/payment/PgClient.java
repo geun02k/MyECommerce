@@ -14,9 +14,6 @@ public interface PgClient {
     /** 결제 요청 **/
     PgApiResponse<PgResult> requestPayment(Payment payment);
 
-    /** 결제 승인 **/
-    PgApprovalResult approvePayment(Payment payment);
-
     // 결제 취소
 
     // 부분 결제 취소

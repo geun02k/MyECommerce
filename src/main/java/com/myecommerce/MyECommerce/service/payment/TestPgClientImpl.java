@@ -59,27 +59,6 @@ public class TestPgClientImpl implements PgClient {
         return PgApiResponse.success(pgResult);
     }
 
-    /** 결제 승인 **/
-    @Override
-    public PgApprovalResult approvePayment(Payment payment) {
-
-        if(payment.getPgTransactionId() == null) {
-            throw new IllegalArgumentException("Payment transaction id is null");
-        }
-
-        BigDecimal paymentAmount = payment.getOrder().getTotalPrice();
-        BigDecimal paymentVat = payment.getOrder().getTotalPrice()
-                .divide(BigDecimal.TEN, 2, RoundingMode.HALF_UP);
-
-        return PgApprovalResult.builder()
-                .pgTransactionId(payment.getPgTransactionId())
-                .approvalStatus(PaymentStatusType.APPROVED)
-                .approvalAt(LocalDateTime.now())
-                .paidAmount(paymentAmount)
-                .vatAmount(paymentVat)
-                .build();
-    }
-
     // 결제 트랜잭션 ID 생성
     private String createPgTransactionId() {
         return UUID.randomUUID().toString().substring(0, 7);

@@ -13,6 +13,7 @@ import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.*;
@@ -61,6 +62,9 @@ public class Payment extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private PaymentStatusType paymentStatus; // 결제 상태
+
+    @Column(nullable = true)
+    private LocalDateTime approvalAt; // 승인일시
 
     /* ----------------------
         Method
@@ -124,6 +128,7 @@ public class Payment extends BaseEntity {
         // 승인결과 반영
         this.approvedAmount = pgResult.getPaidAmount();
         this.vatAmount = pgResult.getVatAmount();
+        this.approvalAt = pgResult.getApprovalAt();
         this.paymentStatus = APPROVED; // 승인 완료
     }
 
@@ -140,6 +145,7 @@ public class Payment extends BaseEntity {
             throw new PaymentException(PAYMENT_STATUS_NOT_IN_PROGRESS);
         }
 
+        this.approvalAt = pgResult.getApprovalAt();
         this.paymentStatus = PaymentStatusType.FAILED; // 승인 실패
     }
 

@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -54,6 +55,31 @@ public class CommonExceptionHandler {
         // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
         return new ResponseEntity<>(errorResponse,
                 Objects.requireNonNull(HttpStatus.resolve(e.getErrorCode().getStatusCode())));
+    }
+
+    /** DTO 매핑실패 예외처리 **/
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    protected ResponseEntity<CommonErrorResponse> methodHttpMessageNotReadableExceptionHandler(
+            HttpMessageNotReadableException e) {
+        // 서버에러객체생성
+        DefaultErrorCode errorCode = INVALID_VALUE;
+        // 에러 메시지 생성
+        String errorCodeMessage = createMessage(errorCode.getErrorMessage());
+        String defaultErrorMessage = e.getMessage();
+
+        // 응답 객체 생성
+        CommonErrorResponse errorResponse = CommonErrorResponse.builder()
+                .errorCode(errorCode) // DefaultErrorCode.INVALID_VALUE
+                .errorMessage(errorCodeMessage + defaultErrorMessage)
+                .build();
+
+        log.warn(errorCode.getErrorMessage(), e);
+
+        // 응답 객체 반환
+        // HttpStatus에 상태코드를 담아서 errorResponse와 함께 Http 응답으로 내려보낸다.
+        return new ResponseEntity<>(errorResponse,
+                Objects.requireNonNull(HttpStatus.resolve(errorCode.getStatusCode())));
     }
 
     /** DTO 유효성검사 예외처리 **/

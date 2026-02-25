@@ -350,7 +350,7 @@ public class PaymentPgApiTest {
         // 입력값 검증 실패 시 400 BadRequest
         mockMvc.perform(post("/api/webhook/pg/approval")
                         .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidJson)))
+                        .content(invalidJson))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode")
                         .value("INVALID_VALUE"));

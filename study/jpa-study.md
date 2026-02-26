@@ -1790,3 +1790,31 @@ Optional<Order> findByIdAndOrderStatus(Long id, OrderStatusType status);
 Optional<Order> findByIdAndOrderStatusForUpdate(Long id, OrderStatusType status);
 ~~~
 
+
+---
+## 24. @Modifying   
+기본적으로 Repository 쿼리 메서드는 조회(select) 전용이다.
+따라서 update / delete JPQL 을 실행하려면 반드시 @Modifying 어노테이션을 붙여야 한다.
+Spring Data JPA에서 벌크 업데이트/삭제 쿼리 실행 시 영속성 컨텍스트 동기화 방식을 제어하는 옵션이다.
+조건부 상태 업데이터, 동시성 제어 쿼리, 상태전이 쿼리, 낙관적 락 대체 쿼리의 경우 사용한다.
+적용하지 않으면 'QueryExecutionRequestException: Not supported for DML operations' 에러를 발생시킨다.
+~~~
+@Modifying
+@Query("update Payment p set p.status = :status where p.id = :id")
+int updateStatus(Long id, Status status);
+~~~
+
+1. 옵션   
+   1) flushAutomatically = true   
+      쿼리 실행 전에 영속성 컨텍스트를 DB에 강제 flush. (실행 전 DB 동기화) 
+      - flush: DB에 SQL을 실행해서 반영하지만, 트랜잭션이 commit되지 않았기 때문에 최종 저장은 아니고 rollback 가능 상태.
+               (flush 전에는 메모리에만 존재해 DB 툴에서 조회 불가, flush 후에는 동일 세션에는 보이고 다른 세션에서는 보이지 않을수도 있음.)  
+   2) clearAutomatically = true   
+      쿼리 실행 후 영속성 컨텍스트 전체 clear. (실행 후 캐시 초기화)    
+      벌크 쿼리에서는 JPA를 우회하므로 clear가 필요하지만, 단건 더티체킹의 경우는 JPA가 관리하므로 clear 불필요.    
+      하지만 JPA에서 벌크란 여러행이 아니라 엔티티를 거치지 않고 DB를 직접 수정하는 쿼리를 뜻하므로, 해당 속성 적용 필요.
+      즉, 조건부 update를 DB에서 원자적으로 처리하려면 JPQL update를 써야 한다는 뜻이다.
+
+2. 영속성 컨텍스트 상태    
+   JPA에서 flush / clear / commit 은 전부 “DB 반영 타이밍”과 “영속성 컨텍스트 상태”를 다루는 개념.
+

@@ -7,6 +7,7 @@ import com.myecommerce.MyECommerce.entity.payment.Payment;
 import com.myecommerce.MyECommerce.exception.PaymentException;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
+import com.myecommerce.MyECommerce.type.PaymentStatusType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,8 +57,11 @@ public class PaymentService {
             return; // 예외가 안 터지면 Spring은 200 OK를 보내 pg 승인결과 반영 재요청 받지 않게 종료.
         }
 
-        // 결제 승인, 실패 처리
-        updatePaymentApprove(payment, pgApprovalResult);
+        // 결제 승인, 실패 처리 (동시성 제어)
+        int updateCnt = updatePaymentApprove(payment, pgApprovalResult);
+        if (updateCnt == 0) {
+            return; // Spring은 200 OK를 보내 pg 승인결과 반영 재요청 받지 않게 종료.
+        }
 
         // 결제 완료된 경우 주문상태 변경 (웹 훅 결과 반영)
          if(payment.getPaymentStatus().equals(APPROVED)) {
@@ -73,13 +77,28 @@ public class PaymentService {
     }
 
     // 결제 승인 및 실패 처리
-    private void updatePaymentApprove(Payment payment,
-                                      PgApprovalResult pgApprovalResult) {
-        if (pgApprovalResult.getApprovalStatus() == APPROVED) {
-            payment.approve(pgApprovalResult); // 결제 완료
-        } else {
-            payment.fail(pgApprovalResult); // 재결제 시도가능
+    private int updatePaymentApprove(Payment payment,
+                                     PgApprovalResult pgApprovalResult) {
+        int updateCnt = 0;
+        PaymentStatusType approvalStatus = pgApprovalResult.getApprovalStatus();
+
+        // 조건부로 결제상태 우선변경 (동시성 제어, JPA 더티체킹 전 수행을 위해 우선 실행)
+        if (approvalStatus == APPROVED || approvalStatus == FAILED) {
+            updateCnt = paymentRepository.approveIfInProgress(
+                    payment.getId(), approvalStatus);
         }
+
+        // 결제 승인 및 실패 처리
+        if (updateCnt > 0) {
+            if (approvalStatus == APPROVED) {
+                payment.approve(pgApprovalResult); // 결제 완료
+
+            } else if (approvalStatus == FAILED) {
+                payment.fail(pgApprovalResult); // 재결제 시도가능
+            }
+        }
+
+        return updateCnt;
     }
 
     // 주문상태 변경 (웹 훅 결과 반영)

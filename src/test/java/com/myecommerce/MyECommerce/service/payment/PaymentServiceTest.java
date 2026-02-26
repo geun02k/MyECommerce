@@ -478,6 +478,9 @@ class PaymentServiceTest {
         // PG 트랜잭션 ID와 일치하는 결제 조회
         given(paymentRepository.findByPgTransactionId(any()))
                 .willReturn(Optional.of(payment));
+        // payment 결제상태 APPROVED로 update되어 1 반환
+        given(paymentRepository.approveIfInProgress(any(), eq(APPROVED)))
+                .willReturn(1);
         // 결제완료되지 않은 주문 조회
         given(orderRepository.findByIdAndOrderStatus(any(), eq(CREATED)))
                 .willReturn(Optional.of(order));
@@ -515,6 +518,9 @@ class PaymentServiceTest {
         // PG 트랜잭션 ID와 일치하는 결제 조회
         given(paymentRepository.findByPgTransactionId(any()))
                 .willReturn(Optional.of(payment));
+        // payment 결제상태 FAILED로 update되어 1 반환
+        given(paymentRepository.approveIfInProgress(any(), eq(FAILED)))
+                .willReturn(1);
 
         // when
         paymentService.handlePgWebHook(pgApprovalResult);
@@ -653,6 +659,9 @@ class PaymentServiceTest {
         // PG 트랜잭션 ID와 일치하는 결제 조회
         given(paymentRepository.findByPgTransactionId(any()))
                 .willReturn(Optional.of(payment));
+        // payment 결제상태 APPROVED로 update되어 1 반환
+        given(paymentRepository.approveIfInProgress(any(), eq(APPROVED)))
+                .willReturn(1);
         // 결제완료되지 않은 주문 조회
         given(orderRepository.findByIdAndOrderStatus(any(), eq(CREATED)))
                 .willReturn(Optional.empty());

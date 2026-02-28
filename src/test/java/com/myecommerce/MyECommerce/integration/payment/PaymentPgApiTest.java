@@ -211,7 +211,7 @@ public class PaymentPgApiTest {
                 .andExpect(status().isOk());
 
         // 결제상태 검증 (통합테스트의 목적은 흐름 검증으로, 도메인로직 검증이 아니므로 부가세 등의 변경은 미검증)
-        Payment resultPayment = paymentRepository.findByPgTransactionId("pgTransactionId").orElseThrow();
+        Payment resultPayment = paymentRepository.findByPgTransactionIdWithOrder("pgTransactionId").orElseThrow();
         assertEquals(APPROVED, resultPayment.getPaymentStatus()); // 결제상태 IN_PROGRESS -> APPROVED
 
         // 주문상태 검증
@@ -245,7 +245,7 @@ public class PaymentPgApiTest {
                 .andExpect(status().isOk());
 
         // 결제상태 검증
-        Payment resultPayment = paymentRepository.findByPgTransactionId("pgTransactionId").orElseThrow();
+        Payment resultPayment = paymentRepository.findByPgTransactionIdWithOrder("pgTransactionId").orElseThrow();
         assertEquals(FAILED, resultPayment.getPaymentStatus()); // 결제상태 IN_PROGRESS -> FAILED
 
         // 주문상태 검증
@@ -283,7 +283,7 @@ public class PaymentPgApiTest {
                 .andExpect(status().isOk());
 
         // 결제상태 검증
-        Payment resultPayment = paymentRepository.findByPgTransactionId("pgTransactionId").orElseThrow();
+        Payment resultPayment = paymentRepository.findByPgTransactionIdWithOrder("pgTransactionId").orElseThrow();
         assertEquals(FAILED, resultPayment.getPaymentStatus()); // 결제상태 FAILD 유지 (상태역전 X)
 
         // 주문상태 검증
@@ -324,7 +324,7 @@ public class PaymentPgApiTest {
                         .value("PG_TRANSACTION_ID_NOT_EXISTS"));
 
         // 결제상태 미변경 검증
-        Payment resultPayment = paymentRepository.findByPgTransactionId("pgTransactionId").orElseThrow();
+        Payment resultPayment = paymentRepository.findByPgTransactionIdWithOrder("pgTransactionId").orElseThrow();
         assertEquals(IN_PROGRESS, resultPayment.getPaymentStatus()); // 결제상태 IN_PROGRESS 유지
 
         // 주문상태 미변경 검증

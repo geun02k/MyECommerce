@@ -71,7 +71,7 @@ public class PaymentService {
 
     // transactionId로 결제(Payment) 객체 조회
     private Payment findPaymentByPgTransactionId(String pgTransactionId) {
-        return paymentRepository.findByPgTransactionId(pgTransactionId)
+        return paymentRepository.findByPgTransactionIdWithOrder(pgTransactionId)
                 .orElseThrow(() ->
                         new PaymentException(PG_TRANSACTION_ID_NOT_EXISTS));
     }

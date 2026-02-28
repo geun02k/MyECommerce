@@ -476,7 +476,7 @@ class PaymentServiceTest {
         Payment payment = inProgressPayment(order);
 
         // PG 트랜잭션 ID와 일치하는 결제 조회
-        given(paymentRepository.findByPgTransactionId(any()))
+        given(paymentRepository.findByPgTransactionIdWithOrder(any()))
                 .willReturn(Optional.of(payment));
         // payment 결제상태 APPROVED로 update되어 1 반환
         given(paymentRepository.approveIfInProgress(any(), eq(APPROVED)))
@@ -490,7 +490,7 @@ class PaymentServiceTest {
 
         // then
         // 결제, 주문 상태 및 값 변경을 위한 조회 필수 검증
-        verify(paymentRepository).findByPgTransactionId(eq(pgTransactionId));
+        verify(paymentRepository).findByPgTransactionIdWithOrder(eq(pgTransactionId));
         verify(orderRepository).findByIdAndOrderStatus(any(), any());
         // 변경, 중요값 검증
         assertEquals(pgTransactionId, payment.getPgTransactionId());
@@ -516,7 +516,7 @@ class PaymentServiceTest {
         Payment payment = inProgressPayment(order);
 
         // PG 트랜잭션 ID와 일치하는 결제 조회
-        given(paymentRepository.findByPgTransactionId(any()))
+        given(paymentRepository.findByPgTransactionIdWithOrder(any()))
                 .willReturn(Optional.of(payment));
         // payment 결제상태 FAILED로 update되어 1 반환
         given(paymentRepository.approveIfInProgress(any(), eq(FAILED)))
@@ -527,7 +527,7 @@ class PaymentServiceTest {
 
         // then
         // 결제 상태 및 값 변경을 위한 조회 필수 검증
-        verify(paymentRepository).findByPgTransactionId(eq(pgTransactionId));
+        verify(paymentRepository).findByPgTransactionIdWithOrder(eq(pgTransactionId));
         // 주문 상태변경을 위한 주문 미조회 검증
         verify(orderRepository, never()).findByIdAndOrderStatus(any(), any());
         // 변경, 중요값 검증
@@ -557,7 +557,7 @@ class PaymentServiceTest {
         Payment payment = approvedPayment(order);
 
         // PG 트랜잭션 ID와 일치하는 결제 조회
-        given(paymentRepository.findByPgTransactionId(any()))
+        given(paymentRepository.findByPgTransactionIdWithOrder(any()))
                 .willReturn(Optional.of(payment));
 
         // when
@@ -587,7 +587,7 @@ class PaymentServiceTest {
         Payment payment = approvedPayment(order);
 
         // PG 트랜잭션 ID와 일치하는 결제 조회
-        given(paymentRepository.findByPgTransactionId(any()))
+        given(paymentRepository.findByPgTransactionIdWithOrder(any()))
                 .willReturn(Optional.of(payment));
 
         // when
@@ -625,7 +625,7 @@ class PaymentServiceTest {
                 .build();
 
         // PG 트랜잭션 ID와 일치하는 결제 조회
-        given(paymentRepository.findByPgTransactionId(any()))
+        given(paymentRepository.findByPgTransactionIdWithOrder(any()))
                 .willReturn(Optional.empty());
 
         // when
@@ -657,7 +657,7 @@ class PaymentServiceTest {
         order.paid(alreadyApprovedPayment);
 
         // PG 트랜잭션 ID와 일치하는 결제 조회
-        given(paymentRepository.findByPgTransactionId(any()))
+        given(paymentRepository.findByPgTransactionIdWithOrder(any()))
                 .willReturn(Optional.of(payment));
         // payment 결제상태 APPROVED로 update되어 1 반환
         given(paymentRepository.approveIfInProgress(any(), eq(APPROVED)))

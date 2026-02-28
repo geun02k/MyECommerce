@@ -21,7 +21,13 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Payment> findLockedById(Long id);
 
-    Optional<Payment> findByPgTransactionId(String pgTransactionId);
+    @Query("""
+            select p
+            from Payment p
+            join fetch p.order
+            where p.pgTransactionId = :pgTransactionId
+    """)
+    Optional<Payment> findByPgTransactionIdWithOrder(String pgTransactionId);
 
     List<Payment> findByOrderIdAndPaymentMethodAndPgProvider(
             Long orderId, PaymentMethodType paymentMethod, PgProviderType pgProvider);

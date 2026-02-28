@@ -1770,3 +1770,94 @@ Spring Data JPA 내부에서 Repository 인터페이스를 스캔해 프록시 �
 인터페이스에 붙여도 에러는 발생하지 않고 정상 동작은 한다.
 하지만 굳이 안 붙이는 이유는, 중복 의미를 제거하고 개발자가 만든 구현체인지 Spring Data JPA 리포지토리인지 헷갈림을 유발하므로 제거가 권장된다.
 
+
+---
+## 23. repository Lock 유무에 따른 동일한 조회 메서드   
+JPA 메서드 이름에 ForUpdate 같이 지원하지 않는 용어를 붙여서 사용해도 된다.
+아무 효과도 없기 때문에 JPA 동작에 영향이 없다.
+따라서 아래의 두 repository 메서드는 완전히 동일한 쿼리를 반환한다.
+메서드명은 의미 표현용일 뿐이다.
+그래서 관례적으로 사람에게만 의미를 주는 이름을 쓰는 것이지 JPA가 인식하는 건 아니다.
+1. JPA가 메서드 이름을 해석하는 규칙     
+   findBy, Id, And, OrderStatus 외 나머지는 메서드 이름으리 꼬리표일 뿐이다.    
+   단, Top, First, Distincy 같은 경우는 JPA 키워드로 의미가 있으므로 꼬리표로는 사용하지 않도록 한다.
+~~~
+// 락 없음 (조회용)
+Optional<Order> findByIdAndOrderStatus(Long id, OrderStatusType status);
+
+// 락 있음 (상태 변경용)
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+Optional<Order> findByIdAndOrderStatusForUpdate(Long id, OrderStatusType status);
+~~~
+
+
+---
+## 24. @Modifying   
+기본적으로 Repository 쿼리 메서드는 조회(select) 전용이다.
+따라서 update / delete JPQL 을 실행하려면 반드시 @Modifying 어노테이션을 붙여야 한다.
+Spring Data JPA에서 벌크 업데이트/삭제 쿼리 실행 시 영속성 컨텍스트 동기화 방식을 제어하는 옵션이다.
+조건부 상태 업데이터, 동시성 제어 쿼리, 상태전이 쿼리, 낙관적 락 대체 쿼리의 경우 사용한다.
+적용하지 않으면 'QueryExecutionRequestException: Not supported for DML operations' 에러를 발생시킨다.
+~~~
+@Modifying
+@Query("update Payment p set p.status = :status where p.id = :id")
+int updateStatus(Long id, Status status);
+~~~
+
+1. 옵션   
+   1) flushAutomatically = true   
+      쿼리 실행 전에 영속성 컨텍스트를 DB에 강제 flush. (실행 전 DB 동기화) 
+      - flush: DB에 SQL을 실행해서 반영하지만, 트랜잭션이 commit되지 않았기 때문에 최종 저장은 아니고 rollback 가능 상태.
+               (flush 전에는 메모리에만 존재해 DB 툴에서 조회 불가, flush 후에는 동일 세션에는 보이고 다른 세션에서는 보이지 않을수도 있음.)  
+   2) clearAutomatically = true   
+      쿼리 실행 후 영속성 컨텍스트 전체 clear. (실행 후 캐시 초기화)    
+      벌크 쿼리에서는 JPA를 우회하므로 clear가 필요하지만, 단건 더티체킹의 경우는 JPA가 관리하므로 clear 불필요.    
+      하지만 JPA에서 벌크란 여러행이 아니라 엔티티를 거치지 않고 DB를 직접 수정하는 쿼리를 뜻하므로, 해당 속성 적용 필요.
+      즉, 조건부 update를 DB에서 원자적으로 처리하려면 JPQL update를 써야 한다는 뜻이다.
+
+2. 영속성 컨텍스트 상태    
+   JPA에서 flush / clear / commit 은 전부 “DB 반영 타이밍”과 “영속성 컨텍스트 상태”를 다루는 개념.
+
+
+---
+## 25. 동시성 테스트 어려운 유형
+### < 동시성 테스트 어려운 유형 >
+1. 동시성 테스트    
+   동시성 테스트는 결과값이 아니라 “한 번만 실행됐는지”를 검증하는 테스트다.
+   1) "Silent Idempotent Write 경쟁 조건" 유형    
+      실패해도 티 안 나는 동시성 로직.
+      반환값 없음, 예외 없음, 결과 상태 동일 가능, 실패 시 로그 없으면 감지 불가 등.
+
+2. 검증결과
+   결과만 보면 동시성 버그인지 정상 수행된 것인지 구분 불가.
+   동시성 테스트는 결과값 검증이 아니라 발생 횟수를 검증해야 한다.
+   예를 들면, 주문 상태 변경 로직이 딱 1번만 실행됐는가를 검증해야 한다.
+
+3. 테스트 전략
+   1) Spy + 호출 횟수 검증    
+      Unit 5와 Spring Boot 환경에서 @SpyBean을 사용하면 실제 객체의 기능을 유지하면서 
+      특정 메서드가 몇 번 호출되었는지, 어떤 인자가 넘어갔는지 아주 정밀하게 추적할 수 있다.
+      ~~~
+      @SpyBean
+      OrderRepository orderRepository;
+      ~~~
+      ~~~
+      verify(orderRepository, times(1))
+            .findByIdAndOrderStatus(any(), eq(CREATED));
+      ~~~ 
+   2) DB 변경 횟수 검증    
+      Order Entity의 경우 paidAt 컬럼을 하나 두고,
+      동시 요청 10개 실행 시 paidAt 값 조회해 변경 시각이 1번만 기록되었는지 확인해 테스트한다.
+
+
+### < @SpyBean >
+@SpyBean은 스프링 부트 테스트(Spring Boot Test) 환경에서 사용하는 어노테이션.
+실제 스프링 컨텍스트에 등록된 빈(Bean)을 '스파이' 객체로 감싸는 역할을 한다.     
+@SpyBean은 모킹은 아니지만, 필요에 따라 doReturn().when() 같은 구문을 써서 
+특정 메서드만 모킹처럼 동작하게 만들 수 있기 때문에 "부분 모킹" 도구로 불리기도 한다.
+1) 기본 동작       
+   진짜 메서드가 호출되어 실제 빈의 로직을 그대로 수행.
+2) 추가 기능     
+   어떤 메서드가 호출되었는지 감시(Spying)하고, 
+   필요하다면 특정 메서드만 부분적으로 모킹(Partial Mocking) 가능.
+

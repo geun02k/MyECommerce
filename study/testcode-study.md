@@ -75,6 +75,7 @@
 29. 도메인 테스트
     - 도메인 테스트
     - Order–OrderItem 관계의 불변식을 설계로 고정해 테스트하지 않음
+30. Payment.isTerminal() 테스트코드 작성 - 팩토리 생성 구조에서 특정 상태 테스트가 불가능한 문제 해결
 
 
 --- 
@@ -2935,4 +2936,610 @@ Docker 컨테이너로 진짜 Redis를 띄운다.
    4) 정상 동작의 증명    
       정상 동작은 OrderEntity 테스트 하나면 충분하다.
       assignOrder() 정상 동작은 재할당 불가 전체를 충족하게 되고 Order -> OrderItem 관계를 보장하게 된다.
+
+
+---
+## 30. Payment.isTerminal() 테스트코드 작성 - 팩토리 생성 구조에서 특정 상태 테스트가 불가능한 문제 해결   
+1. 발생 원인   
+   Payment 엔티티는 팩토리 메서드를 통해서만 생성되고, 상태 변경 또한 도메인 메서드로만 가능하도록 캡슐화되어 있다.    
+   이러한 구조는 도메인 무결성을 지키는 올바른 설계지만, 
+   아직 실제 로직에서 CANCELED 상태로 전이되는 기능이 구현되지 않은 상태이므로 
+   테스트 코드에서 해당 상태 객체를 생성할 방법이 없었다.     
+   그 결과 isTerminal() 메서드에서 CANCELED 상태 검증 테스트를 작성할 수 없는 문제가 발생했다.     
+   
+2. 해결 방법     
+   도메인 캡슐화 설계와 테스트 필요 조건 사이에서 발생한 자연스러운 충돌이었고,
+   테스트 전용 객체 생성 방식을 도입하여 해결했다.    
+   테스트 전용 생성 경로와 리플렉션 기반 필드 설정을 통해 설계를 훼손하지 않으면서 테스트 가능성을 확보하는 것이다.      
+   테스트 코드 내부에서만 사용하는 헬퍼(테스트 전용 팩토리)를 만들고, 
+   ReflectionTestUtils를 사용해 Payment 객체의 private 필드인 paymentStatus 값을 직접 설정하도록 했다. 
+   이를 통해 프로덕션 코드의 생성 규칙과 캡슐화를 유지하면서도 테스트에서 필요한 상태 객체를 생성할 수 있게 되었다.    
+   ~~~
+    /** PG 승인취소된 결제 생성 - 결제상태 CANCELED */
+    Payment canceledPayment() {
+        // ...
+
+        // 결제 생성 (READY)
+        Payment payment = Payment.createPayment(order, requestMethod, pgProvider);
+
+        // PG 결제 승인취소 (현재 로직에서 미지원으로 강제변경)
+        ReflectionTestUtils.setField(payment, "paymentStatus", CANCELED);
+
+        return payment;
+    }
+   ~~~
+   
+
+### < 상태변경 로직이 없어도 테스트해야 하는 이유 >
+테스트의 목적은 현재 구현된 기능만 검증하는 것이 아니라, 
+도메인이 보장해야 할 규칙이 미래에도 유지되는지를 검증하는 것이다.     
+PaymentStatus enum에 CANCELED 상태가 정의되어 있고 도메인 규칙상 해당 상태가 terminal 상태라면, 
+그 규칙 자체가 테스트 대상이다.    
+만약 테스트가 없다면 이후 코드 수정 과정에서 CANCELED 상태가 terminal 조건에서 빠지는 버그가 생겨도 감지할 수 없다.    
+즉, “아직 기능이 없다”는 이유는 테스트 생략의 근거가 되지 않으며, 상태 모델에 존재하는 값이라면 언제든 검증되어야 한다.    
+
+
+### < ReflectionTestUtils >
+1. ReflectionTestUtils    
+   ReflectionTestUtils는 Spring 테스트 유틸리티.    
+   자바 리플렉션을 활용해 접근 제한자(private, protected 등)를 무시하고 
+   객체 내부 필드 값을 읽거나 수정할 수 있게 해주는 도구다.     
+   엔티티에서 setter를 제공하지 않아 외부에서 상태 변경이 불가능하도록 설계했더라도, 
+   테스트 환경에서는 이 도구를 통해 내부 값을 직접 설정할 수 있다.     
+   즉, 도메인 설계를 깨지 않고 테스트만을 위해 객체 상태를 구성할 수 있도록 해주는 안전한 테스트 지원 도구다.   
+
+2. setter가 없는데 값이 수정되는 이유    
+   자바 리플렉션은 런타임에 클래스 구조를 분석하고 접근 제한을 우회할 수 있는 기능을 제공한다. 
+   ReflectionTestUtils는 내부적으로 리플렉션 API를 사용하여 private 필드 접근 제한을 해제한 뒤 값을 주입한다.    
+   따라서 setter가 없어도 값 변경이 가능하다.    
+   중요한 점은 이 방식은 일반 애플리케이션 로직에서는 사용되지 않고 테스트 코드에서만 사용된다는 점이며, 
+   이는 도메인 무결성을 유지하면서 테스트 유연성을 확보하기 위한 의도된 사용 방식이다.      
+
+
+---
+## 31. 코드의 분기
+아래의 코드의 분기는 딱 2개 뿐이다.   
+true는 예외 발생, false느 통과한다.   
+READY / IN_PROGRESS는 동일분기, APPROVED / CANCELED 도 동일분기이다.    
+분기별 테스트는 최소 하나씩 작성하는 게 좋다.
+하지만 READY / IN_PROGRESS 중 하나의 상태만 테스트한 반면,
+APPROVED / CANCELED 상태 두가지를 모두 테스트코드를 작성하는 것은 분기 문제가 아니라 리스크 관리 문제 때문이다.   
+누군가 나중에 코드를 변경할 수 있기 때문에 사전에 방지하는 것이다.
+READY / IN_PROGRESS의 경우는 아직 결제가 종결되지 않았다는 도메인적 의미를 가지지만,
+APPROVED / CANCELED은 둘 다 approve 불가지만 비즈니스 의미가 다르다.
+따라서 정책 테스트에서는 둘 다 검증하는 게 안전하다.   
+Entity에서의 테스트코드는 로직 정확성 검증용, 정책 테스트에서는 규칙 적용 검증용이기 때문이다.
+
+~~~
+// PaymentPolicy 코드
+    // 결제 승인된 경우 결제 생성 불가 (승인, 취소 등 PG 승인된 경우)
+    private void validatePaymentAlreadyApproved(List<Payment> paymentList) {
+        long invalidPaymentCount = paymentList.stream()
+                .filter(payment -> !payment.isApproveRequestAvailable()) // 결제 완료되어 결제불가
+                .count();
+
+        if (invalidPaymentCount > 0) {
+            throw new PaymentException(PAYMENT_ALREADY_COMPLETED);
+        }
+    }
+~~~
+~~~
+// Payment 코드
+    /** PaymentStatus - 자기 상태 판단
+     *  PG 승인 요청 가능 여부 반환 **/
+    public boolean isApproveRequestAvailable() {
+        return !(this.paymentStatus == APPROVED || this.paymentStatus == CANCELED);
+    }
+
+~~~
+
+
+---
+## 32. PaymentServiceTest 구조개선
+### < given절 >
+1. 좋지 않은 given    
+   읽는 사람이 Builder 내부 구조 해석해야 함.
+   ~~~
+   Member member = Member.builder()
+       .userId("customer")
+       .roles(List.of(MemberAuthority.builder())
+       .build(); 
+   ~~~
+
+2. 좋은 given    
+   읽는 순간 의미 이해되어야 함.
+   1) 기존 생각     
+      given 데이터를 픽스쳐로 외부로 빼버리면 데이터를 보러 픽스쳐 메서드로 이동해야하니까 더 읽기 어려운 구조가 되는 것이라고 생각했다.
+      그래서 요청 데이터들은 픽스쳐로 빼지 않았다.    
+   2) 픽스쳐 메서드로 빼야하는 것    
+      fixture는 무조건 빼는 게 아니라 "의미없는 데이터만" 빼는 것이다.
+      즉, 테스트 의도와 상관없는 값을 빼는 것이다.
+      따라서 요청 데이터는 테스트 코드 안에 유지하는 것이 맞다.
+   ~~~
+   Member member = fixture.member();
+   Order order = fixture.order(member);
+   PgResult pgResult = fixture.pgResult();
+   ~~~
+
+3. PaymentService 정상흐름 테스트에서 요청값     
+   둘 다 요청값이지만 request는 핵심 입력값이고 member는 현재 테스트에서는 핵심 입력값이 아니다.
+   reqeust는 결과를 바꾸는 값인 반면, member는 정책 검증 통과용 객체로 결과를 변경하지 않기 때문이다.   
+   따라서 request는 유지, member는 픽스쳐로 빼는 것이 가독성 측면에서 좋다.
+
+   
+### < verify() >
+Mockito에서 verify()는 times()를 명시하지 않으면 기본값이 1회 호출 검증하므로 생략가능.
+기본값이 1이니까, times(1)을 쓰게 되면 노이즈일 뿐이다.
+1. 기존 코드
+   ~~~
+   verify(paymentPolicy, times(1)).preValidateCreate(member);
+   ~~~
+2. 수정한 코드   
+   ~~~
+   verify(paymentPolicy).preValidateCreate(member);
+   ~~~
+
+
+### < 정상 시나리오 테스트 역할별 분리 >
+1. 문제점    
+   현재 정상 시나리오 테스트 하나로 흐름을 모두 검증하고 있다.
+   즉, 검증 범위가 너무 넓다.    
+   이는 사실상 단위 테스트가 아니라 Mockito로 흉내 낸 통합 테스트이다.    
+   현재 테스트는 아래의 책임을 동시에 검증하고 있다.
+   - 정책 검증 호출
+   - 주문 조회
+   - 결제 생성
+   - 결제 저장
+   - PG 호출
+   - 상태 변경
+   - 응답 DTO 생성
+   ~~~
+    @Test
+    @DisplayName("결제생성 성공 - 결제 객체 생성 및 PG 결제 요청")
+    void startPayment_shouldCreatePaymentAndPgRequest_whenValid() {
+        // given
+        // 요청 결제 정보
+        Long requestOrderId = 1L;
+        RequestPaymentDto request = RequestPaymentDto.builder()
+                .orderId(requestOrderId)
+                .paymentMethod(CARD)
+                .build();
+        // 결제 요청 고객
+        Member member = customer();
+
+        // PG 결제대행사
+        PgProviderType pgProvider = PgProviderType.MOCK_PG;
+        // 요청 결제에 대한 주문
+        Order order = order(member);
+        // 저장된 신규 결제
+        Payment savedPayment = Payment.createPayment(order, CARD, pgProvider);
+        // PG 결제 요청 응답
+        PgResult pgResult = PgResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .build();
+
+        // PG 결제대행사 반환
+        given(pgClient.getProvider()).willReturn(pgProvider);
+        // 요청 결제에 대한 주문 조회
+        given(orderRepository.findLockedByIdAndOrderStatus(
+                requestOrderId, OrderStatusType.CREATED))
+                .willReturn(Optional.of(order));
+        // 주문에 대한 기존 결제내역 미존재
+        given(paymentRepository.findLockedAllByOrderId(requestOrderId))
+                .willReturn(Collections.emptyList());
+        // 신규 결제 생성 및 저장
+        given(paymentRepository.save(any())).willReturn(savedPayment);
+        // PG 결제대행사에 결제 요청
+        given(pgClient.requestPayment(savedPayment))
+                .willReturn(pgResult);
+
+        // when
+        ResponsePaymentDto response =
+                paymentService.startPayment(request, member);
+
+        // then
+        // 정책 실행여부 검증
+        verify(paymentPolicy).preValidateCreate(member);
+        verify(paymentPolicy).validateCreate(Collections.emptyList(), order, member);
+        // PG 요청여부 검증 (외부 api 호출)
+        verify(pgClient).requestPayment(savedPayment);
+        // 결제 저장여부 검증
+        ArgumentCaptor<Payment> paymentArgCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentArgCaptor.capture());
+
+        // Payment 저장 전, 신규 생성된 결제객체 검증
+        Payment capturedPayment = paymentArgCaptor.getValue();
+        assertEquals(order, capturedPayment.getOrder());
+        assertEquals(request.getPaymentMethod(), capturedPayment.getPaymentMethod());
+        assertEquals(pgProvider, capturedPayment.getPgProvider());
+        assertNotNull(capturedPayment.getPaymentCode()); // paymentCode 규칙 검증은 Payment Entity에서 검증 (paymentCode 생성 규칙 바뀌면 Service 테스트가 깨지기 때문)
+        assertEquals(READY, capturedPayment.getPaymentStatus()); // 결제 생성 상태
+
+        // PG 요청 후 응답 검증
+        assertEquals(requestOrderId, response.getOrderId());
+        assertEquals(IN_PROGRESS, response.getPaymentStatus()); // 결제 상태 PG 요청으로 변경
+        assertEquals(pgResult.getPgTransactionId(), response.getPgResult().getPgTransactionId());
+        assertEquals(pgResult.getRedirectUrl(), response.getPgResult().getRedirectUrl());
+    }
+   ~~~
+   
+2. 해결방법    
+   하나의 테스트에서 결제 생성, 정책 검증, 저장, PG 호출, 상태 변경, 응답 검증까지 전부 확인하고 있는데, 
+   이렇게 되면 테스트 하나가 서비스 전체 흐름을 동시에 책임지게 된다.  
+   그러면 내부 구현이 조금만 바뀌어도 테스트가 연쇄적으로 깨진다. 
+   좋은 테스트는 로직이 아니라 책임 단위를 검증해야 한다.   
+   따라서 현재 정상 시나리오 테스트를 분해해야 한다.
+   1) startPayment() 내부 책임
+      - 결제 생성
+      - PG 요청
+      - 결과 반영 및 응답 반환
+
+   2) 전체 정상 흐름 테스트    
+      테스트의 목적은 딱 하나다.
+      사용자 입장에서 기능이 정상 동작하는가?   
+      따라서 여기서는 내부 검증을 거의 하지 않는다.    
+      내부 구현 검증이 아닌 기능 동작 검증이기 때문이다.
+      ~~~
+      @Test
+      void 결제_정상_흐름() {
+         ResponsePaymentDto response =
+         paymentService.startPayment(request, member);
+   
+         assertEquals(IN_PROGRESS, response.getPaymentStatus());
+      }
+      ~~~
+   
+   3) 결제 생성 책임 테스트    
+      결제가 생성되고 저장되는지만 검증.   
+      ~~~
+      @Test
+      void 결제_생성된다() {
+          // given
+          Member member = customer();
+          Order order = order(member);
+   
+          given(pgClient.getProvider()).willReturn(PgProviderType.MOCK_PG);
+          given(orderRepository.findLockedByIdAndOrderStatus(1L, OrderStatusType.CREATED))
+                  .willReturn(Optional.of(order));
+          given(paymentRepository.findLockedAllByOrderId(1L))
+                  .willReturn(Collections.emptyList());
+   
+          // when
+          paymentService.startPayment(
+                  RequestPaymentDto.builder().orderId(1L).paymentMethod(CARD).build(),
+                  member
+          );
+   
+          // then
+          verify(paymentRepository).save(any());
+      }
+      ~~~
+      
+   4) 정책 호출 테스트   
+      정책이 실행되는지만 검증
+      ~~~
+      @Test
+      void 정책이_호출된다() {
+          Member member = customer();
+          Order order = order(member);
+   
+          given(pgClient.getProvider()).willReturn(PgProviderType.MOCK_PG);
+          given(orderRepository.findLockedByIdAndOrderStatus(1L, OrderStatusType.CREATED))
+                  .willReturn(Optional.of(order));
+          given(paymentRepository.findLockedAllByOrderId(1L))
+                  .willReturn(Collections.emptyList());
+   
+          paymentService.startPayment(
+                  RequestPaymentDto.builder().orderId(1L).paymentMethod(CARD).build(),
+                  member
+          );
+   
+          verify(paymentPolicy).preValidateCreate(member);
+          verify(paymentPolicy).validateCreate(any(), eq(order), eq(member));
+      }
+      ~~~
+   
+   5) PG 요청 테스트    
+      PG 호출되는지만 확인.
+      ~~~
+      @Test
+      void PG요청_보낸다() {
+          Member member = customer();
+          Order order = order(member);
+          Payment payment = Payment.createPayment(order, CARD, PgProviderType.MOCK_PG);
+   
+          given(pgClient.getProvider()).willReturn(PgProviderType.MOCK_PG);
+          given(orderRepository.findLockedByIdAndOrderStatus(1L, OrderStatusType.CREATED))
+                  .willReturn(Optional.of(order));
+          given(paymentRepository.findLockedAllByOrderId(1L))
+                  .willReturn(Collections.emptyList());
+          given(paymentRepository.save(any())).willReturn(payment);
+          given(pgClient.requestPayment(any())).willReturn(PgResult.builder().build());
+   
+          paymentService.startPayment(
+                  RequestPaymentDto.builder().orderId(1L).paymentMethod(CARD).build(),
+                  member
+          );
+   
+          verify(pgClient).requestPayment(any());
+      }
+      ~~~
+
+   6) 응답값 테스트    
+      반환 DTO만 검증.
+      ~~~
+      @Test
+      void 응답값_정상() {
+          Member member = customer();
+          Order order = order(member);
+          Payment payment = Payment.createPayment(order, CARD, PgProviderType.MOCK_PG);
+   
+          PgResult result = PgResult.builder()
+               .pgTransactionId("tx")
+               .redirectUrl("url")
+               .build();
+   
+          given(pgClient.getProvider()).willReturn(PgProviderType.MOCK_PG);
+          given(orderRepository.findLockedByIdAndOrderStatus(1L, OrderStatusType.CREATED))
+                  .willReturn(Optional.of(order));
+          given(paymentRepository.findLockedAllByOrderId(1L))
+                  .willReturn(Collections.emptyList());
+          given(paymentRepository.save(any())).willReturn(payment);
+          given(pgClient.requestPayment(any())).willReturn(result);
+   
+          ResponsePaymentDto response =
+               paymentService.startPayment(
+                       RequestPaymentDto.builder().orderId(1L).paymentMethod(CARD).build(),
+                       member
+               );
+   
+          assertEquals(IN_PROGRESS, response.getPaymentStatus());
+          assertEquals("tx", response.getPgResult().getPgTransactionId());
+      }
+      ~~~
+      
+3. 테스트를 분해하는 이유    
+   기존 구조에서는 Payment 내부 로직이 바뀌면 테스트 하나가 아니라 전체 테스트가 깨진다. 
+   하지만 책임별 테스트로 나누면 특정 로직만 영향을 받는다. 
+   예를 들어 결제 상태 변경 로직이 수정되면 상태 테스트만 실패한다. 
+   나머지는 그대로 통과한다. 
+   이것이 테스트 유지보수성의 핵심이다.
+
+
+### < 서비스 테스트에서 mock()과 willAnswer() 이해하기 >
+목적 → 테스트를 구현이 아니라 행동과 결과 중심으로 유지
+이 원칙만 유지하면 테스트가 커져도 깨지지 않고 유지보수가 쉬워진다.    
+
+서비스 단위 테스트에서 중요한 원칙은 테스트 대상 로직만 검증하고 외부 의존성은 통제하는 것이다. 
+이때 사용하는 것이 mock()과 willAnswer() 같은 Mockito 기능이다.   
+
+mock()은 실제 객체 대신 사용하는 가짜 객체다. 
+예를 들어 주문 조회 결과만 필요하고 주문 내부 로직은 중요하지 않다면 
+실제 Order를 생성할 필요 없이 mock 객체를 만들어 필요한 값만 반환하도록 설정하면 된다. 
+이렇게 하면 테스트가 불필요한 도메인 생성 로직에 의존하지 않아 더 단순하고 안정적이 된다.    
+
+1. willAnswer()    
+   - 호출 인자 기반 동적 응답 설정     
+   mock 메서드가 호출됐을 때 전달된 인자 기반으로 동적으로 응답을 만들고 싶을 때 사용한다. 
+   대표적인 예가 repository.save()이다. 
+   실제 JPA save는 전달된 엔티티를 그대로 반환하는데, 
+   일반 willReturn()을 쓰면 항상 고정 객체만 반환하게 되어 실제 동작과 달라질 수 있다. 
+   이때 willAnswer(invocation -> invocation.getArgument(0))처럼 작성하면 
+   save에 전달된 객체를 그대로 반환하게 되어 실제 저장 동작을 자연스럽게 흉내낼 수 있다.
+
+2. invocation    
+   mock 호출 정보를 담은 객체이고, getArgument(0)은 첫 번째 파라미터를 꺼내는 메서드다. 
+   즉 위 코드는 “save에 전달된 객체를 그대로 반환하라”는 의미다.
+
+3. mock()   
+   테스트 대상이 아닌 의존 객체를 단순화하기 위한 도구
+
+   
+### < 정상 흐름 테스트에서 어디까지 검증해야 할까? >
+지금 고민 방향은 아주 좋다. 결론부터 말하면 맞다. IN_PROGRESS만 검증하는 건 최소 검증 기준이고, 실제로는 “외부에 약속한 결과 값”까지는 검증하는 게 좋다.
+단, 핵심 기준은 하나다.
+정상 흐름 테스트는 내부 구현이 아니라 “외부 계약(Contract)”만 검증한다.
+
+
+### < 전달인자 비교 eq()와 argThat() >
+1. 문제점
+   eq()는 객체 동일성 비교로, new ArrayList<>() 반환처럼 내부 구현이 바뀌면 테스트 실패.
+   지금은 emptyList이지만, 만약 객체를 비교한다면, 내부 필드 틀려도 통과하는 문제가 발생할 수 있다.   
+   ~~~
+        verify(paymentPolicy).validateCreate(
+                eq(Collections.emptyList()), eq(order), eq(member));
+   ~~~
+2. 문제해결     
+   리스트 내용 검증하도록 수정.    
+   eq()로 하는 객체 검증보다 argThat()을 사용한 속성 검증을 통해 인스턴스가 달라도 통과하도록 해 테스트 안정성 높임.
+   ~~~
+   verify(paymentPolicy).validateCreate(
+        argThat(List::isEmpty),
+        eq(order),
+        eq(member)
+   );
+   ~~~
+3. 외부 api 호출과 payload 검증    
+   외부 API 호출 테스트에서 가장 중요한 건 외부에 보낸 데이터가 정확한가이다.
+   외부 API 테스트 = 전달 데이터 검증 테스트는 필수이다.
+   ~~~
+       // PG 요청여부 검증 (외부 api 호출)
+        verify(pgClient).requestPayment(argThat(p ->
+                p.getOrder().equals(order)
+                && p.getPaymentMethod() == requestPaymentMethod
+                && p.getPgProvider() == pgProvider
+                && p.getPgTransactionId().equals(pgTransactionId)
+                && p.getPaymentStatus() == READY
+        ));
+   ~~~
+
+
+### < 실행순서 검증 >
+어떤 로직은 순서가 틀리면 버그이다.
+따라서 메서드 호출 순서가 정확한지 확인하는 테스트가 필요하다.   
+순서가 비즈니스 규칙일 경우에만 사용하고 남발하지 않도록 한다.
+
+1. 실행 순서 검증(InOrder)    
+   Mockito에서 제공하는 기능.    
+   호출 여부 뿐 아니라 메서드 호출 순서까지 검증.
+   ~~~
+   // mock1.method1() 다음 mock2.method2() 호출됨을 검증.
+   InOrder inOrder = inOrder(mock1, mock2);
+
+   inOrder.verify(mock1).method1();
+   inOrder.verify(mock2).method2();
+   ~~~
+
+2. 조회를 순서 검증에서 제외하는 이유     
+   조회는 “결과를 만들기 위한 준비 단계”이고
+   순서 검증은 “상태를 바꾸는 핵심 단계”만 검증.
+
+
+---
+## 33. 동시성 테스트
+### < 기존 코드에서 발생한 문제 >
+@BeforeEach에서 저장한 데이터를 @AfterEach에서 삭제할 때 TransientObjectException 발생
+1. 원인    
+   Payment → Order 참조 때문에 삭제 시 flush 시점에서 Hibernate가 transient reference로 판단.   
+   동시성 테스트에서는 클래스 단위 @Transactional 적용 불가 → AfterEach에서 수동 삭제 필요.
+2. 결과    
+   삭제 순서와 flush 타이밍 관리가 복잡해지고 테스트 코드 꼬임.    
+
+### < 테스트 목적별 클래스 분리 필요성 >
+한 클래스에서 섞으면 트랜잭션 정책 충돌과 테스트 관리 복잡 발생    
+1. 통합 테스트: 서비스/리포지토리 단일 스레드 검증, 트랜잭션 롤백 활용 가능
+2. 동시성 테스트: Race condition/락 경쟁 등 멀티스레드 검증, 스레드별 독립 트랜잭션 필요
+
+### < 분리 시 문제 해결 >
+각 테스트 목적에 맞는 트랜잭션 구조로 테스트 안정화, 코드 간결화.
+1. 통합 테스트     
+   클래스 단위 @Transactional 적용 → 롤백으로 데이터 자동 정리, transient exception 없음
+2. 동시성 테스트     
+   BeforeEach/AfterEach에서 독립 트랜잭션으로 생성/삭제, Payment → Order 순서 지킴 → transient exception 방지
+
+
+### < 동시성 테스트에서 발생한 문제와 원인 >
+1. TransientObjectException
+   1) 원인: 영속화되지 않은 엔티티를 참조하거나 삭제 시 flush 시점에서 Hibernate가 transient reference로 판단
+   2) 대표 케이스: Payment → Order 참조, AfterEach에서 Order를 먼저 삭제하려고 시도
+   3) 해결
+      - 삭제 순서 조정: Payment → Order → Product → Member
+      - BeforeEach/AfterEach를 독립 트랜잭션으로 묶기 (TransactionTemplate)
+      - 테스트 메서드 전체 @Transactional 사용 불가 시 수동 관리
+
+2. onstraintViolationException / Unique 제약 조건 위반
+   1) 원인: 여러 스레드가 동시에 같은 unique 컬럼 값을 insert
+   2) 대표 케이스: paymentCode 또는 pgTransactionId 생성 시 중복
+   3) 해결
+      - 동시성 안전한 ID 생성: UUID 또는 DB 시퀀스 활용
+      - 테스트에서 중복 요청 시 예외 발생 기대치 명시 (assertThrows)
+
+3. LazyInitializationException
+   1) 원인: 영속성 컨텍스트가 없는 상태에서 LAZY 로딩 시도
+   2) 대표 케이스: Payment → Order LAZY 관계 접근, AfterEach에서 트랜잭션 없이 삭제
+   3) 해결
+      - BeforeEach/AfterEach를 TransactionTemplate 등 트랜잭션 안에서 수행
+      - 필요 시 Fetch Join 사용하거나 LAZY 강제 초기화 (Hibernate.initialize())
+
+
+---
+## 34. 테스트 가독성과 검증
+### < 행위검증과 상태검증 >
+둘이 동시에 존재하는 건 과한 검증이다.
+- 상태 검증이 있으면 행위 검증은 제거.
+- 행위 검증이 있으면 상태 검증 제거.
+
+### < 중복검증 >
+이미 테스트한 내용을 일부만 다시 검증하는 것은 불필요하다.
+
+### < verify()로 검증 필요 여부 >
+그럼 반환값이 없는 경우에는 호출여부로 판단하는 것이고, 
+구현 방법 자체를 검증하는 것은 테스트를 구현에 의존적으로 만들기 때문에 권장되지 않는다.    
+verify()가 구현 검증인 문서화 역할을 하는 경우는 남겨두는 것이 좋다.
+예를 들면, verify(findOrder...) 가 존재한다면 조회 → 승인 처리 흐름임을 한 눈에 알 수 있기 때문이다.
+
+### < 테스트 데이터의 핵심 상태만 표현 >
+상태와 이유를 표현하는 메서드명을 가진 픽스쳐를 사용해 핵심 상태만 보이고 나머지는 숨기겨 가독성을 높이도록 한다.   
+검증값이 에러니까 세부값 숨김.
+~~~
+    @Test
+    @DisplayName("CREATED -> PAID 실패 - 주문 완료상태가 아니면 주문 결제완료 실패")
+    void paid_shouldThrowException_whenOrderIsNotCreated() {
+        Order alreadyPaidOrder = alreadyPaidOrder();
+        Payment approvedPayment = payment(alreadyPaidOrder);
+
+        // when
+        // then
+        OrderException e = assertThrows(OrderException.class, () ->
+                alreadyPaidOrder.paid(approvedPayment));
+        assertEquals(ORDER_STATUS_NOT_CREATED, e.getErrorCode());
+    }
+~~~
+
+
+### < 픽스쳐 메서드명 >
+fixture는 상태가 아니라 행위를 표현하는 게 좋음.
+~~~
+createInProgressPayment()
+~~~
+
+
+### < 테스트 준비 단계 >
+1. 도메인 메서드 사용과 Reflection 사용 기준       
+   테스트에서 Service 메서드만 호출하지 않으면 된다고 생각하기 쉽지만 실제 기준은 그보다 더 본질적이다. 
+   테스트 준비 단계에서 도메인 생성·상태변경 메서드를 사용하는 것이 문제인지 여부는 
+   그 메서드가 테스트 대상 로직인지 아닌지로 판단해야 한다. 
+   만약 그 메서드가 지금 검증하려는 핵심 로직이라면 준비 단계에서 호출하면 안 되지만, 
+   단순히 상태를 만들기 위한 용도라면 호출해도 괜찮다. 
+   즉 Service냐 Entity냐가 기준이 아니라 테스트 대상 책임이냐 아니냐가 기준이다. 
+   또한 setter를 막았다고 해서 ReflectionTestUtils를 사용하는 것은 권장되지 않는다. 
+   리플렉션은 캡슐화를 깨고 테스트를 구현 의존적으로 만들기 때문에, 
+   대신 테스트 전용 팩토리나 fixture 메서드를 만들어 유효한 상태를 생성하는 방식이 가장 바람직하다.
+
+2. 테스트 준비 코드에서 도메인 메서드를 사용해도 되는 기준     
+   테스트 준비 단계에서 도메인 객체의 생성 메서드나 상태 변경 메서드를 사용하는 것이 가능한지 여부는 
+   그 메서드에 검증 로직이 있느냐 없느냐가 아니라, 
+   그 메서드가 현재 테스트하려는 핵심 로직에 해당하느냐로 판단해야 한다. 
+   테스트 대상이 아닌 단순 상태 생성용 메서드라면 
+   내부에 검증 로직이 포함되어 있어도 사용해도 괜찮지만, 
+   테스트 대상 기능 자체를 수행하는 메서드를 준비 단계에서 호출하면 
+   테스트가 실행 전에 이미 핵심 로직을 수행해버리므로 테스트 의미가 사라진다. 
+   따라서 기준은 항상 하나다. 
+   “이 메서드가 실패하면 지금 테스트가 실패해야 하는가?” 
+   만약 그렇다면 준비 단계에서 호출하면 안 되고, 아니라면 사용해도 된다.   
+   ***즉, 로직 자체가 테스트 대상이 아니라면 도메인 메서드를 이용한 상태 변경해도 된다.*** 
+
+
+---
+## 테스트를 위한 코드수정
+"테스트만을 위해 프로덕션 코드를 수정하는 것"은 개발자로서 지켜야 할 '관심사의 분리' 원칙과 충돌하는 것처럼 느껴진다.
+하지만 실무적인 관점에서 이번 Join Fetch 도입은 
+**"테스트만을 위한 수정"이 아니라 "프로덕션 코드의 잠재적 버그를 해결하고 최적화하는 과정"**으로 보아야 한다. 
+
+1. 이건 '테스트용 코드'가 아니라 '정상적인 최적화'이다.      
+   현재 Payment.approve() 메서드는 내부에서 order.getTotalPrice()를 호출하고 있습니다.
+   - 기존 코드: Payment 조회(1번 쿼리) + 금액 검증 시 Order 조회(추가 쿼리) = N+1 문제 발생
+   - 수정 코드: Join Fetch를 통해 한 번에 조회 = 쿼리 1번으로 단축     
+   실제 운영 환경에서도 웹훅이 올 때마다 굳이 쿼리를 두 번 날릴 이유가 없습니다. 테스트가 아니더라도 성능 최적화를 위해 당연히 수행해야 할 작업입니다.
+
+2. 'LazyInitializationException'은 운영 환경의 시한폭탄입니다      
+   테스트에서 이 에러가 발생했다는 것은, 운영 환경에서도 트랜잭션 범위가 조금만 어긋나면 언제든 결제 승인이 실패할 수 있다는 경고입니다.
+   서비스 레이어에 @Transactional이 걸려 있어도, OSIV(Open Session In View) 설정이나 복잡한 비즈니스 흐름 속에서 엔티티가 준영속 상태가 되면 실제 고객 결제 시에도 똑같은 에러가 터질 수 있습니다.
+   테스트는 이 잠재적 결함을 미리 발견해 준 고마운 신호인 셈입니다.
+
+3. 테스트 가능성(Testability)도 설계의 품질입니다      
+   실무에서는 **"테스트하기 어려운 코드는 나쁜 설계일 확률이 높다"**고 판단합니다.
+   동시성 테스트를 할 수 없다는 것은 해당 비즈니스 로직이 외부 환경(DB 세션, 스레드 컨텍스트)에 너무 의존적이라는 뜻입니다.
+   Join Fetch를 통해 데이터 의존성을 명확히 해결하는 것은, 코드를 더 예측 가능하고 독립적으로 만드는 과정입니다.
+
+
+---
+## 동시성 테스트
+추가 조언: startSignal의 중요성
+기존에는 스레드를 순차적으로 생성한다.
+아주 미세한 차이지만, 첫 번째 스레드가 이미 DB 수정을 끝낸 뒤에 10번째 스레드가 생성될 수도 있다.
+진정한 "찰나의 동시성"을 테스트하려면 앞서 언급했던 CountDownLatch startSignal = new CountDownLatch(1);을 추가하여
+모든 스레드가 준비된 후 일제히 출발하게 만드는 것이 동시성 테스트의 정석이다.
+- 동시성 테스트 수정 전: PaymentConcurrencyTest.class
+- 동시성 테스트 수정 후: PaymentPgApiConcurrencyTest.class
 

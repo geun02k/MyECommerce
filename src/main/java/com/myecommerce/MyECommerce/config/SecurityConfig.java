@@ -49,9 +49,10 @@ public class SecurityConfig {
                 // 접근경로허가
                 .authorizeHttpRequests((authorizeRequests) ->
                         authorizeRequests
-                            // 회원가입, 로그인 경로에 대해 모든인원 접근허용
+                            // 회원가입, 로그인, PG 웹훅 승인 경로에 대해 모든인원 접근허용
                             .requestMatchers("/member/signup/**",
-                                             "/member/signin/**").permitAll()
+                                             "/member/signin/**",
+                                             "/api/webhook/pg/approval").permitAll()
                             .requestMatchers(HttpMethod.GET,  "/product").permitAll()
                             .requestMatchers(HttpMethod.GET,  "/product/*").permitAll()
                             // 그 외 경로에 대해 인증필요

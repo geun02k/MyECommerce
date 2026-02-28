@@ -2,6 +2,9 @@ package com.myecommerce.MyECommerce.entity.order;
 
 import com.myecommerce.MyECommerce.entity.BaseEntity;
 import com.myecommerce.MyECommerce.entity.member.Member;
+import com.myecommerce.MyECommerce.entity.payment.Payment;
+import com.myecommerce.MyECommerce.exception.OrderException;
+import com.myecommerce.MyECommerce.exception.PaymentException;
 import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.type.OrderStatusType;
 import jakarta.persistence.*;
@@ -14,8 +17,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static com.myecommerce.MyECommerce.exception.errorcode.OrderErrorCode.ORDER_STATUS_NOT_CREATED;
+import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.PAYMENT_NOT_APPROVED;
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_ON_SALE;
 import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
+import static com.myecommerce.MyECommerce.type.OrderStatusType.PAID;
+import static com.myecommerce.MyECommerce.type.PaymentStatusType.APPROVED;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 
 @Entity
@@ -87,6 +94,24 @@ public class Order extends BaseEntity {
         order.setCalculatedTotalPrice();
 
         return order;
+    }
+
+    /** 주문 결제완료로 상태 변경 **/
+    // Payment가 Order를 직접 조작하지 않음.
+    // 메서드 파라미터로 payment를 전달한다 -> Payment가 원인이고 Order가 반응한다는 의미.
+    public void paid(Payment payment) {
+        // 결제 승인 완료되지 않으면 주문 결제 완료 불가
+        if (payment.getPaymentStatus() != APPROVED) {
+            throw new PaymentException(PAYMENT_NOT_APPROVED);
+        }
+
+        // 주문 생성된 상태가 아니면 결제 완료 불가
+        if (this.orderStatus != CREATED) {
+            throw new OrderException(ORDER_STATUS_NOT_CREATED);
+        }
+
+        // 주문 결제 완료
+        this.orderStatus = PAID;
     }
 
     // 유효성 검증

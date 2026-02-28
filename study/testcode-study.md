@@ -3532,3 +3532,14 @@ createInProgressPayment()
    동시성 테스트를 할 수 없다는 것은 해당 비즈니스 로직이 외부 환경(DB 세션, 스레드 컨텍스트)에 너무 의존적이라는 뜻입니다.
    Join Fetch를 통해 데이터 의존성을 명확히 해결하는 것은, 코드를 더 예측 가능하고 독립적으로 만드는 과정입니다.
 
+
+---
+## 동시성 테스트
+추가 조언: startSignal의 중요성
+기존에는 스레드를 순차적으로 생성한다.
+아주 미세한 차이지만, 첫 번째 스레드가 이미 DB 수정을 끝낸 뒤에 10번째 스레드가 생성될 수도 있다.
+진정한 "찰나의 동시성"을 테스트하려면 앞서 언급했던 CountDownLatch startSignal = new CountDownLatch(1);을 추가하여
+모든 스레드가 준비된 후 일제히 출발하게 만드는 것이 동시성 테스트의 정석이다.
+- 동시성 테스트 수정 전: PaymentConcurrencyTest.class
+- 동시성 테스트 수정 후: PaymentPgApiConcurrencyTest.class
+

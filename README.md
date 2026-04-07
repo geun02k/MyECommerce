@@ -363,16 +363,20 @@
    - Redis 3.0 (포트 6379)   
 
 ### 6-2. Configuration & Security
-   본 프로젝트는 Jasypt를 활용하여 주요 설정 정보(DB 접속 정보, JWT Secret 등)을 암호화하여 관리합니다.
+본 프로젝트는 Jasypt를 활용하여 주요 설정 정보(DB 접속 정보, JWT Secret 등)를 암호화하여 관리합니다.
    - **암호화 설정**    
      모든 암호화 값은 ENC(...) 형식으로 application.properties에 정의되어 있습니다.
    - **복호화 키**    
      현재 로컬 실행 편의를 위해 JasyptConfigAES.java 내에 마스터 키가 포함되어 있습니다.
    - **개인 환경 대응**     
-     로컬 DB 계정 정보가 프로젝트 설정과 다를 경우, 해당 설정값을 본인의 환경에 맞춰 수정하거나 평문으로 교체하여 실행하세요.
+     로컬 DB 계정 정보가 프로젝트 설정과 다를 경우, 해당 설정값을 본인의 환경에 맞춰 수정하여 실행하세요.
+     1. **암호문 생성**   
+        src/test/java/.../SecretPropertyGenerator.java 에서 평문을 수정 후 실행합니다.
+     2. **설정 파일 수정**
+        메서드 실행 후 콘솔에 출력된 ENC(...) 결과값을 복사하여 application.properties에 붙여 넣습니다.
    - **운영 권장 사항**     
-     실제 운영 환경에서는 보안을 위해 소스 코드 내의 마스터 키를 제거하고, 
-     실행 시 시스템 환경변수(-Djasypt.password=...)를 통해 주입하는 것을 권장합니다.
+     실제 운영 환경에서는 보안을 위해 암호화된 평문 정보 파일인 application-secrets.properties를 외부에서 별도 관리를 권장합니다.
+     또한 소스 코드 내의 마스터 키를 제거하고, 실행 시 시스템 환경변수(-Djasypt.password=...)를 통해 주입하는 것을 권장합니다.
    - **DB 스키마**    
      테스트 및 초기 실행 편의를 위해 spring.jpa.hibernate.ddl-auto: create-drop 모드를 사용 중입니다.
 

@@ -163,7 +163,7 @@
 1. @RequestHeader
     - public @interface RequestHeader.java 파일 오픈해서 확인.
     - 메서드 매개변수가 웹 요청 헤더에 바인딩되어야 함을 나타내는 애너테이션.
-    - 매서드 매개변수가 Map<String, String>, MultiValueMap<String, Strng>, HttpHeaders 이면 Map은 모든 헤더 이름과 값으로 채워짐.
+    - 매서드 매개변수가 Map<String, String>, MultiValueMap<String, String>, HttpHeaders 이면 Map은 모든 헤더 이름과 값으로 채워짐.
    ~~~
     @PostMapping("/signout")
     public ResponseEntity<String> signOut(@RequestHeader Map<String, String> headers) {
@@ -457,11 +457,13 @@
       반면 아이디를 30자로 제한했지만 31자리가 되더라도 대부분의 비즈니스에 영향이 없다.
       이 때 비밀번호는 정책으로 관리해야 한다.
    2) 입력 채널이 바뀌어도 동일하게 적용돼야 하는가?   
-      변경되지 안항야 한다면 정책이다.   
+      변경되지 않아야 한다면 정책이다.   
       전화번호는 API, Batch, Admin, Event 등에서 호출하더라도 항상 동일하게 적용되어야 한다.
       아이디는 DB, UI, 기술 스택에 따라 바뀔 수 있다.
    3) 왜 해당 규칙이 존재하하는지 설명 가능한가?
-      비즈니스 언어로 설명 가능하면 정책이다.
+
+   4) 
+   5) 비즈니스 언어로 설명 가능하면 정책이다.
       전화번호 패턴의 경우, 대한민국 휴대폰 정책 때문에 정책으로 관리해야 한다.   
       비밀번호 길이의 경우, 보안 정책 때문에 관리가 필요하다.   
       반면, 아이디의 경우, DB 컬럼이 30자라서 제한한다는 건 모호하다.    
@@ -2587,6 +2589,7 @@ CartPolicy는 기술 언어가 아닌 비즈니스의 언어만을 다루는 곳
 CartPolicy는 이 판단만 알면 충분하고, 
 그 판단이 Redis인지, DB인지, 파일인지와는 전혀 상관이 없어야 한다.   
 
+
 만약 CartPolicy 안에서 Redis TTL을 직접 다루기 시작하면, 정책 코드가 
 “Redis는 Hash에 TTL을 못 건다” 같은 지식을 갖게 된다.
 그러면 CartPolicy는 더 이상 순수한 정책이 아니라, 특정 기술에 강하게 묶인 코드가 된다. 
@@ -4074,4 +4077,55 @@ PG 입장에서 카드 잔액 부족, 비밀번호 오류, 한도 초과 등은 
        return createPaymentLogic(orderId);
    });
    ~~~
- 
+
+
+---
+6. 웹 계층 검증 책임 강화 및 테스트 구조 개선
+   1. 문제 상황
+    초기 Controller 테스트는 단위 테스트 기반으로 작성되어,
+    다음과 같은 한계가 존재했습니다.
+    
+    - Bean Validation 검증 테스트 불가능
+    - HTTP 요청/응답 검증 부족
+    - API 계약(스펙) 보호 역할 미흡
+    
+    또한 일부 API에서 다음 문제가 존재했습니다.
+    - @Valid 누락으로 DTO 검증 미동작
+    - PathVariable 유효성 검증 누락
+    - Validation 메시지 하드코딩
+
+   2. 설계 결정
+      Controller의 핵심 책임을 다음과 같이 재정의했습니다.
+      - HTTP 요청/응답 처리
+      - JSON 바인딩 검증
+      - API 스펙 보호 (Validation 포함)   
+      이에 따라 테스트 전략을 변경했습니다.
+      - 단위 테스트 → @WebMvcTest 기반 웹 계층 테스트 전환
+      - Validation / Security / ExceptionHandler 포함 테스트
+      
+   3. 설계 구현
+      - DTO 검증 강화
+        - @Valid 적용 누락 수정 (회원 로그인 등)
+        - 중첩 DTO 검증 적용
+        - Enum 커스텀 Validator 적용
+      - PathVariable 검증 개선
+        - @NotNull → @Positive 변경
+        - @Validated 적용으로 Method Parameter Validation 활성화
+      - 메시지 관리 개선
+        - ValidationMessages.properties 기반 메시지 외부화
+        - 하드코딩 제거
+      - 테스트 구조 개선
+        - MockMvc 기반 Controller 테스트 전환
+        - Validation 실패 케이스 테스트 추가
+        - 에러 메시지까지 검증하도록 강화
+      - 보안 테스트 적용
+        - TestSecurityConfig 분리
+        - 권한 검증 테스트 추가
+   
+   4. 설계 의의
+      - Validation이 API 계약으로서 테스트로 보호됨
+      - Controller 테스트가 명세 역할 수행
+      - 메시지 변경 시 코드 수정 없이 대응 가능
+      - HTTP 레벨에서 오류를 조기 차단
+
+

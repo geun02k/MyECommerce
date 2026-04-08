@@ -189,7 +189,7 @@ public class PaymentPgApiConcurrencyTest {
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         // 모든 스레드가 끝날 때까지 대기 (해당 코드 없으면 테스트가 중간에 끝남)
         CountDownLatch readyLatch = new CountDownLatch(threadCount); // 준비 완료 신호
-        CountDownLatch startSignal = new CountDownLatch(1);        // 동시 출발 신호
+        CountDownLatch startSignal = new CountDownLatch(1);          // 동시 출발 신호
         CountDownLatch doneLatch = new CountDownLatch(threadCount);  // 종료 대기 신호
 
         // when
@@ -197,7 +197,8 @@ public class PaymentPgApiConcurrencyTest {
             // 여러 트랜잭션 동시 실행 (각 submit은 독립 트랜잭션)
             executor.submit(() -> {
                 try {
-                    startSignal.await(); // 모든 스레드가 준비될 때까지 대기
+                    readyLatch.countDown(); // 작업 스레드 생성
+                    startSignal.await();    // 모든 작업 스레드는 startSignal이 countDown() 될 때까지 대기
                     // 주문 생성
                     paymentService.handlePgWebHook(request);
 
@@ -205,14 +206,14 @@ public class PaymentPgApiConcurrencyTest {
                     log.error(e.getMessage(), e);
 
                 } finally {
-                    doneLatch.countDown();
+                    doneLatch.countDown(); // 각 스레드 종료
                 }
             });
         }
 
-        readyLatch.await();    // 모든 스레드가 생성될 때까지 메인인 테스트 스레드 대기
-        startSignal.countDown(); // "탕!" 하고 일제히 출발
-        doneLatch.await();     // 모든 스레드 종료 대기
+        readyLatch.await();      // 모든 스레드가 생성될 때까지 메인인 테스트 스레드 대기
+        startSignal.countDown(); // 생성한 모든 작업 스레드 일제히 시작
+        doneLatch.await();       // 모든 스레드 종료 대기
         // 스레드풀 자원 종료
         executor.shutdown();
     }

@@ -3427,7 +3427,7 @@ mock()은 실제 객체 대신 사용하는 가짜 객체다.
       - BeforeEach/AfterEach를 독립 트랜잭션으로 묶기 (TransactionTemplate)
       - 테스트 메서드 전체 @Transactional 사용 불가 시 수동 관리
 
-2. onstraintViolationException / Unique 제약 조건 위반
+2. ConstraintViolationException / Unique 제약 조건 위반
    1) 원인: 여러 스레드가 동시에 같은 unique 컬럼 값을 insert
    2) 대표 케이스: paymentCode 또는 pgTransactionId 생성 시 중복
    3) 해결
@@ -3542,4 +3542,82 @@ createInProgressPayment()
 모든 스레드가 준비된 후 일제히 출발하게 만드는 것이 동시성 테스트의 정석이다.
 - 동시성 테스트 수정 전: PaymentConcurrencyTest.class
 - 동시성 테스트 수정 후: PaymentPgApiConcurrencyTest.class
+
+## 동시성 테스트와 무한대기   
+- 참고: executeConcurrentHandlerWebhooks()
+1. 문제 발생   
+   테스트가 무한 대기에 빠졌다. readyLatch의 사용 방식이 잘못되었기 때문이다.
+2. 발생 원인    
+   - readyLatch 교착상태(Deadlock)    
+     readylatch를 10으로 선언했지만, executor.submit() 내부에서 readyLatch.countDown()을 호출하는 코드가 존재하지 않는다.
+     그 후 readyLatch.await() 을 호출하면, 카운트를 10번 줄여줄 때 까지 기다리게 된다.
+     스레드 풀 내의 작업들으 startSignal.await() 에서 대기중이고, 
+     메인 스레드는 readyLatch에서 대기 중이므로 서로 신호를 주고받지 못하고 영원히 멈추기 된다.
+     따라서 readyLatch.await() 해당 라인에서 테스트 스레드가 영원히 멈추게 되었다.
+3. 해결 방법
+   누락된 readyLatch.count()를 수행하도록 한줄 추가한다.
+   ~~~
+   void executeConcurrentHandlerWebhooks(PgApprovalResult request) throws Exception {
+       int threadCount = 10;
+       ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+       
+       CountDownLatch readyLatch = new CountDownLatch(threadCount); 
+       CountDownLatch startSignal = new CountDownLatch(1);        
+       CountDownLatch doneLatch = new CountDownLatch(threadCount);  
+   
+       for (int i = 0; i < threadCount; i++) {
+           executor.submit(() -> {
+               try {
+                   // -------------------------------------------------------
+                   readyLatch.countDown(); // [1. 추가] "저 준비 완료됐어요!" 신호 보냄
+                   // -------------------------------------------------------
+                   
+                   startSignal.await();    // 메인 스레드가 "탕!" 할 때까지 대기
+                   paymentService.handlePgWebHook(request);
+   
+               } catch (Exception e) {
+                   log.error(e.getMessage(), e);
+               } finally {
+                   doneLatch.countDown();
+               }
+           });
+       }
+   
+       readyLatch.await();      // 여기서 모든 스레드가 1번 위치에 도달할 때까지 대기함
+       startSignal.countDown(); // 모든 스레드에게 "이제 시작해!"라고 신호 보냄
+       doneLatch.await();       // 모든 작업이 끝날 때까지 대기
+       
+       executor.shutdown();
+   }
+   ~~~
+
+      
+
+## 동시성 테스트
+1. CountDownLatch를 여러 개 쓰는 이유    
+   모든 스레드(readyLatch.countDown())가 시작점에서 메인 스레드의 시작 신호를 받아 동시에 시작(startLatch.countDown())하도록 하기 위함이다.   
+   - 3개의 Latch가 필요한 이유   
+     테스트의 목적은 여러 개의 요청을 거의 동시에 서버에 꽂아 넣는 것이다.
+     그냥 for문으로 스레들르 실행하면, 1번 스레드가 이미 일을 끝냈을 떄 다른 스레드가 생성되는 등 실행 시점이 제각각일 수 있기 떄문이다.
+
+2. 동시성 테스트에서 3개의 countDownLatch가 제어하는 것   
+countDownLatch(N)은 내부적으로 숫자를 가지고 있다.
+- countDown(): 숫자 1 감소
+- await(): 숫자가 0이 될 때까지 호출한 스레드 정지
+
+3. ExecutorService: 스레드 관리자    
+   자바에서 스레드를 직접 new Thread()로 생성해서 관리하는 번거로움을 줄여주는 스레드 풀 인터페이스.    
+   스레드의 생성, 실행, 수명 주기를 대신 관리한다.
+   스레드를 생성하는 작업은 OS 자원을 많이 소모하는 무거운 작업이다. 
+   따라서 미리 스레드들을 만들어 풀에 담아두고, 작업이 들어올 때마다 재사용함으로써 효율성을 높인다.
+   1) submit(): 작업을 큐에 넣고 비동기로 실행.
+   2) shutdown(): 더 이상 작업을 받지 않고, 실행 중인 작업이 끝나면 스레드 풀을 종료.
+
+4. CountDownLatch: 스레드 동기화 도구   
+   하나 이상의 스레드가 다른 스레드에서 수행되는 일의 작업이 완료될 때까지 기다릴 수 있도록 해주는 동기화 장치.   
+   단, 한 번 카운트가 0이 되면 재사용할 수 없다.
+   1) 카운트 설정 (new CountDownLatch(10)): CountDownLatch 생성 시 인자로 숫자를 넘긴다.
+   2) 기다리기(await()): 이 메서드를 호출한 스레드는 카운트가 0이 될 때까지 실행을 멈추고 대기한다. 
+      await()를 호출해 멈춰 있던 스레드가 다시 움직이기 시작하는 조건이 바로 카운트가 0이 되는 순간이다.
+   3) 숫자 줄이기(countDown()): 다른 스레드에서 작업이 완료될 때마다 이 메서드를 호출하여 카운트를 1씩 감소시킨다.
 

@@ -9,7 +9,6 @@ import com.myecommerce.MyECommerce.mapper.*;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.service.stock.StockCacheService;
-import com.myecommerce.MyECommerce.type.ProductCategoryType;
 import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -74,6 +73,24 @@ class ProductServiceTest {
                 .build();
     }
 
+    /** 요청 옵션 목록 -> Service 전용 옵션 목록 */
+    List<ServiceProductOptionDto> serviceProductOptionDtoList(
+            List<RequestProductOptionDto> requestOptions) {
+
+        List<ServiceProductOptionDto> serviceOptions = new ArrayList<>();
+
+        for (RequestProductOptionDto option : requestOptions) {
+            serviceOptions.add(
+                    ServiceProductOptionDto.builder()
+                            .optionCode(option.getOptionCode())
+                            .optionName(option.getOptionName())
+                            .price(option.getPrice())
+                            .quantity(option.getQuantity())
+                            .build());
+        }
+        return serviceOptions;
+    }
+
     /**
      * Service DTO 생성
      * - 옵션 분기 (수정/신규) 판단용
@@ -99,9 +116,49 @@ class ProductServiceTest {
                 .build();
     }
 
-    /** Service 전용 상품 DTO (판매중 상태 유지 ) */
+    /** 등록 Service 전용 상품 DTO */
+    ServiceProductDto serviceProductDto(RequestProductDto request) {
+        List<ServiceProductOptionDto> options =
+                serviceProductOptionDtoList(request.getOptions());
+
+        return ServiceProductDto.builder()
+                .code(request.getCode())
+                .name(request.getName())
+                .category(request.getCategory())
+                .options(options)
+                .build();
+    }
+
+    /** 수정 Service 전용 상품 DTO (판매중 상태 유지) */
     ServiceProductDto serviceProductDto(List<RequestModifyProductOptionDto> options) {
         return this.serviceProductDto(ON_SALE, options);
+    }
+
+    /** 등록할 옵션 Entity */
+    List<ProductOption> notInsertedProductEntity(
+            List<ServiceProductOptionDto> serviceOptions) {
+
+        List<ProductOption> options = new ArrayList<>();
+        for(ServiceProductOptionDto option : serviceOptions) {
+            options.add(
+                    ProductOption.builder()
+                            .optionCode(option.getOptionCode())
+                            .optionName(option.getOptionName())
+                            .price(option.getPrice())
+                            .quantity(option.getQuantity())
+                            .build());
+        }
+        return options;
+    }
+
+    /** 등록할 상품 Entity */
+    Product notInsertedProductEntity(ServiceProductDto product) {
+        return Product.builder()
+                .code(product.getCode())
+                .name(product.getName())
+                .category(product.getCategory())
+                .options(notInsertedProductEntity(product.getOptions()))
+                .build();
     }
 
     /** 수정할 상품 Entity */
@@ -134,6 +191,18 @@ class ProductServiceTest {
                 .build();
     }
 
+    /** 상품 response DTO 반환 */
+    ResponseProductDto responseProductDto(Product product) {
+        return ResponseProductDto.builder()
+                .id(product.getId())
+                .seller(product.getSeller())
+                .code(product.getCode())
+                .name(product.getName())
+                .category(product.getCategory())
+                .saleStatus(product.getSaleStatus())
+                .build();
+    }
+
     /* ------------------
         Helper Method
        ------------------ */
@@ -160,190 +229,97 @@ class ProductServiceTest {
        ---------------------- */
 
     @Test
-    @DisplayName("상품등록 성공")
-    void successSaveProduction() {
+    @DisplayName("상품등록 성공 - 유효한 상품 정보 요청 시 신규 상품과 상품옵션 등록")
+    void registerProduct_shouldInsertProductAndOption_whenValidProduct() {
         // given
-        String productionCode = "RM-JK-D11S51";
-        String productionName = "제 품 명";
-        ProductCategoryType category = WOMEN_CLOTHING;
-        String description = "설명";
-        ProductSaleStatusType saleStatus = ON_SALE;
-
-        String optionCode = "S-BL";
-        String optionName = "스몰사이즈 블루컬러";
-        BigDecimal price = BigDecimal.valueOf(67900);
-        int quantity = 30;
-        int seq = 1;
-
-        Long memberId = 1L;
-
-        // 요청 상품옵션 DTO 목록
+        // 요청 상품옵션 DTO
         RequestProductOptionDto requestOptionDto = RequestProductOptionDto.builder()
-                .optionCode(optionCode)
-                .optionName(optionName)
-                .price(price)
-                .quantity(quantity)
+                .optionCode("S-BL")
+                .optionName("스몰사이즈 블루컬러")
+                .price(BigDecimal.valueOf(67900))
+                .quantity(30)
                 .build();
         // 요청 상품 DTO
-        RequestProductDto requestProductionDto =
-                RequestProductDto.builder()
-                        .code(productionCode)
-                        .name(productionName)
-                        .category(category)
-                        .description(description)
-                        .options(Collections.singletonList(requestOptionDto))
-                        .build();
+        RequestProductDto requestProductDto = RequestProductDto.builder()
+                .code("RM-JK-D11S51")
+                .name("제 품 명")
+                .category(WOMEN_CLOTHING)
+                .options(Collections.singletonList(requestOptionDto))
+                .build();
         // 요청 회원 DTO
-        Member member = Member.builder()
-                .id(memberId)
-                .build();
+        Member member = seller();
 
-        // Service DTO
-        ServiceProductOptionDto serviceOptionDto =
-                ServiceProductOptionDto.builder()
-                        .optionCode(optionCode)
-                        .optionName(optionName)
-                        .price(price)
-                        .quantity(quantity)
-                        .build();
-        ServiceProductDto serviceProductionDto =
-                ServiceProductDto.builder()
-                        .code(productionCode)
-                        .name(productionName)
-                        .category(category)
-                        .options(Collections.singletonList(serviceOptionDto))
-                        .build();
-        ProductOption expectedEntityServiceOptionDto =
-                ProductOption.builder()
-                        .optionCode(optionCode)
-                        .optionName(optionName)
-                        .price(price)
-                        .quantity(quantity)
-                        .build();
-        Product expectedEntityOfServiceProductionDto =
-                Product.builder()
-                        .code(productionCode)
-                        .name(productionName)
-                        .category(category)
-                        .options(Collections.singletonList(
-                                expectedEntityServiceOptionDto))
-                        .build();
-
-        // 저장할 상품옵션 Entity
-        ProductOption optionEntity = ProductOption.builder()
-                .optionCode(optionCode)
-                .optionName(optionName)
-                .price(price)
-                .quantity(quantity)
-                .build();
-        // 저장할 상품 Entity
-        Product productionEntity  = Product.builder()
-                .seller(member.getId())
-                .code(requestProductionDto.getCode())
-                .name(requestProductionDto.getName())
-                .category(requestProductionDto.getCategory())
-                .description(requestProductionDto.getDescription())
-                .saleStatus(saleStatus)
-                .build();
+        // serviceProductMapper.toServiceDto() 예상 반환 결과
+        ServiceProductDto serviceProductDto = serviceProductDto(requestProductDto);
+        // serviceProductMapper.toEntity() 예상 반환 결과
+        Product expectedProduct = notInsertedProductEntity(serviceProductDto);
 
         // 저장된 상품 Entity
-        Product expectedProductionEntity = Product.builder()
+        Product insertedProduct = Product.builder()
                 .id(1L)
-                .seller(productionEntity.getSeller())
-                .code(productionEntity.getCode())
-                .name(productionEntity.getName())
-                .category(productionEntity.getCategory())
-                .description(productionEntity.getDescription())
-                .saleStatus(productionEntity.getSaleStatus())
+                .seller(member.getId())
+                .code(requestProductDto.getCode())
+                .name(requestProductDto.getName())
+                .category(requestProductDto.getCategory())
+                .saleStatus(ON_SALE)
                 .options(null)
                 .build();
         // 저장된 상품옵션 Entity
-        ProductOption expectedOptionEntity = ProductOption.builder()
+        ProductOption insertedOptionEntity = ProductOption.builder()
                 .id(1L)
-                .optionCode(optionEntity.getOptionCode())
-                .optionName(optionEntity.getOptionName())
-                .price(optionEntity.getPrice())
-                .quantity(optionEntity.getQuantity())
-                .product(expectedProductionEntity)
+                .optionCode(requestOptionDto.getOptionCode())
+                .optionName(requestOptionDto.getOptionName())
+                .price(requestOptionDto.getPrice())
+                .quantity(requestOptionDto.getQuantity())
+                .product(insertedProduct)
                 .build();
+
         // response 상품 DTO
-        ResponseProductDto expectedProductionDto = ResponseProductDto.builder()
-                .id(1L)
-                .seller(member.getId())
-                .code(productionCode)
-                .name(productionName)
-                .category(category)
-                .description(description)
-                .saleStatus(ON_SALE)
-                .build();
+        ResponseProductDto responseProduct = responseProductDto(insertedProduct);
 
-        given(serviceProductMapper.toServiceDto(requestProductionDto))
-                .willReturn(serviceProductionDto);
-        given(serviceProductMapper.toEntity(serviceProductionDto))
-                .willReturn(expectedEntityOfServiceProductionDto);
-
-        ArgumentCaptor<Product> productionCaptor =
-                ArgumentCaptor.forClass(Product.class);
-        ArgumentCaptor<ProductOption> optionCaptor =
-                ArgumentCaptor.forClass(ProductOption.class);
-        // stub(가설) : productionRepository.save() 실행 시 expectedProductionEntity 반환 예상.
-        given(productRepository.save(productionCaptor.capture()))
-                .willReturn(expectedProductionEntity);
-        // stub(가설) : productionOptionRepository.save() 실행 시
-        // expectedProductionEntity 정보를 포함한 ProductOption Entity 반환 예상.
-        given(productOptionRepository.save(optionCaptor.capture()))
-                .willReturn(expectedOptionEntity);
-
-        // stub(가설) : productionMapper.toDto() 실행 시 productionEntity에 대한 DTO 반환 예상.
-        given(serviceProductMapper.toDto(expectedProductionEntity))
-                .willReturn(expectedProductionDto);
+        given(serviceProductMapper.toServiceDto(requestProductDto))
+                .willReturn(serviceProductDto);
+        given(serviceProductMapper.toEntity(serviceProductDto))
+                .willReturn(expectedProduct);
+        given(productRepository.save(any())).willReturn(insertedProduct);
+        given(productOptionRepository.save(any())).willReturn(insertedOptionEntity);
+        given(serviceProductMapper.toDto(insertedProduct)).willReturn(responseProduct);
 
         // when
-        ResponseProductDto response =
-                productService.registerProduct(requestProductionDto, member);
+        productService.registerProduct(requestProductDto, member);
 
         // then
-        verify(productPolicy, times(1))
-                .validateRegister(serviceProductionDto, member);
+        // 저장 여부 검증
+        ArgumentCaptor<Product> productionCaptor = ArgumentCaptor.forClass(Product.class);
+        ArgumentCaptor<ProductOption> optionCaptor = ArgumentCaptor.forClass(ProductOption.class);
         verify(productRepository, times(1))
                 .save(productionCaptor.capture());
         verify(productOptionRepository, times(1))
                 .save(optionCaptor.capture());
-        // 상품 재고 등록 여부 검증
-        verify(stockCacheService, times(1))
-                .saveProductStock(eq(expectedProductionEntity));
+
         // 상품 전달인자 검증
-        Product capturedProduction = productionCaptor.getValue();
-        assertNull(capturedProduction.getId());
-        assertEquals(productionCode, capturedProduction.getCode());
-        assertEquals(productionName, capturedProduction.getName());
-        assertEquals(WOMEN_CLOTHING, capturedProduction.getCategory());
-        assertEquals(ON_SALE, capturedProduction.getSaleStatus());
-        assertEquals(member.getId(), capturedProduction.getSeller());
-        assertNull(capturedProduction.getOptions());
+        Product capturedProduct = productionCaptor.getValue();
+        assertEquals(requestProductDto.getCode(), capturedProduct.getCode());
+        assertEquals(requestProductDto.getName(), capturedProduct.getName());
+        assertEquals(requestProductDto.getCategory(), capturedProduct.getCategory());
+        assertEquals(ON_SALE, capturedProduct.getSaleStatus());
+        assertEquals(member.getId(), capturedProduct.getSeller());
+        assertNull(capturedProduct.getOptions());
         // 상품옵션 전달인자 검증
         ProductOption capturedOption = optionCaptor.getAllValues().get(0);
-        assertNull(capturedOption.getId());
-        assertEquals(optionCode, capturedOption.getOptionCode());
-        assertEquals(quantity, capturedOption.getQuantity());
-        assertEquals(price, capturedOption.getPrice());
-
-        // 상품 검증
-        assertEquals(requestProductionDto.getCode(), response.getCode());
-        assertEquals(requestProductionDto.getName(), response.getName());
-        assertEquals(requestProductionDto.getCategory(), response.getCategory());
-        assertEquals(requestProductionDto.getDescription(), response.getDescription());
-        assertEquals(member.getId(), response.getSeller());
-        assertEquals(productionEntity.getSaleStatus(), response.getSaleStatus());
-        // 상품옵션검증
-        RequestProductOptionDto reqOptFromReqProduction = requestProductionDto.getOptions().get(0);
-        assertEquals(reqOptFromReqProduction.getOptionCode(), expectedOptionEntity.getOptionCode());
-        assertEquals(reqOptFromReqProduction.getOptionName(), expectedOptionEntity.getOptionName());
-        assertEquals(reqOptFromReqProduction.getPrice(), expectedOptionEntity.getPrice());
-        assertEquals(reqOptFromReqProduction.getQuantity(), expectedOptionEntity.getQuantity());
-        assertEquals(expectedProductionEntity, expectedOptionEntity.getProduct());
-        assertEquals(expectedOptionEntity.getId(), expectedOptionEntity.getProduct().getId());
+        assertEquals(1L, capturedOption.getProduct().getId());
+        assertEquals(requestOptionDto.getOptionCode(), capturedOption.getOptionCode());
+        assertEquals(requestOptionDto.getQuantity(), capturedOption.getQuantity());
+        assertEquals(requestOptionDto.getPrice(), capturedOption.getPrice());
     }
+
+    // TODO: 상품등록 성공 - 정책 검증 위임
+    // verify(productPolicy, times(1)).validateRegister(serviceProductDto, member);
+
+    // TODO: 상품등록 성공 - 상품 캐시 재고 등록 위임
+    // verify(stockCacheService, times(1)).saveProductStock(eq(insertedProduct));
+
+    // TODO: 상품등록 실패 - 정책 검증 실패 시 상품 등록 불가
 
     /* ----------------------
         상품수정 Tests

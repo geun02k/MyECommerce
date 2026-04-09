@@ -44,7 +44,7 @@
 ---
 ## 3. Architecture
 ### 3-1. System Architecture
-![시스템 구조도](./output/시스템 구조도.png)
+![시스템 구조도](./output/system-architecture.png)
 - **저장소 이원화 (MySQL & Redis):** 정합성이 필수적인 핵심 데이터(주문, 결제)는 MySQL에, 
   빈번한 I/O가 발생하는 데이터(장바구니, 토큰)는 Redis에 배치하여 RDB 부하 분산 및 응답 속도 극대화.
 
@@ -127,7 +127,7 @@
      [[PgClient 인터페이스]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/payment/PgClient.java#L9) | 
      [[MockPgClient 구현체]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/payment/TestPgClientImpl.java#L25) | 
      [[PaymentService에서의 사용]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/payment/PaymentService.java#L37)   
-     ![결제 API 의존성역전(DIP) 기반 구조 클래스 다이어그램](./output/PG결제 의존성역전 구조도.png)
+     ![결제 API 의존성역전(DIP) 기반 구조 클래스 다이어그램](./output/pg-payment-dip-architecture.png)
      - PaymentService: 비즈니스 로직을 담당하며, 인터페이스인 PgClient에 의존하는 구조.
      - PgClient: 결제 요청 기능을 추상화한 인터페이스.
      - MockPgImpl: 실제 PG사 연동을 대신할 테스트용 로직으로, 인터페이스 PgClient를 구현. 추후 실제 PG사로 구현체만 변경 가능.
@@ -240,7 +240,7 @@
    - 결정: 외부 API 호출과 DB 트랜잭션을 분리하고, DB 작업은 짧은 트랜잭션 단위로 나누어 처리.
    - 구현: PaymentService는 흐름 제어 및 외부 API 호출을 담당하고, 
      PaymentTxService는 @Transactional 기반으로 DB 처리를 전담.
-     ![트랜잭션 분리 시퀀스 다이어그램](./output/트랜잭션 분리 시퀀스 다이어그램.png)
+     ![트랜잭션 분리 시퀀스 다이어그램](./output/transaction-separate-sequence-diagram.png)
      ~~~
      /** 결제 생성 - 결제 시작 **/ 
      public ResponsePaymentDto startPayment(...) {

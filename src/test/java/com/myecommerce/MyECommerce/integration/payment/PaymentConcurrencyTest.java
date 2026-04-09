@@ -51,7 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Import(TestAuditingConfig.class)
 public class PaymentConcurrencyTest {
 
-    private static final Logger log = LoggerFactory.getLogger(PaymentStartIntegrationTest.class);
+    private static final Logger log = LoggerFactory.getLogger(PaymentConcurrencyTest.class);
 
     @Autowired
     private PaymentService paymentService;

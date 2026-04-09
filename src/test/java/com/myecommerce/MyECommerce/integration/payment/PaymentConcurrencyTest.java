@@ -51,7 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Import(TestAuditingConfig.class)
 public class PaymentConcurrencyTest {
 
-    private static final Logger log = LoggerFactory.getLogger(PaymentStartIntegrationTest.class);
+    private static final Logger log = LoggerFactory.getLogger(PaymentConcurrencyTest.class);
 
     @Autowired
     private PaymentService paymentService;
@@ -191,25 +191,30 @@ public class PaymentConcurrencyTest {
 
         // 트랜잭션 생성
         int threadCount = 10;
-        // 동시에 실행될 스레드 풀
+        // 동시에 실행될 스레드 풀 (스레드 생성)
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        // 모든 스레드가 끝날 때까지 대기 (해당 코드 없으면 테스트가 중간에 끝남)
-        CountDownLatch latch = new CountDownLatch(threadCount);
+        // 모든 작업 스레드 실행 종료까지 대기 (해당 코드 없으면 테스트가 중간에 끝남)
+        CountDownLatch readyLatch = new CountDownLatch(threadCount); // 준비 완료 신호
+        CountDownLatch startSignal = new CountDownLatch(1);          // 동시 출발 신호
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);  // 종료 대기 신호
 
         paymentIds = Collections.synchronizedList(new ArrayList<>());
         List<Throwable> exceptions = Collections.synchronizedList(new ArrayList<>());
 
-        // when
-        // TODO: 가독성 향상을 위해 try 내부 로직 메서드로 추출 고려 ( executePaymentRequest(request, exceptions) )
+        // when (동시 실행 자체가 테스트의 목적 -> 동시성 로직을 테스트에 드러냄.)
+        // 여러 트랜잭션 동시 실행. (각 submit -> 각 작업 트랜잭션을 큐에 넣기)
         for (int i = 0; i < threadCount; i++) {
-            // 여러 트랜잭션 동시 실행 (각 submit은 독립 트랜잭션)
-            executor.submit(() -> {
+            executor.submit(() -> { // 생성한 작업 스레드를 큐에 넣고 비동기 실행.
                 try {
-                    Member member = findMemberWithAuthorities();
+                    readyLatch.countDown(); // 작업 스레드 생성 완료 알림
+                    startSignal.await();    // 생성된 현재 작업 스레드 대기
 
+                    // 고객 생성
+                    Member member = findMemberWithAuthorities();
                     // 주문 생성
                     ResponsePaymentDto response =
                             paymentService.startPayment(request, member);
+
                     // 데이터 일괄 삭제를 위한 주문 키 추가
                     paymentIds.add(response.getPaymentId());
 
@@ -218,13 +223,14 @@ public class PaymentConcurrencyTest {
                     log.error(e.getMessage(), e);
 
                 } finally {
-                    latch.countDown();
+                    doneLatch.countDown(); // 대기중인 메인 스레드 종료를 위해, 작업 스레드 작업 완료 시 countdown
                 }
             });
         }
 
-        // 메인인 테스트 스레드 대기 -> 모든 결제 완료 후 검증가능
-        latch.await();
+        readyLatch.await();      // 작업 스레드 전체 생성 대기 (메인 스레드는 모든 작업 스레드가 큐에 등록되어 실행가능한 상태가 될 때까지 대기)
+        startSignal.countDown(); // 전체 작업 스레드 일제히 시작
+        doneLatch.await();       // 작업 스레드 전체 종료 대기 (메인 스레드는 모든 작업 스레드 doneLatch.countDown 완료될 때까지 대기)
         // 스레드풀 자원 종료
         executor.shutdown();
 

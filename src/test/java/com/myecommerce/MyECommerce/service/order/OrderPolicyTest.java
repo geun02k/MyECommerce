@@ -140,6 +140,8 @@ class OrderPolicyTest {
         assertEquals(ORDER_CUSTOMER_ONLY, e.getErrorCode());
     }
 
+    // TODO: 최소 주문 가능 물품 수량 미달 시 주문 불가 테스트코드 작성
+
     @Test
     @DisplayName("주문생성 정책 실패 - 최대 주문 가능 물품 수량 초과 시 주문 불가")
     void validateCreate_shouldThrowException_whenOrderCountExceeded() {
@@ -242,5 +244,7 @@ class OrderPolicyTest {
                 orderPolicy.validateCreate(List.of(invalidRequestItem), member));
         assertEquals(PRODUCT_OPTION_NOT_REGISTERED, e.getErrorCode());
     }
+
+    // TODO: 판매종료, 판매중단 상태의 상품 주문 요청 시 주문 불가 테스트코드 작성
 
 }

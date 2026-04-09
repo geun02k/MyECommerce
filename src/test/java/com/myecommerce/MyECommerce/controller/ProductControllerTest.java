@@ -139,7 +139,7 @@ class ProductControllerTest {
     }
 
     @Test
-    @DisplayName("상품상세조회 실패 - 상품코드 형식오류 발생 시 예외발생")
+    @DisplayName("상품등록 실패 - 상품코드 형식오류 발생 시 예외발생")
     public void registerProduct_shouldReturnBadRequest_WhenInvalidCode() throws Exception {
         // given
         // 요청 상품 DTO
@@ -164,7 +164,7 @@ class ProductControllerTest {
     }
 
     @Test
-    @DisplayName("상품상세조회 실패 - 유효하지않은 Enum 값 입력 시 예외발생")
+    @DisplayName("상품등록 실패 - 유효하지않은 Enum 값 입력 시 예외발생")
     public void registerProduct_shouldReturnBadRequest_whenInvalidEnumType() throws Exception {
         // given
         // 요청 상품 DTO
@@ -187,7 +187,7 @@ class ProductControllerTest {
     }
 
     @Test
-    @DisplayName("상품상세조회 실패 - 옵션 유효성 미검증으로 DTO Validation 예외 발생 시 에러 응답 반환")
+    @DisplayName("상품등록 실패 - 옵션 유효성 미검증으로 DTO Validation 예외 발생 시 에러 응답 반환")
     public void registerProduct_shouldReturnBadRequest_whenInvalidOption()
             throws Exception {
         // given
@@ -221,7 +221,7 @@ class ProductControllerTest {
     }
 
     @Test
-    @DisplayName("상품상세조회 실패 - 상품코드중복 비즈니스 예외 발생 시 에러 응답 반환")
+    @DisplayName("상품등록 실패 - 상품코드중복 비즈니스 예외 발생 시 에러 응답 반환")
     public void registerProduct_shouldReturnConflict_whenAlreadyRegisteredProduct()
             throws Exception {
         // given

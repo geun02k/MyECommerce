@@ -75,6 +75,19 @@ class ProductServiceTest {
                 .build();
     }
 
+    /** 등록된 상품 Entity */
+    Product insertedOnSaleProduct(Long id, Member member, RequestProductDto product) {
+        return Product.builder()
+                .id(id)
+                .seller(member.getId())
+                .code(product.getCode())
+                .name(product.getName())
+                .category(product.getCategory())
+                .saleStatus(ON_SALE)
+                .options(null)
+                .build();
+    }
+
     /** 수정할 상품 Entity */
     Product onSaleProductEntity() {
         return Product.builder()
@@ -88,6 +101,20 @@ class ProductServiceTest {
                                 .optionCode("existingOptionCode")
                                 .quantity(1)
                                 .build())))
+                .build();
+    }
+
+    /** 등록할 상품옵션 Entity */
+    ProductOption insertedProductOption(Long id,
+                                        RequestProductOptionDto option,
+                                        Product product) {
+        return ProductOption.builder()
+                .id(id)
+                .optionCode(option.getOptionCode())
+                .optionName(option.getOptionName())
+                .price(option.getPrice())
+                .quantity(option.getQuantity())
+                .product(product)
                 .build();
     }
 
@@ -107,6 +134,7 @@ class ProductServiceTest {
         상품등록 Tests
        ---------------------- */
 
+    // 각 단계의 존재 여부가 중요 -> 하나의 테스트가 모든 것을 검증하지 않고 테스트 분리
     @Test
     @DisplayName("상품등록 성공 - 신규 상품 및 상품옵션 등록 후 응답 반환")
     void registerProduct_shouldInsertProductAndOption_whenValidProduct() {
@@ -129,27 +157,14 @@ class ProductServiceTest {
         Member member = seller();
 
         // 저장된 상품 Entity
-        Product insertedProduct = Product.builder()
-                .id(1L)
-                .seller(member.getId())
-                .code(requestProductDto.getCode())
-                .name(requestProductDto.getName())
-                .category(requestProductDto.getCategory())
-                .saleStatus(ON_SALE)
-                .options(null)
-                .build();
+        Product insertedProduct =
+                insertedOnSaleProduct(1L, member, requestProductDto);
         // 저장된 상품옵션 Entity
-        ProductOption insertedOptionEntity = ProductOption.builder()
-                .id(1L)
-                .optionCode(requestOptionDto.getOptionCode())
-                .optionName(requestOptionDto.getOptionName())
-                .price(requestOptionDto.getPrice())
-                .quantity(requestOptionDto.getQuantity())
-                .product(insertedProduct)
-                .build();
+        ProductOption insertedOption =
+                insertedProductOption(1L, requestOptionDto, insertedProduct);
 
         given(productRepository.save(any())).willReturn(insertedProduct);
-        given(productOptionRepository.save(any())).willReturn(insertedOptionEntity);
+        given(productOptionRepository.save(any())).willReturn(insertedOption);
 
         // when
         ResponseProductDto response =
@@ -157,10 +172,10 @@ class ProductServiceTest {
 
         // then
         // 저장 여부 검증
-        ArgumentCaptor<Product> productionCaptor = ArgumentCaptor.forClass(Product.class);
-        ArgumentCaptor<ProductOption> optionCaptor = ArgumentCaptor.forClass(ProductOption.class);
         verify(productRepository, times(1))
-                .save(productionCaptor.capture());
+                .save(any(Product.class));
+        ArgumentCaptor<ProductOption> optionCaptor =
+                ArgumentCaptor.forClass(ProductOption.class);
         verify(productOptionRepository, times(1))
                 .save(optionCaptor.capture());
 
@@ -190,6 +205,7 @@ class ProductServiceTest {
         상품수정 Tests
        ---------------------- */
 
+    // 모든 단계가 서로 영향을 끼침 -> 테스트에서 반드시 함께 검증
     @Test
     @DisplayName("상품수정 성공 - 판매중 유지 상품 수정 시 상품/옵션 변경 후 재고 등록")
     void modifyProduct_shouldUpdateProductAndSaveStock_whenProductOnSale() {

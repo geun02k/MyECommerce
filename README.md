@@ -78,7 +78,7 @@
 변경이 두렵지 않은 구조의 설계를 위해 
 비즈니스 로직과 세부 구현의 결합도를 낮추어, 요구사항 변경에 즉각 대응 가능한 구조를 목표로 합니다.
 
-#### 1. 서비스 로직의 기능 단위 분리 (책임 분리를 통한 서비스 레이어 정제)   
+#### 1. 서비스 로직의 기능 단위 분리   
    - 설계 배경: Service 내부에 DTO 변환, 유효성 검증, Entity 생성, 저장 로직 등이 모두 포함된 구조로 인해 로직 파악 및 수정 난이도 상승.   
    - 결정: Service는 비즈니스 흐름 조합 역할에 집중하고, 세부 로직은 메서드로 위임.
    - 구현: 특정 기능을 독립된 메서드로 분리하여 코드 가독성 향상   
@@ -92,7 +92,7 @@
    - 결정: 계층별 단위 테스트 도입 및 피드백 속도 최적화.
    - 구현: 외부 의존성 제거를 위한 Mockito 기반의 Service 로직 검증과 MockMvc 기반의 API 규약 검증으로 테스트 범위 이원화.   
           [[변경 과정 ProductServiceTest - successSaveProduction()]](https://github.com/geun02k/MyECommerce/pull/7/files#diff-56603b707aa6b5ecc1820c4673d2185eec20421e5d90f8f333f0a51789ebc34cR50-R191)   
-          [[최종 개선 결과(추가적인 개선사항 없음) ProductServiceTest - successSaveProduction()]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/service/product/ProductServiceTest.java#L158-L346)
+          [[최종 개선 결과 ProductServiceTest - registerProduct_shouldInsertProductAndOption_whenValidProduct()]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/service/product/ProductServiceTest.java#L138-L202)
    - 의의: '수정 -> 테스트 -> 검증' 사이클 단축하여 리팩토링 안정성을 확보.
    <br>
 
@@ -104,8 +104,7 @@
 
 #### 1. 관심사 분리(SoC)를 통한 검증 책임 분리
    - 설계 배경: Service 메서드가 단순 입력값 검증부터 복잡한 비즈니스 규칙 판단, 전체 실행 흐름 제어까지 모든 책임을 떠안으면서 코드 가독성이 저하되고 요구사항 변경 시 영향 범위 파악이 어려움.
-   - 결정: 검증 성격에 따라 책임을 계층화합니다. 
-     입력값 검증은 request DTO에서, 복잡한 규칙은 이름 있는 Policy(정책) 객체로 분리하여 Service는 비즈니스 흐름의 조합(Orchestration)에만 집중하도록 개선.
+   - 결정: 검증 성격에 따라 책임을 계층화.
    - 구현
      - 입력값 검증: Request DTO + Bean Validation을 활용해 컨트롤러 진입 단계에서 데이터 무결성 확보
      - 정책 검증: 비즈니스 규칙 위반 여부를 판단하는 전용 Policy 계층 도입.
@@ -114,8 +113,8 @@
      >- [[입력값 검증 - RequestOrderDto]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/dto/order/RequestOrderDto.java#L12-L28)
      >- [[정책 검증 - OrderPolicy - validateCreate()]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/order/OrderPolicy.java#L28-L53)
      >- [[OrderService - createOrder()]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/order/OrderService.java#L36-L63)
-   - 의의: 오류 발생 지점과 원인의 의미가 명확해져 에러 대응 및 예외 처리 효율 향상.
-     정책 변경 시 서비스 전체를 분석할 필요 없이 해당 Policy 객체만 수정하면 되므로 유지보수성 극대화.   
+   - 의의: 오류 발생 지점과 원인이 명확해져 에러 대응 및 예외 처리 효율 향상.
+     정책 변경 시 서비스를 전체 분석할 필요없이 해당 Policy 객체만 수정하면 되므로 유지보수성 향상.   
    <br>
 
 #### 2. 의존성 역전(DIP) 기반의 구조 설계
@@ -140,13 +139,12 @@
    - 설계 배경: 기존 구조는 도메인 객체가 상태만 보유하는 빈약한 모델(Anemic Domain Model)로,
      비즈니스 로직이 서비스 계층에 집중. 
    - 결정: 핵심 도메인(주문, 결제)의 경우, 객체가 자신의 상태와 규칙을 스스로 관리하도록 설계.
-     이를 통해 Service 계층은 도메인 객체를 조합하는 역할로 제한.
    - 구현
-     - 생성 책임 부여: createPayment() 정적 팩토리 메서드를 통해 객체 생성 시점에 도메인 규칙 검증 수행. 
-     - 상태 변경 제어: requestPgPayment(), approve(), fail() 같은 상태 변경 메서드를 통해 
+     - **생성 책임 부여:** createPayment() 정적 팩토리 메서드를 통해 객체 생성 시점에 도메인 규칙 검증 수행. 
+     - **상태 변경 제어:** requestPgPayment(), approve(), fail() 같은 상태 변경 메서드를 통해 
        허용된 흐름에서만 상태 변경이 가능하도록 제한.
-     - 도메인 규칙 내재화: PG 응답 검증, 결제 금액 검증 등 비즈니스 규칙을 Entity 내부에 포함.
-     - 자기 상태 판단: isTerminal(), isPgRequestAvailable() 등 상태 기반 판단 로직을 객체 내부에서 제공.    
+     - **도메인 규칙 내재화:** PG 응답 검증, 결제 금액 검증 등 비즈니스 규칙을 Entity 내부에 포함.
+     - **자기 상태 판단:** isTerminal(), isPgRequestAvailable() 등 상태 기반 판단 로직을 객체 내부에서 제공.    
      [[도메인 중심 설계 Payment]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/entity/payment/Payment.java#L29)  
    - 의의
      - 비즈니스 로직이 도메인에 응집되면서 코드의 책임 명확화 및 가독성 향상. 
@@ -161,11 +159,8 @@
        - BaseAbstractException이 행위 중심 구조로 설계되어 메시지 확장 어려움
        - ErrorCode / Exception / Handler 간 책임 중복으로 역할 불명확
        - HTTP 상태 코드가 명확한 기준 없이 사용되어 API 응답 의미 전달이 부족
-   - 결정: '예외는 상태를 전달하고, 메시지 조립은 Handler가 담당한다'는 원칙하에 책임을 명확히 분리하고 메시지를 외부 리소스(properties)로 관리.
-       - ErrorCode는 식별자 역할만 수행하도록 제한
-       - Exception은 상태와 데이터(messageArgs) 전달 역할로 단순화
-       - 메시지 생성은 Handler에서 담당하도록 책임 위임
-       - HTTP 상태 코드를 의미 기반으로 재정의
+   - 결정: Exception은 상태 전달, Handler는 메시지 조립을 책임을 명확히 분리.
+     또한 ErrorCode의 메시지를 외부 리소스(properties)로 관리하고 HTTP 상태 코드는 의미 기반으로 재정의.
    - 구현
        - ErrorCode의 식별자화:
          HTTP 상태 코드와 메시지 키(Key)만 보유하도록 단순화하여 외부 리소스와의 결합을 끊음.   
@@ -200,7 +195,7 @@
           [[책임 검증 PaymentServiceTest - 결제시작 시 객체 생성 책임 위임 검증]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/service/payment/PaymentServiceTest.java#L242-L284)
         - Entity/Policy: 상태 전이 및 규칙 검증.
           [[상태 전이 검증 PaymentTest - 결제상태 전이 READY -> IN_PROGRESS]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/entity/payment/PaymentTest.java#L198-L223) |
-          [[정책 검증 PaymentPolicyTest - 본인 주문 외 결제 차탄]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/service/payment/PaymentPolicyTest.java#L237-L260)
+          [[정책 검증 PaymentPolicyTest - 본인 주문 외 결제 차단]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/service/payment/PaymentPolicyTest.java#L237-L260)
         - Controller: API 요청/응답 및 Validation 검증.
           Validation, Security, ExceptionHandler를 포함한 API 계약 테스트 수행.
           [[API 요청/응답 검증 ProductControllerTest - 상품등록 성공]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/controller/ProductControllerTest.java#L114) |
@@ -208,7 +203,7 @@
         - Integration: 실제 동작 검증.
           [[결제시작 통합 테스트 PaymentStartIntegrationTest]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/integration/payment/PaymentStartIntegrationTest.java#L114-L141)
         - Concurrency: 동시성 제어로 안정성 검증.
-          [[결제시작 동시성 테스트 PaymentConcurrencyTest]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/integration/payment/PaymentConcurrencyTest.java#L178-L245)
+          [[결제시작 동시성 테스트 PaymentConcurrencyTest]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/integration/payment/PaymentConcurrencyTest.java#L178-L251)
    - 설계 의의   
      - 테스트 코드만으로 비즈니스 흐름을 이해할 수 있는 구조 확보.
      - 구현 변경에 영향을 받지 않는 안정적인 테스트 구성.
@@ -273,7 +268,7 @@
      상태 기반으로 조건부 업데이트를 수행하여 동일 요청이 반복되더라도 결과가 변하지 않도록 멱등성 보장.
    - 구현 
      [[결제생성 웹훅 처리 PaymentService - handlePgWebHook]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/payment/PaymentService.java#L48-L70)
-     - 상태 기반 조건부 업데이트: 특정 상태(IN_PROGRESS)일 때만 업데이트를 수행하여 동시 요청 시 하나의 요청만 성공하도록 보장.
+     - **상태 기반 조건부 업데이트:** 특정 상태(IN_PROGRESS)일 때만 업데이트를 수행하여 동시 요청 시 하나의 요청만 성공하도록 보장.
        상태가 업데이트 되지 않는다면, 다음 로직은 실행되지 않도록 결제 종료.
        ~~~
        public interface PaymentRepository extends JpaRepository<Payment, Long> {
@@ -289,7 +284,7 @@
            }
        } 
        ~~~
-     - 멱등성 보장: 이미 종결된 결제는 추가 처리하지 않도록 해, 동일 웹훅이 여러 번 들어와도 결과 일관성 유지.
+     - **멱등성 보장:** 이미 종결된 결제는 추가 처리하지 않도록 해, 동일 웹훅이 여러 번 들어와도 결과 일관성 유지.
        ~~~ 
         // 결제 승인, 실패 처리 (동시성 제어)
         int updateCnt = updatePaymentApprove(payment, pgApprovalResult);
@@ -297,7 +292,7 @@
             return; // Spring은 200 OK를 보내 pg 승인결과 반영 재요청 받지 않게 종료.
         }
        ~~~
-     - 비관적 락 기반 선점 제어: 결제 및 주문 조회 시 PESSIMISTIC_WRITE 락을 적용해 
+     - **비관적 락 기반 선점 제어:** 결제 및 주문 조회 시 PESSIMISTIC_WRITE 락을 적용해 
        동일 자원에 대한 동시 접근을 차단하여 정합성 확보.
        [[결제를 위한 주문 조회 PaymentTxService - createPayment()]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/payment/PaymentTxService.java#L43-L46)
        ~~~
@@ -315,30 +310,23 @@
 
 ### 5-1. 전략적 재고 관리    
    단순 DB 조회의 한계를 극복하기 위해 Redis 캐시 계층을 두어 성능과 정합성을 동시에 고려했습니다.
-   - **동기화 시점**    
-     상품 등록 및 신규 옵션 추가 시점에 Redis에 옵션별 재고 데이터를 즉시 생성.
-   - **성능 최적화**    
-     장바구니 조회나 상품 목록의 실시간 품절 여부 확인 시, RDBMS I/O를 발생시키지 않고 
+   - **동기화 시점:** 상품 등록 및 신규 옵션 추가 시점에 Redis에 옵션별 재고 데이터를 즉시 생성.
+   - **성능 최적화:** 장바구니 조회나 상품 목록의 실시간 품절 여부 확인 시, RDBMS I/O를 발생시키지 않고 
      Redis 데이터만으로 빠르게 응답하여 사용자 경험을 개선.
-   - **데이터 정제**    
-     상품이 '판매 중단' 또는 '판매 종료' 상태로 변경될 경우, 불필요한 메모리 점유 방지를 위해 캐시 재고 즉시 삭제.
-   - **제약 사항**    
-     재고 데이터의 무결성을 위해 상품 수정 시 기존 옵션의 수량 변경은 제한하며, 
+   - **데이터 정제:** 상품이 '판매 중단' 또는 '판매 종료' 상태로 변경될 경우, 불필요한 메모리 점유 방지를 위해 캐시 재고 즉시 삭제.
+   - **제약 사항:** 재고 데이터의 무결성을 위해 상품 수정 시 기존 옵션의 수량 변경은 제한하며, 
      재고 추가가 필요한 경우 신규 옵션 추가 프로세스를 따르도록 강제.
 
 ### 5-2. 비즈니스 로직 중심의 주문 생성
    주문 생성 과정에서 비즈니스 규칙을 적용하고 데이터의 신뢰성을 확보했습니다.
-   - **재고 선점 및 차감 프로세스**     
-     다수의 사용자가 동시에 주문할 때 발생할 수 있는 초과 판매를 방지하기 위해,
+   - **재고 선점 및 차감 프로세스:** 다수의 사용자가 동시에 주문할 때 발생할 수 있는 초과 판매를 방지하기 위해,
      주문 시점에 실시간으로 재고를 선점하고 DB 캐시(Redis)의 수량을 동기화하여 정확한 판매 수량을 관리.
-   - **제약 사항**     
-     판매 중인 상품만 주문 가능, 최소/최대 주문 수량 제한 등 주문 규칙 설정.
+   - **제약 사항:** 판매 중인 상품만 주문 가능, 최소/최대 주문 수량 제한 등 주문 규칙 설정.
 
 ### 5-3. 안정적인 결제 파이프라인    
    결제 도메인은 외부 시스템 의존성이 높기 때문에 결제 시도 이력 관리와 웹훅 기반의 상태 정합성에 집중했습니다.
    - **결제 이력 기반의 재시도 허용**    
-     결제 수단 변경이나 승인 실패 등 다양한 변수에 대응하기 위해,
-     하나의 주문에 대해 여러 건의 결제 시도 이력을 관리하도록 설계.   
+     결제 수단 변경이나 승인 실패 등 다양한 변수에 대응하기 위해, 하나의 주문에 대해 여러 건의 결제 시도 이력을 관리하도록 설계.   
      결제 시작 시점에 READY 상태의 데이터를 즉시 INSERT하여 모든 시도 과정을 추적할 수 있게 구축.
    - **비동기 웹훅 기반 상태 동기화**   
      PG사의 결제 승인 결과를 웹훅(Webhook)으로 수신하여 처리.

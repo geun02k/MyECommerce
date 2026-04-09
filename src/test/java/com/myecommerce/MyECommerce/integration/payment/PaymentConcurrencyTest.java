@@ -201,8 +201,7 @@ public class PaymentConcurrencyTest {
         paymentIds = Collections.synchronizedList(new ArrayList<>());
         List<Throwable> exceptions = Collections.synchronizedList(new ArrayList<>());
 
-        // when
-        // TODO: 가독성 향상을 위해 try 내부 로직 메서드로 추출 고려 ( executePaymentRequest(request, exceptions) )
+        // when (동시 실행 자체가 테스트의 목적 -> 동시성 로직을 테스트에 드러냄.)
         // 여러 트랜잭션 동시 실행. (각 submit -> 각 작업 트랜잭션을 큐에 넣기)
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> { // 생성한 작업 스레드를 큐에 넣고 비동기 실행.

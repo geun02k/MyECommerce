@@ -182,7 +182,7 @@ public class PaymentPgApiConcurrencyTest {
 
     /** PG 결제승인 웹훅 동시성 실행
      *  : 지저분한 기술적 코드를 메서드로 분리 */
-    void executeConcurrentHandlerWebhooks(PgApprovalResult request) throws Exception {
+    void executeConcurrentPgWebhookRequests(PgApprovalResult request) throws Exception {
         // 트랜잭션 생성
         int threadCount = 10;
         // 동시에 실행될 스레드 풀
@@ -241,8 +241,8 @@ public class PaymentPgApiConcurrencyTest {
                 .build();
 
         // when
-        // PG 결제승인 웹훅 동시성 실행
-        executeConcurrentHandlerWebhooks(request);
+        // PG 결제승인 웹훅 동시성 실행 (중복처리방지, 멱등성, 상태전이 안정성 검증으로, 동시성 코드 분리)
+        executeConcurrentPgWebhookRequests(request);
 
         // then
         // 결제상태 검증

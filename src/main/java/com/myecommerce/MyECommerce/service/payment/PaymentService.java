@@ -45,6 +45,7 @@ public class PaymentService {
         return ResponsePaymentDto.from(payment, pgResponse);
     }
 
+    // TODO: 이중 결제 불가를 위해 Order 락을 걸고 paid 상태를 우선 점검한 후 마지막에 update로 변경
     /** 결제 생성 웹훅 처리 - 결제 상태 변경해 결제 종료 **/
     @Transactional
     public void handlePgWebHook(PgApprovalResult pgApprovalResult) {

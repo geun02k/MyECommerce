@@ -10,6 +10,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableEncryptableProperties //  Spring 환경 전체에서 암호화 가능한 속성을 활성화
 public class JasyptConfigAES {
+    // TODO: 보안을 위해 암호화 키 -> 외부 환경 변수로 분리해 관리할 것
+    // 1. 설정 정보를 상수로 분리
+    //    단위 테스트에서도 해당 상수를 사용하면서 단위 테스트의 순수성을 지키기
+    //    bootRun --args='--jasypt.password=키값' 이런 식으로 실행 시점에만 키를 알려주는 방식
 
     // jasyptEncryptorAES로 Bean을 등록 -> application.properties의 jasypt bean으로 등록 시 사용.
     @Bean("jasyptEncryptorAES")

@@ -12,6 +12,7 @@ import java.util.Optional;
 public interface ProductOptionRepository extends JpaRepository<ProductOption, Long>,
                                                  ProductOptionRepositoryCustom {
     // 상품의 옵션코드목록에 대한 옵션 목록 조회
+    // TODO: 정책 검즘에서만 사용하고 이후 조회한 연관객체 미사용으로 join fetch 의미없으므로 수정 필요.
     @Query(" SELECT PRD " +
             " FROM Product PRD" +
             " INNER JOIN FETCH PRD.options OPTION" +

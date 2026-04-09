@@ -19,6 +19,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -46,6 +48,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @ActiveProfiles("test")
 @Import(TestAuditingConfig.class)
 public class OrderCreateIntegrationTest {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderCreateIntegrationTest.class);
 
     @Autowired
     private OrderService orderService;
@@ -227,6 +231,53 @@ public class OrderCreateIntegrationTest {
                 option.getProduct().getCode() + ":" +
                 option.getOptionCode();
     }
+
+    /** 주문요청 10건 동시 실행 -> 주문 10건 생성
+     *  : 지저분한 기술적 코드를 메서드로 분리 */
+    List<Long> executeConcurrentOrderRequests(List<RequestOrderDto> requestOrders,
+                                              Member member) throws InterruptedException {
+        // 트랜잭션 생성
+        int threadCount = 10;
+        // 동시에 실행될 스레드 풀
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        // 모든 스레드가 끝날 때까지 대기 (해당 코드 없으면 테스트가 중간에 끝남)
+        CountDownLatch readyLatch = new CountDownLatch(threadCount);
+        CountDownLatch startSignal = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+
+        List<Long> orderIds = Collections.synchronizedList(new ArrayList<>());
+        // 여러 트랜잭션 동시 실행. (각 submit -> 각 작업 트랜잭션을 큐에 넣기)
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> { // 생성한 작업 스레드를 큐에 넣고 비동기 실행.
+                try {
+                    readyLatch.countDown(); // 작업 스레드 생성 완료 알림
+                    startSignal.await();    // 생성된 현재 작업 스레드 대기
+
+                    // 주문 생성
+                    ResponseOrderDto response =
+                            orderService.createOrder(requestOrders, member);
+
+                    // 데이터 일괄 삭제를 위한 주문 키 추가
+                    orderIds.add(response.getId());
+
+                } catch(Exception e) {
+                    log.error(e.getMessage(), e);
+
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        readyLatch.await();      // 작업 스레드 전체 생성 대기 (메인 스레드는 모든 작업 스레드가 큐에 등록되어 실행가능한 상태가 될 때까지 대기)
+        startSignal.countDown(); // 전체 작업 스레드 일제히 시작
+        doneLatch.await();       // 작업 스레드 전체 종료 대기 (메인 스레드는 모든 작업 스레드 doneLatch.countDown 완료될 때까지 대기)
+        // 스레드풀 자원 종료
+        executor.shutdown();
+
+        return orderIds;
+    }
+
     /* ------------------
         주문생성 Test
        ------------------ */
@@ -275,47 +326,21 @@ public class OrderCreateIntegrationTest {
         assertEquals(price("4000"), savedOrderSecondItem.getTotalPrice()); // 2000원 * 2개 = 4000원
     }
 
+    // TODO: 통합테스트와 동시성 테스트 클래스 분리
     @Test
     @DisplayName("주문생성 성공 - 동시에 여러 주문 요청 시 옵션 재고 차감")
     void createOrder_shouldDecreaseOptionStock_whenConcurrentlyOrderRequest()
             throws InterruptedException {
         // given
         // 요청 사용자
-        Long memberId = savedMember.getId();
-        Member member = customer(memberId);
+        Member member = customer(savedMember.getId());
         // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건)
-        List<RequestOrderDto> requestOrder =
+        List<RequestOrderDto> requestOrders =
                 givenRequestOrders(savedProduct.getId());
 
         // when
-        // 트랜잭션 생성
-        int threadCount = 10;
-        // 동시에 실행될 스레드 풀
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        // 모든 스레드가 끝날 때까지 대기 (해당 코드 없으면 테스트가 중간에 끝남)
-        CountDownLatch latch = new CountDownLatch(threadCount);
-
-        List<Long> orderIds = Collections.synchronizedList(new ArrayList<>());
-        for (int i = 0; i < threadCount; i++) {
-            // 여러 트랜잭션 동시 실행 (각 submit은 독립 트랜잭션)
-            executor.submit(() -> {
-                try {
-                    // 주문 생성
-                    ResponseOrderDto response =
-                            orderService.createOrder(requestOrder, member);
-                    // 데이터 일괄 삭제를 위한 주문 키 추가
-                    orderIds.add(response.getId());
-
-                } finally {
-                    latch.countDown();
-                }
-            });
-        }
-
-        // 메인인 테스트 스레드 대기 -> 모든 주문 완료 후 검증가능
-        latch.await();
-        // 스레드풀 자원 종료
-        executor.shutdown();
+        // 주문 요청 동시 10번 수행 (테스트 목적: 동시 요청 시 재고가 안전하게 차감되는가 -> 동시성 메서드를 테스트에서 분리)
+        List<Long> orderIds = executeConcurrentOrderRequests(requestOrders, member);
 
         // then
         // 동시에 실행 요청했을 때 결과가 안전한지 검증.

@@ -8,7 +8,9 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JasyptConfigAESTest {
-
+    // 단위 테스트로서의 의미
+    // StandardPBEStringEncryptor 그 자체가 라이브러리로서 잘 동작하는지,
+    // 내가 설정한 PBEWithHMACSHA512AndAES_256 알고리즘이 현재 환경(JDK 등)에서 지원되는지 등 확인가능
     @Test
     @DisplayName("jasypt문자열암호화 성공")
     void successStringEncrypting() {

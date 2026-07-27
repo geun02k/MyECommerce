@@ -47,7 +47,7 @@ public class CartRetrieveIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        redisTemplate.opsForHash().delete(CART_KEY, cartKeys);
+        redisTemplate.delete(CART_KEY);
         redisTemplate.delete(stockCache);
     }
 
@@ -68,11 +68,13 @@ public class CartRetrieveIntegrationTest {
 
         // 100건 장바구니 상품 옵션 데이터 생성
         for (int i = 1; i <= 100; i++) {
+            Long sellerId = (long) i;
             String productCode = "product" + i;
             String optionCode = "option" + i;
-            String hashKey = productCode + ":" + optionCode;
+            String hashKey = sellerId + ":" + productCode + ":" + optionCode;
 
             RedisCartDto redisCartDto = RedisCartDto.builder()
+                    .sellerId(sellerId)
                     .productId((long) i)
                     .productCode(productCode)
                     .optionId((long) i)
@@ -95,9 +97,10 @@ public class CartRetrieveIntegrationTest {
         Map<String, Integer> stock = new HashMap<>();
 
         for (int i = 1; i <= 70; i++) {
+            int sellerId = i;
             String productCode = "product" + i;
             String optionCode = "option" + i;
-            String key = STOCK + ":" + productCode + ":" + optionCode;
+            String key = STOCK + ":" + sellerId + ":" + productCode + ":" + optionCode;
             int stockValue;
 
             // 짝수는 재고 있음, 홀수는 재고 없음
@@ -118,10 +121,12 @@ public class CartRetrieveIntegrationTest {
 
     /** 장바구니에서 특정 상품 옵션 찾기 */
     ResponseCartDetailDto findItem(List<ResponseCartDetailDto> cart,
+                                   Long sellerId,
                                    String productCode,
                                    String optionCode) {
         for (ResponseCartDetailDto item : cart) {
-            if (productCode.equals(item.getProductCode()) &&
+            if (sellerId.equals(item.getSellerId()) &&
+                    productCode.equals(item.getProductCode()) &&
                     optionCode.equals(item.getOptionCode())) {
                 return item;
             }
@@ -155,17 +160,17 @@ public class CartRetrieveIntegrationTest {
 
         // 특정 상품 재고/품절여부 검증
         ResponseCartDetailDto itemAvailable =  // 판매중이고 재고 있음 (70이하 짝수)
-                findItem(response, "product38", "option38");
+                findItem(response, 38L, "product38", "option38");
         assertEquals(38, itemAvailable.getAvailableQuantity());
         assertFalse(itemAvailable.isOutOfStock());
 
         ResponseCartDetailDto itemOutOfStock =  // 판매중이지만 재고 0 (70이하 홀수)
-                findItem(response, "product57", "option57");
+                findItem(response, 57L, "product57", "option57");
         assertEquals(0, itemOutOfStock.getAvailableQuantity());
         assertTrue(itemOutOfStock.isOutOfStock());
 
         ResponseCartDetailDto itemOfDiscontinue = // 판매중단으로 재고 미등록 (71이상)
-                findItem(response, "product88", "option88");
+                findItem(response, 88L, "product88", "option88");
         assertEquals(0, itemOfDiscontinue.getAvailableQuantity());
         assertTrue(itemOfDiscontinue.isOutOfStock());
 

@@ -60,6 +60,7 @@ class CartControllerTest {
     /** 유효한 장바구니 추가 요청 */
     RequestCartDto requestCartDto() {
         return RequestCartDto.builder()
+                .sellerId(1L)
                 .productCode("productCode")
                 .optionCode("optionCode")
                 .quantity(5)
@@ -76,8 +77,9 @@ class CartControllerTest {
         // given
         RequestCartDto request = requestCartDto();
         Member invalidMember = Member.builder()
+                .id(1L)
                 .roles(List.of(MemberAuthority.builder()
-                        .authority(SELLER).build())).build();; // 고객아님
+                        .authority(SELLER).build())).build(); // 고객아님
 
         // when
         // then

@@ -75,12 +75,14 @@ class CartPolicyTest {
     @DisplayName("장바구니추가정책 통과")
     void validateAdd_shouldPass_whenAllValid() {
         // given
+        Long sellerId = 5L;
         Member customer = customer();
         // 사용자 장바구니 현재 사이즈 반환
         given(redisMultiDataService.getSizeOfHashData(CART, customer.getUserId()))
                 .willReturn(1L);
         // 요청한 상품은 판매중인 상품으로 반환
-        given(productRepository.findByCodeAndSaleStatus(eq("productCode"), eq(ON_SALE)))
+        given(productRepository.findBySellerAndCodeAndSaleStatus(
+                eq(sellerId), eq("productCode"), eq(ON_SALE)))
                 .willReturn(Optional.of(Product.builder()
                         .code("productCode")
                         .saleStatus(ON_SALE).build()));
@@ -88,14 +90,14 @@ class CartPolicyTest {
         // when
         // then
         assertDoesNotThrow(() ->
-                cartPolicy.validateAdd("productCode", customer));
-
+                cartPolicy.validateAdd(sellerId, "productCode", customer));
     }
 
     @Test
     @DisplayName("장바구니추가정책 실패 - 이미 장바구니에 허용된 최대 사이즈 도달 시 예외발생")
     void validateAdd_shouldReturnCartSizeExceeded_whenCartItemCountExceed() {
         // given
+        Long sellerId = 5L;
         Member customer = customer();
 
         given(redisMultiDataService.getSizeOfHashData(CART, customer.getUserId()))
@@ -103,7 +105,7 @@ class CartPolicyTest {
         // when
         // then
         CartException e = assertThrows(CartException.class, () ->
-                cartPolicy.validateAdd("productCode", customer()));
+                cartPolicy.validateAdd(sellerId, "productCode", customer()));
         assertEquals(CART_SIZE_EXCEEDED, e.getErrorCode());
 
     }
@@ -112,27 +114,32 @@ class CartPolicyTest {
     @DisplayName("장바구니추가정책 실패 - 판매중인 상품이 아니면 예외발생")
     void validateAdd_shouldReturnProductNotOnSale_whenProductNotOnSale() {
         // given
+        Long sellerId = 5L;
         Member customer = customer();
         // 사용자 장바구니 사이즈 (타정책 통과용)
         givenUserCartSize(customer);
         // 판매중단된 상품으로 조회되지 않음
-        given(productRepository.findByCodeAndSaleStatus(eq("productCode"), eq(ON_SALE)))
+        given(productRepository.findBySellerAndCodeAndSaleStatus(
+                eq(sellerId), eq("productCode"), eq(ON_SALE)))
                 .willReturn(Optional.empty());
 
         // when
         // then
         ProductException e =assertThrows(ProductException.class, () ->
-                cartPolicy.validateAdd("productCode", customer));
+                cartPolicy.validateAdd(
+                        sellerId, "productCode", customer));
         assertEquals(PRODUCT_NOT_ON_SALE, e.getErrorCode());
         // 판매상태 조회 실행여부 검증
         verify(productRepository, times(1))
-                .findByCodeAndSaleStatus("productCode", ON_SALE);
+                .findBySellerAndCodeAndSaleStatus(
+                        sellerId, "productCode", ON_SALE);
     }
 
     @Test
     @DisplayName("장바구니추가정책 실패 - 고객 외 장바구니 접근 시 예외발생")
     void validateAdd_shouldReturnCartCustomerOnly_whenAccessNotCustomer() {
         // given
+        Long sellerId = 5L;
         Member invalidMember = Member.builder()
                 .roles(List.of(MemberAuthority.builder()
                         .authority(SELLER).build())).build();; // 고객아님
@@ -140,7 +147,8 @@ class CartPolicyTest {
         // when
         // then
         CartException e = assertThrows(CartException.class, () ->
-                cartPolicy.validateAdd("productCode", invalidMember));
+                cartPolicy.validateAdd(
+                        sellerId, "productCode", invalidMember));
         assertEquals(CART_CUSTOMER_ONLY, e.getErrorCode());
     }
 }

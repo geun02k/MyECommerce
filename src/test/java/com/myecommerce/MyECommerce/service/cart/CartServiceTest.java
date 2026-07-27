@@ -65,12 +65,16 @@ class CartServiceTest {
     }
 
     /** 장바구니에 존재하는 상품옵션 단건  */
-    RedisCartDto existingCartItem() {
+    RedisCartDto existingCartItem(Long sellerId,
+                                  String productCode,
+                                  String optionCode,
+                                  int quantity) {
         return RedisCartDto.builder()
-                .productCode("productCode")
-                .optionCode("optionCode")
+                .sellerId(sellerId)
+                .productCode(productCode)
+                .optionCode(optionCode)
                 .price(new BigDecimal("10000"))
-                .quantity(1)
+                .quantity(quantity)
                 .build();
     }
 
@@ -94,23 +98,27 @@ class CartServiceTest {
         // given
         // 요청 장바구니 상품 정보
         RequestCartDto requestCartDto = RequestCartDto.builder()
+                .sellerId(5L)
                 .productCode("productCode")
                 .optionCode("optionCode")
-                .quantity(1)
+                .quantity(1) // 수량 1개 추가
                 .build();
         // 요청 사용자 정보
         Member member = member();
 
-        // 저장 대상 장바구니 옵션
-        RedisCartDto targetRedisCartDto = existingCartItem();
+        // 요청자 장바구니에 존재하는 동일 상품옵션
+        RedisCartDto targetRedisCartDto = existingCartItem(
+                5L, "productCode", "optionCode", 1); // 기존 수량 1개
 
         // Redis key
         String redisKey = member.getUserId();
-        String redisHashKey = requestCartDto.getProductCode()
+        String redisHashKey = requestCartDto.getSellerId()
+                + ":" + requestCartDto.getProductCode()
                 + ":" + requestCartDto.getOptionCode();
 
         // 반환 상품정보
         ResponseCartDto expectedResponseCartDto = ResponseCartDto.builder()
+                .sellerId(targetRedisCartDto.getSellerId())
                 .productCode(targetRedisCartDto.getProductCode())
                 .optionCode(targetRedisCartDto.getOptionCode())
                 .price(targetRedisCartDto.getPrice())
@@ -135,9 +143,11 @@ class CartServiceTest {
         // then
         // 정책 실행여부 검증
         verify(cartPolicy, times(1))
-                .validateAdd(requestCartDto.getProductCode(), member);
+                .validateAdd(requestCartDto.getSellerId(),
+                             requestCartDto.getProductCode(),
+                             member);
         verify(productOptionRepository, never())
-                .findByProductCodeAndOptionCodeOfOnSale(any(), any());
+                .findBySellerAndProductCodeAndOptionCodeOfOnSale(any(), any(), any());
         // redis 저장 실행여부 검증
         verify(redisSingleDataService, times(1))
                 .saveSingleHashValueData(
@@ -149,6 +159,7 @@ class CartServiceTest {
         RedisCartDto capturedRedisCartDto = redisCartDtoCaptor.getValue();
         assertEquals(2, capturedRedisCartDto.getQuantity());
         // 반환 결과 검증
+        assertEquals(requestCartDto.getSellerId(), responseCartDto.getSellerId());
         assertEquals(requestCartDto.getProductCode(), responseCartDto.getProductCode());
         assertEquals(requestCartDto.getOptionCode(), responseCartDto.getOptionCode());
         assertEquals(targetRedisCartDto.getPrice(), responseCartDto.getPrice());
@@ -161,6 +172,7 @@ class CartServiceTest {
         // given
         // 요청 장바구니 상품 정보
         RequestCartDto requestCartDto = RequestCartDto.builder()
+                .sellerId(10L)
                 .productCode("productCode")
                 .optionCode("optionCode")
                 .quantity(5)
@@ -173,11 +185,13 @@ class CartServiceTest {
 
         // Redis key
         String redisKey = member.getUserId();
-        String redisHashKey = requestCartDto.getProductCode()
+        String redisHashKey = requestCartDto.getSellerId()
+                + ":" + requestCartDto.getProductCode()
                 + ":" + requestCartDto.getOptionCode();
 
         // 반환 상품정보
         ResponseCartDto expectedResponseCartDto = ResponseCartDto.builder()
+                .sellerId(10L)
                 .productCode(foundOptionDto.getProductCode())
                 .optionCode(foundOptionDto.getOptionCode())
                 .price(foundOptionDto.getPrice())
@@ -189,7 +203,8 @@ class CartServiceTest {
                 eq(CART), eq(redisKey), eq(redisHashKey)))
                 .willReturn(null);
         // 판매중인 상품옵션 DB에서 조회.
-        given(productOptionRepository.findByProductCodeAndOptionCodeOfOnSale(
+        given(productOptionRepository.findBySellerAndProductCodeAndOptionCodeOfOnSale(
+                eq(requestCartDto.getSellerId()),
                 eq(requestCartDto.getProductCode()),
                 eq(requestCartDto.getOptionCode())))
                 .willReturn(Optional.of(foundOptionDto));
@@ -204,11 +219,13 @@ class CartServiceTest {
         // then
         // 정책 실행여부 검증
         verify(cartPolicy, times(1))
-                .validateAdd(eq(requestCartDto.getProductCode()), eq(member));
+                .validateAdd(eq(requestCartDto.getSellerId()),
+                             eq(requestCartDto.getProductCode()),
+                             eq(member));
         // 요청 상품 장바구니 미존재해 상품 옵션 조회
         verify(productOptionRepository, times(1))
-                .findByProductCodeAndOptionCodeOfOnSale(
-                        eq("productCode"), eq("optionCode"));
+                .findBySellerAndProductCodeAndOptionCodeOfOnSale(
+                        eq(10L), eq("productCode"), eq("optionCode"));
         // redis 저장 실행여부 검증
         ArgumentCaptor<RedisCartDto> redisCartDtoCaptor =
                 ArgumentCaptor.forClass(RedisCartDto.class);
@@ -222,6 +239,7 @@ class CartServiceTest {
         // 캡쳐 결과 검증
         assertEquals(5, redisCartDtoCaptor.getValue().getQuantity());
         // 반환 결과 검증
+        assertEquals(requestCartDto.getSellerId(), responseCartDto.getSellerId());
         assertEquals(requestCartDto.getProductCode(), responseCartDto.getProductCode());
         assertEquals(requestCartDto.getOptionCode(), responseCartDto.getOptionCode());
         assertEquals(foundOptionDto.getPrice(), responseCartDto.getPrice());

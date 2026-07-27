@@ -74,9 +74,9 @@ class ProductPolicyTest {
     }
 
     /** 판매자 권한 사용자 */
-    Member seller() {
+    Member seller(Long id) {
         return Member.builder()
-                .id(1L)
+                .id(id)
                 .roles(List.of(MemberAuthority.builder()
                         .authority(SELLER)
                         .build()))
@@ -106,13 +106,14 @@ class ProductPolicyTest {
         given(productRepository.findBySellerAndCode(anyLong(), anyString()))
                 .willReturn(Optional.empty());
         given(productOptionRepository
-                .findByProductCodeAndOptionCodeIn(anyString(), anyList()))
+                .findBySellerAndProductCodeAndOptionCodeIn(
+                        anyLong(), anyString(), anyList()))
                 .willReturn(Collections.emptyList());
 
         // when
         // then
         assertDoesNotThrow(() ->
-                productPolicy.validateRegister(production, seller()));
+                productPolicy.validateRegister(production, seller(1L)));
     }
 
     @Test
@@ -120,7 +121,7 @@ class ProductPolicyTest {
     void validationRegister_shouldFail_whenDuplicatedProductCode() {
         // given
         ServiceProductDto product = productForInsert();
-        Member seller = seller();
+        Member seller = seller(1L);
 
         // 이미 등록된 동일 상품코드 존재
         given(productRepository
@@ -147,7 +148,7 @@ class ProductPolicyTest {
         // when
         // then
         ProductException e = assertThrows(ProductException.class, () ->
-                productPolicy.validateRegister(product, seller()));
+                productPolicy.validateRegister(product, seller(1L)));
         assertEquals(OPTION_AT_LEAST_ONE_REQUIRED, e.getErrorCode());
     }
 
@@ -159,7 +160,7 @@ class ProductPolicyTest {
         production.setOptions(List.of(
                 optionForInsert("optionCode01"),
                 optionForInsert("optionCode01"))); // 중복
-        Member seller = seller();
+        Member seller = seller(1L);
 
         given(productRepository.
                 findBySellerAndCode(seller.getId(), production.getCode()))
@@ -178,16 +179,17 @@ class ProductPolicyTest {
     void validateRegister_shouldFail_whenAlreadyRegisteredOptionCode() {
        // given
         ServiceProductDto production = productForInsert();
-        Member seller = seller();
+        Member seller = seller(1L);
 
         given(productRepository.
                 findBySellerAndCode(seller.getId(), production.getCode()))
                 .willReturn(Optional.empty());
         // 이미 등록된 기존 동일 옵션코드 존재
         given(productOptionRepository.
-                findByProductCodeAndOptionCodeIn(
-                        production.getCode(), List.of("optionCode")))
+                findBySellerAndProductCodeAndOptionCodeIn(
+                        seller.getId(), production.getCode(), List.of("optionCode")))
                 .willReturn(List.of(Product.builder()
+                                    .seller(1L)
                                     .code("code")
                                     .options(List.of(ProductOption.builder()
                                             .optionCode("optionCode")
@@ -211,6 +213,7 @@ class ProductPolicyTest {
     void validateModify_shouldPass_whenAllValid() {
         // given
         Product production = Product.builder()
+                .seller(1L)
                 .code("code")
                 .saleStatus(ON_SALE)
                 .build();
@@ -220,8 +223,8 @@ class ProductPolicyTest {
                         .optionCode("insertOptionCode")
                         .build();
 
-        given(productOptionRepository.findByProductCodeAndOptionCodeIn(
-                "code", List.of("insertOptionCode")))
+        given(productOptionRepository.findBySellerAndProductCodeAndOptionCodeIn(
+                1L, "code", List.of("insertOptionCode")))
                 .willReturn(Collections.emptyList());
 
         // when
@@ -268,6 +271,7 @@ class ProductPolicyTest {
     void validateModify_shouldFail_whenAlreadyRegisteredOptionCode() {
         // given
         Product production = Product.builder()
+                .seller(1L)
                 .code("code")
                 .saleStatus(ON_SALE)
                 .build();
@@ -276,8 +280,8 @@ class ProductPolicyTest {
 
         // 이미 등록된 기존 동일 옵션코드 존재
         given(productOptionRepository.
-                findByProductCodeAndOptionCodeIn(
-                        production.getCode(), List.of("insertOptionCode")))
+                findBySellerAndProductCodeAndOptionCodeIn(
+                        1L, production.getCode(), List.of("insertOptionCode")))
                 .willReturn(List.of(Product.builder()
                         .code("code")
                         .options(List.of(ProductOption.builder()

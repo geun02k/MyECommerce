@@ -16,6 +16,8 @@ public class ResponseCartDetailDto {
 
     private Long productId;
 
+    private Long sellerId;
+
     private String productCode;
 
     private String productName;

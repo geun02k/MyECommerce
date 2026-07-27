@@ -1,6 +1,7 @@
 package com.myecommerce.MyECommerce.integration.cart;
 
 import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
+import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.dto.product.RequestProductDto;
 import com.myecommerce.MyECommerce.dto.product.RequestProductOptionDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
@@ -14,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +25,7 @@ import java.util.List;
 
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.ProductCategoryType.WOMEN_CLOTHING;
+import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.STOCK;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,13 +48,16 @@ public class CartAddIntegrationTest {
         Test Fixtures
        ------------------ */
 
+    private final String USER_ID = "customer";
     // 등록한 재고 캐시 키목록
     List<String> stockCacheKeys = new ArrayList<>();
+    private final String cartKey = CART + ":" + USER_ID;
 
     @AfterEach
     void cleanUp() {
         // 상품등록으로 인한 redis 재고 캐시 삭제
         redisTemplate.delete(stockCacheKeys);
+        redisTemplate.delete(cartKey);
     }
 
     /** 셀러권한 사용자 */
@@ -67,7 +71,7 @@ public class CartAddIntegrationTest {
     /** 고객권한 사용자 */
     Member customer() {
         return Member.builder()
-                .userId("customer")
+                .userId(USER_ID)
                 .roles(List.of(MemberAuthority.builder()
                         .authority(CUSTOMER)
                         .build()))
@@ -107,8 +111,9 @@ public class CartAddIntegrationTest {
     }
 
     /** 장바구니 상품추가 요청 DTO 생성 */
-    RequestCartDto requestCartDto(String productCode, String optionCode) {
+    RequestCartDto requestCartDto(Long sellerId, String productCode, String optionCode) {
         return RequestCartDto.builder()
+                .sellerId(sellerId)
                 .productCode(productCode)
                 .optionCode(optionCode)
                 .quantity(1)
@@ -119,10 +124,10 @@ public class CartAddIntegrationTest {
         장바구니 추가 Test
        ------------------ */
 
-    // 기존 설계 문제 재현
+    // 기존 설계 문제 해결
     @Test
-    @DisplayName("장바구니 추가 실패 - 동일한 상품코드가 존재하면 상품 단건 조회 실패")
-    void addCart_shouldFailedSearch_whenDuplicateProductCodeExists() {
+    @DisplayName("장바구니 상품추가 성공 - 동일한 상품코드가 존재 시에도 특정 셀러의 상품 장바구니에 추가")
+    void addCart_shouldAddItem_whenDuplicateProductCodeExists() {
         // given
         // 동일한 상품코드로 두 셀러가 상품 등록
         registerProduct(1L, "productCode", "option1");
@@ -130,13 +135,35 @@ public class CartAddIntegrationTest {
         // 장바구니 추가를 위한 객체 생성
         Member member = customer();
         RequestCartDto requestCartDto =
-                requestCartDto("productCode", "option2");
+                requestCartDto(2L, "productCode", "option2");
 
         // when
+        ResponseCartDto response = cartService.addCart(requestCartDto, member);
         // then
-        // productCode 단일 조회 결과가 2건이 되어 예외 발생
-        assertThrows(IncorrectResultSizeDataAccessException.class, () ->
-                cartService.addCart(requestCartDto, member));
+        assertEquals(2L, response.getSellerId());
+        assertEquals("productCode", response.getProductCode());
+        assertEquals("option2", response.getOptionCode());
     }
+
+//    // 기존 설계 문제 재현
+//    @Test
+//    @Disabled("기존 장바구니 상품 추가 실패 문제 재현 후 버그 수정 완료로 테스트 제외")
+//    @DisplayName("장바구니 추가 실패 - 동일한 상품코드가 존재하면 상품 단건 조회 실패")
+//    void addCart_shouldFailedSearch_whenDuplicateProductCodeExists() {
+//        // given
+//        // 동일한 상품코드로 두 셀러가 상품 등록
+//        registerProduct(1L, "productCode", "option1");
+//        registerProduct(2L, "productCode", "option2");
+//        // 장바구니 추가를 위한 객체 생성
+//        Member member = customer();
+//        RequestCartDto requestCartDto =
+//                requestCartDto("productCode", "option2");
+//
+//        // when
+//        // then
+//        // productCode 단일 조회 결과가 2건이 되어 예외 발생
+//        assertThrows(IncorrectResultSizeDataAccessException.class, () ->
+//                cartService.addCart(requestCartDto, member));
+//    }
 
 }

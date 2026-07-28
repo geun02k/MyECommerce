@@ -170,7 +170,7 @@ public class OrderCreateIntegrationTest {
         Map <String, Object> stockMap = new HashMap<>();
 
         for(ProductOption option : product.getOptions()) {
-            String key = STOCK + ":" + product.getCode() + ":" + option.getOptionCode();
+            String key = createStockRedisKey(option);
             stockMap.put(key, option.getQuantity());
         }
         redisMultiDataService.saveMultiData(stockMap);
@@ -228,6 +228,7 @@ public class OrderCreateIntegrationTest {
     // 재고 redis key 생성
     String createStockRedisKey(ProductOption option) {
         return STOCK + ":" +
+                option.getProduct().getSeller() + ":" +
                 option.getProduct().getCode() + ":" +
                 option.getOptionCode();
     }

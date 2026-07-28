@@ -86,7 +86,7 @@ public class CartAddIntegrationTest {
         productService.registerProduct(requestProduct, seller);
 
         // redis 캐시 재고 삭제를 위한 키 생성
-        String stockKey = STOCK + ":" + productCode + ":" + optionCode;
+        String stockKey = STOCK + ":" + sellerId + ":" + productCode + ":" + optionCode;
         stockCacheKeys.add(stockKey);
     }
 

@@ -49,18 +49,15 @@ public class CartService {
         // redis 장바구니에 상품 단건 등록
         // key = 사용자아이디(토큰값을 사용하게되면 만료 시 장바구니내역 사용불가로)
         // value = 상품목록(해시,같은 필드명에 대해서는 새로운 값으로 덮어씌움)
-        //       - hashKey = 등록할 판매자:상품코드:상품옵션코드
+        //       - hashKey = 상품옵션아이디
         //       - hashValue = 등록할 상품 및 옵션 정보
 
         // 0. 정책검증
-        cartPolicy.validateAdd(requestCartDto.getSellerId(),
-                               requestCartDto.getProductCode(),
-                               member);
+        Long productOptionId = requestCartDto.getProductOptionId();
+        cartPolicy.validateAdd(productOptionId, member);
 
         String redisKey = member.getUserId();
-        String redisHashKey = createCartRedisHashKey(requestCartDto.getSellerId(),
-                                                     requestCartDto.getProductCode(),
-                                                     requestCartDto.getOptionCode());
+        String redisHashKey = createCartRedisHashKey(productOptionId);
 
         // 1. 요청 상품옵션에 대한 장바구니 조회
         RedisCartDto cartItem = getCartItem(redisKey, redisHashKey);
@@ -99,10 +96,8 @@ public class CartService {
     }
 
     // 장바구니 조회 Redis Hash Key 생성
-    private String createCartRedisHashKey(Long sellerId,
-                                          String productCode,
-                                          String optionCode) {
-        return sellerId + ":" + productCode + ":" + optionCode;
+    private String createCartRedisHashKey(Long productOptionId) {
+        return String.valueOf(productOptionId);
     }
 
     // 장바구니 상품옵션 단건 조회
@@ -129,9 +124,7 @@ public class CartService {
 
         // 1. 요청 상품이 장바구니에 미존재 시 상품옵션조회 (DB)
         if (targetRedisCartDto == null) {
-            result = findOptionDtoById(requestCartDto.getSellerId(),
-                                       requestCartDto.getProductCode(),
-                                       requestCartDto.getOptionCode());
+            result = findOptionDtoById(requestCartDto.getProductOptionId());
             // 장바구니 신규 등록이므로 수량 0으로 초기화
             result.setQuantity(0);
 
@@ -147,11 +140,9 @@ public class CartService {
     }
 
     // 상품옵션에 해당하는 상품옵션 조회
-    private RedisCartDto findOptionDtoById(Long sellerId, String productCode, String optionCode) {
+    private RedisCartDto findOptionDtoById(Long productOptionId) {
         // 상품옵션조회
-        return productOptionRepository
-                .findBySellerAndProductCodeAndOptionCodeOfOnSale(
-                        sellerId, productCode, optionCode)
+        return productOptionRepository.findByIdOfOnSale(productOptionId)
                 .orElseThrow(() ->
                         new ProductException(PRODUCT_OPTION_NOT_EXIST));
     }

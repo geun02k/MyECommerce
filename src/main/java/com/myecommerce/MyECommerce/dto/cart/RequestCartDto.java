@@ -10,15 +10,9 @@ import lombok.*;
 @AllArgsConstructor
 public class RequestCartDto {
 
-    @NotNull(message = "{validation.cart.seller.id.not.null}")
-    @Positive(message = "{validation.cart.seller.id.positive}")
-    private Long sellerId;
-
-    @NotBlank(message = "{validation.cart.product.id.not.blank}")
-    private String productCode;
-
-    @NotBlank(message = "{validation.cart.option.id.not.blank}")
-    private String optionCode;
+    @NotNull(message = "{validation.cart.product.option.id.not.null}")
+    @Positive(message = "{validation.cart.product.option.id.positive}")
+    private Long productOptionId;
 
     @NotNull(message = "{validation.cart.quantity.not.null}")
     @Min(value = 1, message = "{validation.cart.quantity.min}")

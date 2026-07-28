@@ -28,13 +28,13 @@ public class CartPolicy {
     private final ProductRepository productRepository;
 
     /** 장바구니 추가 정책 **/
-    public void validateAdd(Long sellerId, String productCode, Member member) {
+    public void validateAdd(Long productId, Member member) {
         // 고객 한정 장바구니 접근 제한
         validateCartAccessPolicy(member);
         // 장바구니 물품 100건 제한
         checkUserCartSizePolicy(member.getUserId());
         // 장바구니에 추가 가능한 상품은 판매중인 경우로 제한
-        validateOnSaleProductPolicy(sellerId, productCode);
+        validateOnSaleProductPolicy(productId);
     }
 
     // 장바구니 제품 수량 체크 정책
@@ -47,8 +47,8 @@ public class CartPolicy {
     }
 
     // 상품 판매상태(ON_SALE) 검증 정책
-    private void validateOnSaleProductPolicy(Long sellerId, String productCode) {
-        productRepository.findBySellerAndCodeAndSaleStatus(sellerId, productCode, ON_SALE)
+    private void validateOnSaleProductPolicy(Long productId) {
+        productRepository.findByIdAndSaleStatus(productId, ON_SALE)
                 .orElseThrow(() -> new ProductException(PRODUCT_NOT_ON_SALE));
     }
 

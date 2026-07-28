@@ -22,7 +22,7 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
     List<Product> findBySellerAndProductCodeAndOptionCodeIn(
             Long sellerId, String productCode, List<String> optionCodes);
 
-    // 판매중인 상품옵션 상품옵션 단건 조회
+    // 판매중인 상품옵션 단건 조회
     @Query(" SELECT new com.myecommerce.MyECommerce.dto.cart.RedisCartDto( " +
             "       PRD.id, PRD.seller, PRD.code, PRD.name, " +
             "       OPTION.id, OPTION.optionCode, OPTION.optionName, " +
@@ -30,12 +30,9 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
             ")" +
             " FROM Product PRD" +
             " INNER JOIN PRD.options OPTION" +
-            " WHERE PRD.seller = ?1" +
-            " AND PRD.code = ?2" +
-            " AND OPTION.optionCode = ?3" +
+            " WHERE PRD.id = ?1" +
             " AND PRD.saleStatus = 'ON_SALE'")
-    Optional<RedisCartDto> findBySellerAndProductCodeAndOptionCodeOfOnSale(
-            Long sellerId, String productCode, String optionCode);
+    Optional<RedisCartDto> findByIdOfOnSale(Long optionId);
 
     // 상품ID에 해당하는 옵션 목록 조회
     List<ProductOption> findByProductId(Long productId);

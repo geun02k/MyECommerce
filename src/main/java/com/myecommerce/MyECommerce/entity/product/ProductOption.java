@@ -8,6 +8,10 @@ import org.hibernate.annotations.ColumnDefault;
 import java.math.BigDecimal;
 
 @Entity
+@Table(uniqueConstraints = {@UniqueConstraint(  // 비즈니스 키
+                name = "uk_product_option_product_id_option_code",
+                columnNames = {"product_id", "option_code"} // @UniqueConstraint의 columnNames에는 엔티티 필드명이 아니라 실제 DB 컬럼명 작성
+)})
 @Getter
 @Setter
 @Builder

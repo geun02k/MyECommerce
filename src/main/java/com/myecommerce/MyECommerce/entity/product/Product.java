@@ -9,7 +9,14 @@ import lombok.*;
 import java.util.List;
 
 @Entity
-@Table(indexes = {@Index(name = "idx_product_search", columnList = "saleStatus,category")}) // 복합인덱스 생성
+@Table(indexes = {@Index(
+                name = "idx_product_search",
+                columnList = "saleStatus,category")},
+        uniqueConstraints = {@UniqueConstraint(     // 비즈니스 키
+                name = "uk_product_seller_code",
+                columnNames = {"seller", "code"}
+        )}
+) // 복합인덱스 생성
 @Getter
 @Setter
 @Builder
@@ -22,6 +29,7 @@ public class Product extends BaseEntity {
     @Column(nullable = false)
     private Long id;
 
+    // TODO: Member 객체로 연결할 것
     @Column(nullable = false)
     private Long seller;
 
@@ -43,7 +51,7 @@ public class Product extends BaseEntity {
     private ProductSaleStatusType saleStatus;
 
     // 상품:옵션 (1:N)
-    // 상품의 옵션 데이터를 production_option 테이블 join해서 가져옴.
+    // 상품의 옵션 데이터를 product_option 테이블 join해서 가져옴.
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY, mappedBy = "product")
     private List<ProductOption> options; // 한 상품이 여러 옵션을 가질 수 있음.
 

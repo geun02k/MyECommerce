@@ -33,9 +33,7 @@ public class StockCacheService {
         options.forEach(option -> {
             redisSingleDataService.saveSingleData(
                     STOCK,
-                    createStockRedisKey(product.getSeller(),
-                                        product.getCode(),
-                                        option.getOptionCode()),
+                    createStockRedisKey(option.getId()),
                     option.getQuantity());
         });
     }
@@ -43,11 +41,7 @@ public class StockCacheService {
     /** Redis 상품 재고 감소 **/
     public void decrementProductStock(List<OrderItem> orderItems) {
         for(OrderItem orderItem : orderItems) {
-            Long sellerId = orderItem.getProduct().getSeller();
-            String productCode = orderItem.getProduct().getCode();
-            String optionCode = orderItem.getOption().getOptionCode();
-
-            String redisKey = createStockRedisKey(sellerId, productCode, optionCode);
+            String redisKey = createStockRedisKey(orderItem.getOption().getId());
             Long orderQuantity = (long) orderItem.getQuantity();
 
             // 원자적 감소
@@ -64,9 +58,7 @@ public class StockCacheService {
         // 상품옵션 재고삭제
         options.forEach(option -> {
             redisSingleDataService.deleteSingleData(
-                    STOCK, createStockRedisKey(product.getSeller(),
-                                               product.getCode(),
-                                               option.getOptionCode()));
+                    STOCK, createStockRedisKey(option.getId()));
         });
     }
 
@@ -76,8 +68,7 @@ public class StockCacheService {
     }
 
     // 재고 Redis key 생성
-    private String createStockRedisKey(
-            Long sellerId, String productCode, String optionCode) {
-        return sellerId + ":" + productCode + ":" + optionCode;
+    private String createStockRedisKey(Long productOptionId) {
+        return String.valueOf(productOptionId);
     }
 }

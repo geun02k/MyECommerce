@@ -227,10 +227,7 @@ public class OrderCreateIntegrationTest {
 
     // 재고 redis key 생성
     String createStockRedisKey(ProductOption option) {
-        return STOCK + ":" +
-                option.getProduct().getSeller() + ":" +
-                option.getProduct().getCode() + ":" +
-                option.getOptionCode();
+        return STOCK + ":" + option.getId();
     }
 
     /** 주문요청 10건 동시 실행 -> 주문 10건 생성

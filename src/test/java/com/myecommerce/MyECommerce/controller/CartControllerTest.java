@@ -60,9 +60,7 @@ class CartControllerTest {
     /** 유효한 장바구니 추가 요청 */
     RequestCartDto requestCartDto() {
         return RequestCartDto.builder()
-                .sellerId(1L)
-                .productCode("productCode")
-                .optionCode("optionCode")
+                .productOptionId(5L)
                 .quantity(5)
                 .build();
     }

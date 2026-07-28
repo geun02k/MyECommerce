@@ -4,9 +4,12 @@ import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.dto.product.RequestProductDto;
 import com.myecommerce.MyECommerce.dto.product.RequestProductOptionDto;
+import com.myecommerce.MyECommerce.dto.product.ResponseProductDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
+import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.integration.config.TestAuditingConfig;
+import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.service.cart.CartService;
 import com.myecommerce.MyECommerce.service.product.ProductService;
 import org.junit.jupiter.api.AfterEach;
@@ -40,6 +43,9 @@ public class CartAddIntegrationTest {
 
     @Autowired
     CartService cartService;
+
+    @Autowired
+    ProductOptionRepository productOptionRepository;
 
     @Autowired
     RedisTemplate<String, Object> redisTemplate;
@@ -79,15 +85,22 @@ public class CartAddIntegrationTest {
     }
 
     /** 상품등록 */
-    void registerProduct(Long sellerId, String productCode, String optionCode) {
+    ProductOption registerProduct(Long sellerId, String productCode, String optionCode) {
         // 상품등록
         RequestProductDto requestProduct = requestProductDto(productCode, optionCode);
         Member seller = seller(sellerId);
-        productService.registerProduct(requestProduct, seller);
+        ResponseProductDto savedProduct =
+                productService.registerProduct(requestProduct, seller);
+        // 등록한 상품옵션조회
+        ProductOption option =
+                productOptionRepository.findByProductId(savedProduct.getId())
+                        .get(0);
 
         // redis 캐시 재고 삭제를 위한 키 생성
-        String stockKey = STOCK + ":" + sellerId + ":" + productCode + ":" + optionCode;
+        String stockKey = STOCK + ":" + savedProduct.getId();
         stockCacheKeys.add(stockKey);
+
+        return option;
     }
 
     /** 상품등록 요청 상품 옵션 DTO 생성 */
@@ -111,11 +124,9 @@ public class CartAddIntegrationTest {
     }
 
     /** 장바구니 상품추가 요청 DTO 생성 */
-    RequestCartDto requestCartDto(Long sellerId, String productCode, String optionCode) {
+    RequestCartDto requestCartDto(Long productOptionId) {
         return RequestCartDto.builder()
-                .sellerId(sellerId)
-                .productCode(productCode)
-                .optionCode(optionCode)
+                .productOptionId(productOptionId)
                 .quantity(1)
                 .build();
     }
@@ -131,15 +142,16 @@ public class CartAddIntegrationTest {
         // given
         // 동일한 상품코드로 두 셀러가 상품 등록
         registerProduct(1L, "productCode", "option1");
-        registerProduct(2L, "productCode", "option2");
+        ProductOption productOption = registerProduct(
+                2L, "productCode", "option2");
         // 장바구니 추가를 위한 객체 생성
         Member member = customer();
-        RequestCartDto requestCartDto =
-                requestCartDto(2L, "productCode", "option2");
+        RequestCartDto requestCartDto = requestCartDto(productOption.getId());
 
         // when
         ResponseCartDto response = cartService.addCart(requestCartDto, member);
         // then
+        assertNotNull(response.getOptionId());
         assertEquals(2L, response.getSellerId());
         assertEquals("productCode", response.getProductCode());
         assertEquals("option2", response.getOptionCode());

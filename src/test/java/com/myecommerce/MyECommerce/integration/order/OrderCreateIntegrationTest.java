@@ -105,15 +105,14 @@ public class OrderCreateIntegrationTest {
                 .build();
     }
 
-    /** 2건의 요청 상품 옵션 목록 */
-    List<RequestOrderDto> givenRequestOrders(Long productId) {
+    /** optionIds로 전달된 옵션에 대한 요청 상품 옵션 목록 */
+    List<RequestOrderDto> givenRequestOrders(List<Long> optionIds) {
         List<RequestOrderDto> requestOrders = new ArrayList<>();
-        // 1 상품에 2 옵션
-        for(int j = 1; j <= 2; j++) { // 상품 옵션 수
+        int quantity = 1;
+        for(Long optionId : optionIds) {
             RequestOrderDto request = RequestOrderDto.builder()
-                    .productId(productId)
-                    .optionCode("optionCode" + j)
-                    .quantity(j)
+                    .productOptionId(optionId)
+                    .quantity(quantity++)
                     .build();
             requestOrders.add(request);
         }
@@ -230,6 +229,13 @@ public class OrderCreateIntegrationTest {
         return STOCK + ":" + option.getId();
     }
 
+    // 상품에 대한 옵션 아이디 목록 조회
+    List<Long> optionIds(Product product) {
+        return product.getOptions().stream()
+                .map(ProductOption::getId)
+                .toList();
+    }
+
     /** 주문요청 10건 동시 실행 -> 주문 10건 생성
      *  : 지저분한 기술적 코드를 메서드로 분리 */
     List<Long> executeConcurrentOrderRequests(List<RequestOrderDto> requestOrders,
@@ -288,9 +294,9 @@ public class OrderCreateIntegrationTest {
         // 요청 사용자
         Long memberId = savedMember.getId();
         Member member = customer(memberId);
-        // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건)
-        Long productId = savedProduct.getId();
-        List<RequestOrderDto> requestOrder = givenRequestOrders(productId);
+        // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
+        List<Long> optionIds = optionIds(savedProduct);
+        List<RequestOrderDto> requestOrder = givenRequestOrders(optionIds);
 
         // when
         ResponseOrderDto response =
@@ -307,7 +313,7 @@ public class OrderCreateIntegrationTest {
 
         // 재고 차감 여부 검증
         Map<String, ProductOption> optionMapDecreasedStock =
-                findProductOptionMap(productId);
+                findProductOptionMap(savedProduct.getId());
         // 재고 20개에서 1개 차감
         assertEquals(19, optionMapDecreasedStock.get("optionCode1").getQuantity());
         // 재고 20개에서 2개 차감
@@ -332,9 +338,9 @@ public class OrderCreateIntegrationTest {
         // given
         // 요청 사용자
         Member member = customer(savedMember.getId());
-        // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건)
-        List<RequestOrderDto> requestOrders =
-                givenRequestOrders(savedProduct.getId());
+        // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
+        List<Long> optionIds = optionIds(savedProduct);
+        List<RequestOrderDto> requestOrders = givenRequestOrders(optionIds);
 
         // when
         // 주문 요청 동시 10번 수행 (테스트 목적: 동시 요청 시 재고가 안전하게 차감되는가 -> 동시성 메서드를 테스트에서 분리)

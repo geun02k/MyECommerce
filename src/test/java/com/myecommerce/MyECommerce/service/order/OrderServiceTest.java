@@ -13,7 +13,6 @@ import com.myecommerce.MyECommerce.mapper.OrderMapper;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.service.stock.StockCacheService;
-import com.myecommerce.MyECommerce.vo.order.ProductOptionKey;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -79,6 +78,7 @@ class OrderServiceTest {
                 .build();
 
         return ProductOption.builder()
+                .id(10L)
                 .optionCode("optionCode")
                 .quantity(100)
                 .price(new BigDecimal("10000"))
@@ -110,16 +110,12 @@ class OrderServiceTest {
         Member member = customer();
         // 요청 주문물품
         RequestOrderDto requestItem = RequestOrderDto.builder()
-                .productId(5L)
-                .optionCode("optionCode")
+                .productOptionId(10L)
                 .quantity(5)
                 .build();
-
         // 주문 요청에 대한 상품옵션 조회
-        ProductOptionKey optionKey =
-                new ProductOptionKey(5L, "optionCode");
         ProductOption registeredOption = registeredOption();
-        given(productOptionRepository.findOptionsWithLock(List.of(optionKey)))
+        given(productOptionRepository.findByIdIn(List.of(requestItem.getProductOptionId())))
                 .willReturn(new ArrayList<>(List.of(registeredOption)));
 
         // 주문 저장
@@ -140,7 +136,7 @@ class OrderServiceTest {
         // then
         // 정책 실행 여부 검증
         verify(orderPolicy, times(1))
-                .validateCreate(any(), any());
+                .validateCreate(any(), any(), any());
         // 재고 캐시 데이터 차감 실행 여부 검증
         verify(stockCacheService, times(1))
                 .decrementProductStock(any());
@@ -170,15 +166,14 @@ class OrderServiceTest {
         Member member = customer();
         // 요청 주문물품
         RequestOrderDto invalidRequestItem = RequestOrderDto.builder()
-                .productId(5L)
-                .optionCode("optionCode")
+                .productOptionId(5L)
                 .quantity(51) // 주문 정책 제한: 물품 당 최대 주문 수량 초과
                 .build();
 
         // 정책에서 예외 발생
         doThrow(new OrderException(ORDER_ITEM_MAX_QUANTITY_EXCEEDED))
                 .when(orderPolicy)
-                .validateCreate(eq(List.of(invalidRequestItem)), eq(member));
+                .validateCreate(eq(List.of(invalidRequestItem)), any(), eq(member));
 
         // when
         // then

@@ -31,7 +31,7 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
             ")" +
             " FROM Product PRD" +
             " INNER JOIN PRD.options OPTION" +
-            " WHERE PRD.id = ?1" +
+            " WHERE OPTION.id = ?1" +
             " AND PRD.saleStatus = 'ON_SALE'")
     Optional<RedisCartDto> findByIdOfOnSale(Long optionId);
 

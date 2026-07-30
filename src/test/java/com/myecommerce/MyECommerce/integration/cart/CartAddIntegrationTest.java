@@ -96,8 +96,9 @@ public class CartAddIntegrationTest {
                 productOptionRepository.findByProductId(savedProduct.getId())
                         .get(0);
 
+        // TODO: Key 포맷 변경 시 정상 동작하지 않을 수 있으므로, 운영 코드의 RedisKeyGenerator 또는 Enum/Constant 메서드를 공유해서 사용하는 것을 권장
         // redis 캐시 재고 삭제를 위한 키 생성
-        String stockKey = STOCK + ":" + savedProduct.getId();
+        String stockKey = STOCK + ":" + option.getId();
         stockCacheKeys.add(stockKey);
 
         return option;

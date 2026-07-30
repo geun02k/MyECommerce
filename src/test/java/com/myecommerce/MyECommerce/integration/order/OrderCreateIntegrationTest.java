@@ -317,20 +317,28 @@ public class OrderCreateIntegrationTest {
                 orderService.createOrder(requestOrder, member);
 
         // then
-        // 주문생성 검증
-        assertNotNull(response.getId());
-        assertNotNull(response.getOrderNumber());
-        assertEquals(price("5000"), response.getTotalPrice());
         Order savedOrder = findSavedOrder(response);
-        assertEquals(2, savedOrder.getItems().size());
 
+        // 주문 물품의 상품옵션 식별자 연결 검증
         Map<Long, OrderItem> orderItems = orderItemToMap(savedOrder);
         OrderItem firstItem = orderItems.get(optionIds.get(0));
         OrderItem secondItem = orderItems.get(optionIds.get(1));
-        // 요청한 optionId가 그대로 OrderItem과 연결되었는지 검증
-        assertTrue(orderItems.containsKey(firstItem.getOption().getId()));
-        assertTrue(orderItems.containsKey(secondItem.getOption().getId()));
+        // 1. 요청한 optionId에 해당하는 OrderItem이 생성되었는지 검증
+        assertNotNull(firstItem);
+        assertNotNull(secondItem);
+        // 2. 요청한 optionId와 실제 orderItem이 참조하는 옵션 ID가 일치하는지 검증
+        assertEquals(optionIds.get(0), firstItem.getOption().getId());
+        assertEquals(optionIds.get(1), secondItem.getOption().getId());
+
+        // 주문 생성 결과 검증
+        assertNotNull(response.getId());
+        assertNotNull(response.getOrderNumber());
+        assertEquals(member.getUserId(), response.getBuyerUserId());
+        assertEquals(price("5000"), response.getTotalPrice()); // 1000 + 2000*2 = 5000
+        assertEquals(CREATED, response.getOrderStatus());
+        assertNotNull(response.getOrderedAt());
         // 물품별 주문 수량 검증
+        assertEquals(2, savedOrder.getItems().size());
         assertEquals(1, firstItem.getQuantity());
         assertEquals(2, secondItem.getQuantity());
         // 특정 주문 물품 금액 검증
@@ -355,14 +363,6 @@ public class OrderCreateIntegrationTest {
                 orderService.createOrder(requestOrder, member);
 
         // then
-        // 주문 응답 검증
-        assertNotNull(response.getId());
-        assertNotNull(response.getOrderNumber());
-        assertEquals(member.getUserId(), response.getBuyerUserId());
-        assertEquals(CREATED, response.getOrderStatus());
-        assertEquals(price("5000"), response.getTotalPrice()); // 1000 + 2000*2 = 5000
-        assertNotNull(response.getOrderedAt());
-
         // 재고 차감 여부 검증
         Map<String, ProductOption> optionMapDecreasedStock =
                 findProductOptionMap(savedProduct.getId());

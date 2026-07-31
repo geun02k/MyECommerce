@@ -304,6 +304,31 @@
        ~~~
    <br>
 
+#### 9. 상품 옵션 시스템 식별 체계 개선
+   - 설계 배경: 상품코드가 전역 식별자가 아니므로, 기존 Redis Key는 productCode-optionCode를 기반으로 구성되어 있어 서로 다른 판매자가 동일한 상품코드를 사용할 경우 Key 충돌 가능성 존재.
+     이를 검증하기 위해 테스트를 작성하는 과정에서 문제의 원인이 Redis Key가 아니라 시스템 전반에서 비즈니스 식별자와 시스템 식별자가 혼용되고 있다는 점임을 확인.
+   - 결정: 상품 옵션의 시스템 내부 식별 기준을 optionId로 일원화하고, optionCode는 도메인 의미를 표현하는 비즈니스 식별자로만 사용하도록 역할 분리.
+   - 구현
+     - 상품옵션 중복 검증 시 seller 조건 추가  
+       [[상품옵션 중복 검증 - ProductPolicy.validateRegister()]]() 
+     - 상품 및 상품옵션 복합 Unique 제약 추가   
+       [[상품 Unique 제약 - Product]]()
+       [[상품옵션 Unique 제약 - ProductOption]]()   
+     - Redis 재고 및 장바구니 Key를 optionId 기반으로 변경  
+       [[재고 Redis Key - StockCacheService]]()
+       [[장바구니 Redis Hash Key - CartService]]()
+     - 주문 생성 및 재고 처리 로직을 optionId 기반으로 변경  
+       [[주문 로직 변경 과정 - CartService]]()
+       [[재고 로직 변경 과정 - StockCacheService]]()
+     - 테스트를 optionId 기반으로 개선하여 상품 식별자 변경에 따른 데이터 연결 검증 강화 
+       [[상품옵션 optionId 연결 검증 - OrderCreateIntegrationTest]]()
+       [[장바구니 optionId 조회 검증 - CartAddIntegrationTest]]()
+   - 의의: 비즈니스 식별자(seller + productCode, optionCode)는 도메인 의미를 표현하는 용도로 유지하고, 
+     시스템 내부의 참조와 연관관계는 optionId를 사용하도록 역할을 분리. 
+     이를 통해 식별 기준이 명확해졌으며 Redis, 주문, 장바구니, 재고 처리에서 동일한 시스템 식별자를 사용해 유지보수성과 일관성 향상.
+   <br>
+
+
 ---
 ## 5. Key Features
 이커머스의 핵심 도메인인 재고, 주문, 결제에서 데이터 정합성과 시스템 안정성을 확보하는 데 집중했습니다. 
@@ -406,11 +431,6 @@
 ---
 ## 8. Feature Roadmap
 ### 8-1. 최우선 과제
-   - [ ] **Redis 상품 옵션 데이터 식별 체계 개편**
-       - 현재: Redis 키가 productCode-optionCode 조합으로 구성되어, 상품 코드가 전역 유니크 값이 아닌 이커머스 특성상 셀러 간 데이터 충돌 위험 존재. (상품 코드가 전역 유니크가 아님을 인지)
-       - 개선 계획: sellerId를 포함한 복합키 체계(sellerId-productCode-optionCode)로 개편하여 셀러별 데이터 격리를 통해 무결성 보장.   
-       <br>
-   
    - [ ] **외부 웹훅 처리 시 비관적 락을 통한 이중 결제 방지**
        - 현재: 결제 웹훅 처리 시 결제 Entity의 상태를 조건부 업데이트하여 멱등성을 보장하고 있으나,
          동일 주문에 대해 서로 다른 결제 수단으로 동시에 승인이 올 경우 주문 상태의 정합성이 깨질 위험 존재.

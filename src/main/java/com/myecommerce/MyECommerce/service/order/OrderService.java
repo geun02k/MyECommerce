@@ -10,7 +10,6 @@ import com.myecommerce.MyECommerce.mapper.OrderMapper;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.service.stock.StockCacheService;
-import com.myecommerce.MyECommerce.vo.order.ProductOptionKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,12 +36,11 @@ public class OrderService {
     @Transactional
     public ResponseOrderDto createOrder(List<RequestOrderDto> requestOrder, Member member) {
         // 1. 주문 요청 옵션 조회 (재고 차감을 위해 비관적 락)
-        Map<ProductOptionKey, ProductOption> registeredOptions =
+        Map<Long, ProductOption> registeredOptions =
                 findOrderRequestOptionsWithLock(requestOrder);
 
         // 2. 정책검증
-        // TODO: 정책 검증 시 조회 데이터는 Service에서 만들어서 전달하도록 수정해 성능 개선 필요
-        orderPolicy.validateCreate(requestOrder, member);
+        orderPolicy.validateCreate(requestOrder, registeredOptions, member);
 
         // 2. 주문 물품 목록 생성
         List<OrderItem> orderItems =
@@ -64,14 +62,11 @@ public class OrderService {
 
     // 상품옵션 목록 재고 차감
     private void decreaseStockOfProductOptions(List<OrderItem> orderItems,
-                                              Map<ProductOptionKey, ProductOption> registeredOptions) {
+                                               Map<Long, ProductOption> registeredOptions) {
         for(OrderItem item : orderItems) {
-            // 옵션 키 생성
-            ProductOptionKey optionKey = new ProductOptionKey(
-                    item.getProduct().getId(), item.getOption().getOptionCode());
-
             // 재고 차감 대상 옵션
-            ProductOption option = registeredOptions.get(optionKey);
+            Long optionId = item.getOption().getId();
+            ProductOption option = registeredOptions.get(optionId);
 
             // 재고 차감
             int currentStock = option.getQuantity();
@@ -81,30 +76,30 @@ public class OrderService {
     }
 
     // 주문 요청 옵션 조회
-    private Map<ProductOptionKey, ProductOption> findOrderRequestOptionsWithLock(
+    private Map<Long, ProductOption> findOrderRequestOptionsWithLock(
             List<RequestOrderDto> requestOrder) {
-        // 상품 옵션 조회 Key 목록 생성
-        List<ProductOptionKey> optionKeys = createOptionKeys(requestOrder);
+        // 상품 옵션 아이디 목록 생성
+        List<Long> optionIds = requestOrder.stream()
+                .map(RequestOrderDto::getProductOptionId)
+                .toList();
         // 상품 옵션 목록 조회 (트랜잭션 비관적 락)
-        List<ProductOption> options =
-                productOptionRepository.findOptionsWithLock(optionKeys);
+        List<ProductOption> requestOptionList =
+                productOptionRepository.findByIdIn(optionIds);
         // List -> Map 변환
-        return options.stream().collect(Collectors.toMap(
-                option -> new ProductOptionKey(
-                        option.getProduct().getId(), option.getOptionCode()),
-                option -> option));
+        return requestOptionList.stream()
+                .collect(Collectors.toMap(
+                        ProductOption::getId, option -> option));
     }
 
     // 주문 물품 목록 생성
     private List<OrderItem> createOrderItems(List<RequestOrderDto> requestOrder,
-                                             Map<ProductOptionKey, ProductOption> registeredOptions) {
+                                             Map<Long, ProductOption> registeredOptions) {
         List<OrderItem> orderItems = new ArrayList<>();
 
         for(RequestOrderDto requestItem : requestOrder) {
             // 요청한 주문물품 대상 옵션
-            ProductOptionKey optionKey = new ProductOptionKey(
-                    requestItem.getProductId(), requestItem.getOptionCode());
-            ProductOption registeredOption = registeredOptions.get(optionKey);
+            Long optionId = requestItem.getProductOptionId();
+            ProductOption registeredOption = registeredOptions.get(optionId);
 
             // 주문 물품 단건 생성
             OrderItem item = OrderItem.createOrderItem(
@@ -115,14 +110,6 @@ public class OrderService {
         }
 
         return orderItems;
-    }
-
-    // 옵션 키 생성
-    private List<ProductOptionKey> createOptionKeys(List<RequestOrderDto> requestOrder) {
-        return requestOrder.stream()
-                .map(request -> new ProductOptionKey(
-                        request.getProductId(), request.getOptionCode()))
-                .toList();
     }
 
 }

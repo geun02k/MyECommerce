@@ -13,6 +13,8 @@ public class ResponseCartDto {
 
     private Long productId;
 
+    private Long sellerId;
+
     private String productCode;
 
     private String productName;

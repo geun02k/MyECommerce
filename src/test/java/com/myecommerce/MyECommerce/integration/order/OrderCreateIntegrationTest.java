@@ -41,9 +41,9 @@ import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
 import static com.myecommerce.MyECommerce.type.ProductCategoryType.WOMEN_CLOTHING;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.STOCK;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
+// TODO: 가독성 향상을 위해 옵션코드와 수량, 금액이 표현될 수 있도록 객체를 테스트 메서드 내에서 생성하도록 개선할 것.
 @SpringBootTest
 @ActiveProfiles("test")
 @Import(TestAuditingConfig.class)
@@ -89,9 +89,14 @@ public class OrderCreateIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        // 테스트 데이터 정리: redis 재고 데이터 delete
+        // 상품등록으로 인한 테스트 데이터 정리: redis 재고 데이터 delete
         redisMultiDataService.deleteMultiData(
                 savedCacheStock.keySet().stream().toList());
+        // 장바구니에 상품추가로 인한 장바구니 데이터 정리: redis 장바구니 데이터 delete
+       redisMultiDataService.deleteMultiData(
+               savedProduct.getOptions().stream()
+                       .map(option -> String.valueOf(option.getId()))
+                       .toList());
     }
 
     /** 고객권한 사용자 */
@@ -105,15 +110,17 @@ public class OrderCreateIntegrationTest {
                 .build();
     }
 
-    /** 2건의 요청 상품 옵션 목록 */
-    List<RequestOrderDto> givenRequestOrders(Long productId) {
+    /** optionIds로 전달된 옵션에 대한 요청 상품 옵션 목록 */
+    List<RequestOrderDto> givenRequestOrders(List<Long> optionIds) {
+        // 간접적으로 옵션 순서 순서 단정가능.
+        // optionIds 리스트의 첫 번째 요소(get(0))에 수량 1,
+        // 두 번째 요소(get(1))에 수량 2를 순서대로 할당합니다.
         List<RequestOrderDto> requestOrders = new ArrayList<>();
-        // 1 상품에 2 옵션
-        for(int j = 1; j <= 2; j++) { // 상품 옵션 수
+        int quantity = 1;
+        for(Long optionId : optionIds) {
             RequestOrderDto request = RequestOrderDto.builder()
-                    .productId(productId)
-                    .optionCode("optionCode" + j)
-                    .quantity(j)
+                    .productOptionId(optionId)
+                    .quantity(quantity++)
                     .build();
             requestOrders.add(request);
         }
@@ -170,7 +177,7 @@ public class OrderCreateIntegrationTest {
         Map <String, Object> stockMap = new HashMap<>();
 
         for(ProductOption option : product.getOptions()) {
-            String key = STOCK + ":" + product.getCode() + ":" + option.getOptionCode();
+            String key = createStockRedisKey(option);
             stockMap.put(key, option.getQuantity());
         }
         redisMultiDataService.saveMultiData(stockMap);
@@ -206,11 +213,17 @@ public class OrderCreateIntegrationTest {
                         ProductOption::getOptionCode, o -> o));
     }
     // 주문 물품 List -> Map 으로 변환
-    Map<String, OrderItem> orderItemToMap(List<OrderItem> items) {
-        return items.stream()
+    Map<Long, OrderItem> orderItemToMap(Order order) {
+        return order.getItems().stream()
                 .collect(Collectors.toMap(
-                        item -> item.getOption().getOptionCode(),
-                        item -> item));
+                        item -> item.getOption().getId(),
+                        item -> item
+                ));
+    }
+
+    // 주문생성 반환값으로 주문 Entity 조회
+    Order findSavedOrder(ResponseOrderDto responseOrderDto) {
+        return orderRepository.findById(responseOrderDto.getId()).orElseThrow();
     }
 
     // 재고 redis 캐시 데이터 반환
@@ -227,9 +240,14 @@ public class OrderCreateIntegrationTest {
 
     // 재고 redis key 생성
     String createStockRedisKey(ProductOption option) {
-        return STOCK + ":" +
-                option.getProduct().getCode() + ":" +
-                option.getOptionCode();
+        return STOCK + ":" + option.getId();
+    }
+
+    // 상품에 대한 옵션 아이디 목록 조회
+    List<Long> optionIds(Product product) {
+        return product.getOptions().stream()
+                .map(ProductOption::getId)
+                .toList();
     }
 
     /** 주문요청 10건 동시 실행 -> 주문 10건 생성
@@ -283,6 +301,52 @@ public class OrderCreateIntegrationTest {
        ------------------ */
 
     @Test
+    @DisplayName("주문생성 성공 - 상품옵션 시스템 식별자(productOptionId)로만 주문생성")
+    @Transactional // 테스트 끝나면 자동 롤백
+    void createOrder_shouldCreateOrder_whenUseOnlyProductOptionId() {
+        // given
+        // 요청 사용자
+        Long memberId = savedMember.getId();
+        Member member = customer(memberId);
+        // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
+        List<Long> optionIds = optionIds(savedProduct);
+        List<RequestOrderDto> requestOrder = givenRequestOrders(optionIds);
+
+        // when
+        ResponseOrderDto response =
+                orderService.createOrder(requestOrder, member);
+
+        // then
+        Order savedOrder = findSavedOrder(response);
+
+        // 주문 물품의 상품옵션 식별자 연결 검증
+        Map<Long, OrderItem> orderItems = orderItemToMap(savedOrder);
+        OrderItem firstItem = orderItems.get(optionIds.get(0));
+        OrderItem secondItem = orderItems.get(optionIds.get(1));
+        // 1. 요청한 optionId에 해당하는 OrderItem이 생성되었는지 검증
+        assertNotNull(firstItem);
+        assertNotNull(secondItem);
+        // 2. 요청한 optionId와 실제 orderItem이 참조하는 옵션 ID가 일치하는지 검증
+        assertEquals(optionIds.get(0), firstItem.getOption().getId());
+        assertEquals(optionIds.get(1), secondItem.getOption().getId());
+
+        // 주문 생성 결과 검증
+        assertNotNull(response.getId());
+        assertNotNull(response.getOrderNumber());
+        assertEquals(member.getUserId(), response.getBuyerUserId());
+        assertEquals(price("5000"), response.getTotalPrice()); // 1000 + 2000*2 = 5000
+        assertEquals(CREATED, response.getOrderStatus());
+        assertNotNull(response.getOrderedAt());
+        // 물품별 주문 수량 검증
+        assertEquals(2, savedOrder.getItems().size());
+        assertEquals(1, firstItem.getQuantity());
+        assertEquals(2, secondItem.getQuantity());
+        // 특정 주문 물품 금액 검증
+        assertEquals(price("2000"), secondItem.getUnitPrice()); // 하나 당 2000원
+        assertEquals(price("4000"), secondItem.getTotalPrice()); // 2000원 * 2개 = 4000원
+    }
+
+    @Test
     @DisplayName("주문생성 성공 - 주문 등록 시 옵션 재고 차감")
     @Transactional // 테스트 끝나면 자동 롤백
     void createOrder_shouldDecreaseOptionStock_whenOrderCreated() {
@@ -290,40 +354,22 @@ public class OrderCreateIntegrationTest {
         // 요청 사용자
         Long memberId = savedMember.getId();
         Member member = customer(memberId);
-        // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건)
-        Long productId = savedProduct.getId();
-        List<RequestOrderDto> requestOrder = givenRequestOrders(productId);
+        // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
+        List<Long> optionIds = optionIds(savedProduct);
+        List<RequestOrderDto> requestOrder = givenRequestOrders(optionIds);
 
         // when
         ResponseOrderDto response =
                 orderService.createOrder(requestOrder, member);
 
         // then
-        // 주문 응답 검증
-        assertNotNull(response.getId());
-        assertNotNull(response.getOrderNumber());
-        assertEquals(member.getUserId(), response.getBuyerUserId());
-        assertEquals(CREATED, response.getOrderStatus());
-        assertEquals(price("5000"), response.getTotalPrice()); // 1000 + 2000*2 = 5000
-        assertNotNull(response.getOrderedAt());
-
         // 재고 차감 여부 검증
         Map<String, ProductOption> optionMapDecreasedStock =
-                findProductOptionMap(productId);
+                findProductOptionMap(savedProduct.getId());
         // 재고 20개에서 1개 차감
         assertEquals(19, optionMapDecreasedStock.get("optionCode1").getQuantity());
         // 재고 20개에서 2개 차감
         assertEquals(18, optionMapDecreasedStock.get("optionCode2").getQuantity());
-
-        // 주문 1건에 2건의 주문물품 등록 검증
-        Order savedOrder = orderRepository.findById(response.getId()).orElseThrow();
-        assertEquals(2, savedOrder.getItems().size());
-        // 특정 주문 물품 검증
-        Map<String, OrderItem> savedOrderMap = orderItemToMap(savedOrder.getItems());
-        OrderItem savedOrderSecondItem = savedOrderMap.get("optionCode2");
-        assertEquals(2, savedOrderSecondItem.getQuantity()); // 2개 구매
-        assertEquals(price("2000"), savedOrderSecondItem.getUnitPrice()); // 하나 당 2000원
-        assertEquals(price("4000"), savedOrderSecondItem.getTotalPrice()); // 2000원 * 2개 = 4000원
     }
 
     // TODO: 통합테스트와 동시성 테스트 클래스 분리
@@ -334,9 +380,9 @@ public class OrderCreateIntegrationTest {
         // given
         // 요청 사용자
         Member member = customer(savedMember.getId());
-        // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건)
-        List<RequestOrderDto> requestOrders =
-                givenRequestOrders(savedProduct.getId());
+        // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
+        List<Long> optionIds = optionIds(savedProduct);
+        List<RequestOrderDto> requestOrders = givenRequestOrders(optionIds);
 
         // when
         // 주문 요청 동시 10번 수행 (테스트 목적: 동시 요청 시 재고가 안전하게 차감되는가 -> 동시성 메서드를 테스트에서 분리)

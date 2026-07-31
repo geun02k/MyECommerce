@@ -3,39 +3,44 @@ package com.myecommerce.MyECommerce.repository.product;
 import com.myecommerce.MyECommerce.dto.cart.RedisCartDto;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface ProductOptionRepository extends JpaRepository<ProductOption, Long>,
-                                                 ProductOptionRepositoryCustom {
+public interface ProductOptionRepository extends JpaRepository<ProductOption, Long> {
     // 상품의 옵션코드목록에 대한 옵션 목록 조회
     // TODO: 정책 검즘에서만 사용하고 이후 조회한 연관객체 미사용으로 join fetch 의미없으므로 수정 필요.
     @Query(" SELECT PRD " +
             " FROM Product PRD" +
             " INNER JOIN FETCH PRD.options OPTION" +
-            " WHERE PRD.code = ?1" +
-            " AND OPTION.optionCode IN (?2)")
-    List<Product> findByProductCodeAndOptionCodeIn(String productCode, List<String> optionCodes);
+            " WHERE PRD.seller = ?1" +
+            " AND PRD.code = ?2" +
+            " AND OPTION.optionCode IN (?3)")
+    List<Product> findBySellerAndProductCodeAndOptionCodeIn(
+            Long sellerId, String productCode, List<String> optionCodes);
 
-    // 판매중인 상품옵션 상품옵션 단건 조회
+    // 판매중인 상품옵션 단건 조회
     @Query(" SELECT new com.myecommerce.MyECommerce.dto.cart.RedisCartDto( " +
-            "       PRD.id, PRD.code, PRD.name, " +
+            "       PRD.id, PRD.seller, PRD.code, PRD.name, " +
             "       OPTION.id, OPTION.optionCode, OPTION.optionName, " +
             "       OPTION.price, OPTION.quantity" +
             ")" +
             " FROM Product PRD" +
             " INNER JOIN PRD.options OPTION" +
-            " WHERE PRD.code = ?1" +
-            " AND OPTION.optionCode = ?2" +
+            " WHERE OPTION.id = ?1" +
             " AND PRD.saleStatus = 'ON_SALE'")
-    Optional<RedisCartDto> findByProductCodeAndOptionCodeOfOnSale(
-            String productCode, String optionCode);
+    Optional<RedisCartDto> findByIdOfOnSale(Long optionId);
 
     // 상품ID에 해당하는 옵션 목록 조회
     List<ProductOption> findByProductId(Long productId);
+
+    // 옵션아이디 목록을 전달받아 해당 상품옵션 목록 조회
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<ProductOption> findByIdIn(List<Long> optionIds);
 
     // 품절된 상품 옵션 목록 조회
     List<ProductOption> findByProductIdInAndQuantity(List<Long> idList, int quantity);

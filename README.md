@@ -82,8 +82,8 @@
    - 설계 배경: Service 내부에 DTO 변환, 유효성 검증, Entity 생성, 저장 로직 등이 모두 포함된 구조로 인해 로직 파악 및 수정 난이도 상승.   
    - 결정: Service는 비즈니스 흐름 조합 역할에 집중하고, 세부 로직은 메서드로 위임.
    - 구현: 특정 기능을 독립된 메서드로 분리하여 코드 가독성 향상   
-          [[변경 과정 ProductService - registerProduction()]](https://github.com/geun02k/MyECommerce/pull/7/files#diff-0514dafdde336b4ac6e3e96da19c17171bb8b1040808268b5b737dbc6ce6714fR34-R61)   
-          [[최종 개선 결과 ProductService - registerProduction()]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/product/ProductService.java#L42-L65)
+          [[변경 과정 ProductService - registerProduct()]](https://github.com/geun02k/MyECommerce/pull/7/files#diff-0514dafdde336b4ac6e3e96da19c17171bb8b1040808268b5b737dbc6ce6714fR34-R61)   
+          [[최종 개선 결과 ProductService - registerProduct()]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/product/ProductService.java#L42-L65)
    - 의의: 기능 간 결합도를 낮춰 향후 Policy 분리 및 요구사항 변경에 유연하게 대응할 수 있는 기반 마련.   
    <br>
 
@@ -91,7 +91,7 @@
    - 설계 배경: 웹 요청 중심의 테스트로 인해 피드백 사이클이 느림.
    - 결정: 계층별 단위 테스트 도입 및 피드백 속도 최적화.
    - 구현: 외부 의존성 제거를 위한 Mockito 기반의 Service 로직 검증과 MockMvc 기반의 API 규약 검증으로 테스트 범위 이원화.   
-          [[변경 과정 ProductServiceTest - successSaveProduction()]](https://github.com/geun02k/MyECommerce/pull/7/files#diff-56603b707aa6b5ecc1820c4673d2185eec20421e5d90f8f333f0a51789ebc34cR50-R191)   
+          [[변경 과정 ProductServiceTest - successSaveProduct()]](https://github.com/geun02k/MyECommerce/pull/7/files#diff-56603b707aa6b5ecc1820c4673d2185eec20421e5d90f8f333f0a51789ebc34cR50-R191)   
           [[최종 개선 결과 ProductServiceTest - registerProduct_shouldInsertProductAndOption_whenValidProduct()]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/service/product/ProductServiceTest.java#L138-L202)
    - 의의: '수정 -> 테스트 -> 검증' 사이클 단축하여 리팩토링 안정성을 확보.
    <br>

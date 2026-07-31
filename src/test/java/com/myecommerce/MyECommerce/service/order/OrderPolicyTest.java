@@ -3,15 +3,12 @@ package com.myecommerce.MyECommerce.service.order;
 import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
-import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.exception.OrderException;
-import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
@@ -72,21 +69,6 @@ class OrderPolicyTest {
         return result;
     }
 
-    /** productRepository.findByIdIn() 예상 결과 */
-    private List<Product> expectedProductFoundByIdIn() {
-        return List.of(Product.builder()
-                .id(1L)
-                .code("productCode")
-                .options(List.of(ProductOption.builder()
-                        .optionCode("optionCode")
-                        .quantity(20)
-                        .build()))
-                .build());
-    }
-
-    /* ------------------
-        Helper Methods
-       ------------------ */
     /* ----------------------
         주문 생성 Tests
        ---------------------- */

@@ -96,7 +96,7 @@ class ProductPolicyTest {
                 .optionCode("optionCode")
                 .price(BigDecimal.valueOf(1000))
                 .build();
-        ServiceProductDto production = ServiceProductDto.builder()
+        ServiceProductDto product = ServiceProductDto.builder()
                 .id(null)
                 .code("code")
                 .saleStatus(null)
@@ -113,7 +113,7 @@ class ProductPolicyTest {
         // when
         // then
         assertDoesNotThrow(() ->
-                productPolicy.validateRegister(production, seller(1L)));
+                productPolicy.validateRegister(product, seller(1L)));
     }
 
     @Test
@@ -156,21 +156,21 @@ class ProductPolicyTest {
     @DisplayName("상품등록정책실패 - 중복된 옵션코드 입력 시 예외발생")
     void validateRegister_shouldFail_whenDuplicatedOptionCodeRequest() {
         // given
-        ServiceProductDto production = productWithoutOptionsForInsert();
-        production.setOptions(List.of(
+        ServiceProductDto product = productWithoutOptionsForInsert();
+        product.setOptions(List.of(
                 optionForInsert("optionCode01"),
                 optionForInsert("optionCode01"))); // 중복
         Member seller = seller(1L);
 
         given(productRepository.
-                findBySellerAndCode(seller.getId(), production.getCode()))
+                findBySellerAndCode(seller.getId(), product.getCode()))
                 .willReturn(Optional.empty());
 
         // when
         // then
         ProductException exception =
                 assertThrows(ProductException.class, () ->
-                        productPolicy.validateRegister(production, seller));
+                        productPolicy.validateRegister(product, seller));
         assertEquals(PRODUCT_OPTION_CODE_DUPLICATED, exception.getErrorCode());
     }
 
@@ -178,16 +178,16 @@ class ProductPolicyTest {
     @DisplayName("상품등록정책실패 - 이미 등록된 옵션코드 입력 시 예외발생")
     void validateRegister_shouldFail_whenAlreadyRegisteredOptionCode() {
        // given
-        ServiceProductDto production = productForInsert();
+        ServiceProductDto product = productForInsert();
         Member seller = seller(1L);
 
         given(productRepository.
-                findBySellerAndCode(seller.getId(), production.getCode()))
+                findBySellerAndCode(seller.getId(), product.getCode()))
                 .willReturn(Optional.empty());
         // 이미 등록된 기존 동일 옵션코드 존재
         given(productOptionRepository.
                 findBySellerAndProductCodeAndOptionCodeIn(
-                        seller.getId(), production.getCode(), List.of("optionCode")))
+                        seller.getId(), product.getCode(), List.of("optionCode")))
                 .willReturn(List.of(Product.builder()
                                     .seller(1L)
                                     .code("code")
@@ -200,7 +200,7 @@ class ProductPolicyTest {
         // then
         ProductException exception =
                 assertThrows(ProductException.class, () ->
-                        productPolicy.validateRegister(production, seller));
+                        productPolicy.validateRegister(product, seller));
         assertEquals(PRODUCT_OPTION_CODE_ALREADY_REGISTERED, exception.getErrorCode());
     }
 
@@ -212,7 +212,7 @@ class ProductPolicyTest {
     @DisplayName("상품수정정책 통과")
     void validateModify_shouldPass_whenAllValid() {
         // given
-        Product production = Product.builder()
+        Product product = Product.builder()
                 .seller(1L)
                 .code("code")
                 .saleStatus(ON_SALE)
@@ -230,21 +230,21 @@ class ProductPolicyTest {
         // when
         // then
         assertDoesNotThrow(() ->
-                productPolicy.validateModify(production, List.of(insertOption)));
+                productPolicy.validateModify(product, List.of(insertOption)));
     }
 
     @Test
     @DisplayName("상품수정정책 실패 - 판매상태가 삭제이면 예외발생")
     void validateModify_shouldFail_whenDeletionSaleStatus() {
         // given
-        Product deletedProduction = Product.builder()
+        Product deletedProduct = Product.builder()
                 .saleStatus(DELETION).build();
 
         // when
         // then
         ProductException e = assertThrows(ProductException.class, () ->
                 productPolicy.validateModify(
-                        deletedProduction, Collections.emptyList()));
+                        deletedProduct, Collections.emptyList()));
         assertEquals(PRODUCT_ALREADY_DELETED, e.getErrorCode());
     }
 
@@ -252,7 +252,7 @@ class ProductPolicyTest {
     @DisplayName("상품수정정책 실패 - 신규 옵션 중 옵션코드 중복되면 예외발생")
     void validateModify_shouldFail_whenDuplicatedOptionCode() {
         // given
-        Product production = Product.builder()
+        Product product = Product.builder()
                 .saleStatus(ON_SALE)
                 .build();
         List<ServiceProductOptionDto> invalidOptions = List.of(
@@ -262,7 +262,7 @@ class ProductPolicyTest {
         // when
         // then
         ProductException e = assertThrows(ProductException.class, () ->
-                productPolicy.validateModify(production, invalidOptions));
+                productPolicy.validateModify(product, invalidOptions));
         assertEquals(PRODUCT_OPTION_CODE_DUPLICATED, e.getErrorCode());
     }
 
@@ -270,7 +270,7 @@ class ProductPolicyTest {
     @DisplayName("상품수정정책 실패 - 신규 옵션 중 이미 등록된 옵션코드를 추가하면 예외발생")
     void validateModify_shouldFail_whenAlreadyRegisteredOptionCode() {
         // given
-        Product production = Product.builder()
+        Product product = Product.builder()
                 .seller(1L)
                 .code("code")
                 .saleStatus(ON_SALE)
@@ -281,7 +281,7 @@ class ProductPolicyTest {
         // 이미 등록된 기존 동일 옵션코드 존재
         given(productOptionRepository.
                 findBySellerAndProductCodeAndOptionCodeIn(
-                        1L, production.getCode(), List.of("insertOptionCode")))
+                        1L, product.getCode(), List.of("insertOptionCode")))
                 .willReturn(List.of(Product.builder()
                         .code("code")
                         .options(List.of(ProductOption.builder()
@@ -293,7 +293,7 @@ class ProductPolicyTest {
         // then
         ProductException e = assertThrows(ProductException.class, () ->
                 productPolicy.validateModify(
-                        production, List.of(invalidOption)));
+                        product, List.of(invalidOption)));
         assertEquals(PRODUCT_OPTION_CODE_ALREADY_REGISTERED, e.getErrorCode());
     }
 }

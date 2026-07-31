@@ -30,12 +30,12 @@ public class ProductController {
      **/
     @PostMapping
     @PreAuthorize("hasAuthority('SELLER')")
-    public ResponseEntity<ResponseProductDto> registerProduction(
-            @RequestBody @Valid RequestProductDto production,
+    public ResponseEntity<ResponseProductDto> registerProduct(
+            @RequestBody @Valid RequestProductDto product,
             @AuthenticationPrincipal Member member) {
 
         return ResponseEntity.ok(
-                productService.registerProduct(production, member));
+                productService.registerProduct(product, member));
     }
 
     /**
@@ -43,12 +43,12 @@ public class ProductController {
      **/
     @PutMapping
     @PreAuthorize("hasAuthority('SELLER')")
-    public ResponseEntity<ResponseProductDto> modifyProduction(
-            @RequestBody @Valid RequestModifyProductDto production,
+    public ResponseEntity<ResponseProductDto> modifyProduct(
+            @RequestBody @Valid RequestModifyProductDto product,
             @AuthenticationPrincipal Member member) {
 
         return ResponseEntity.ok(
-                productService.modifyProduct(production, member));
+                productService.modifyProduct(product, member));
     }
 
     /**
@@ -59,7 +59,7 @@ public class ProductController {
      * 상품상세 조회 get /product/{id}
      **/
     @GetMapping("/{id}")
-    public ResponseEntity<ResponseSearchDetailProductDto> searchDetailProduction(
+    public ResponseEntity<ResponseSearchDetailProductDto> searchDetailProduct(
             @PathVariable @Positive(message = "{validation.product.id.positive}") Long id) {
         return ResponseEntity.ok(
                 productService.searchDetailProduct(id));
@@ -69,10 +69,10 @@ public class ProductController {
      * 상품목록 조회 get /product
      **/
     @GetMapping
-    public ResponseEntity<Page<ResponseProductDto>> searchProductionList(
-            @Valid RequestSearchProductDto requestSearchProductionDto) {
+    public ResponseEntity<Page<ResponseProductDto>> searchProductList(
+            @Valid RequestSearchProductDto requestSearchProductDto) {
         return ResponseEntity.ok(
-                productService.searchProductList(requestSearchProductionDto));
+                productService.searchProductList(requestSearchProductDto));
     }
 
 }

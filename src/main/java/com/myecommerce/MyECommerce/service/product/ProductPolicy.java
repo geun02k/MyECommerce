@@ -56,7 +56,7 @@ public class ProductPolicy {
     private void enforceProductCodeUniquenessPolicy(Long sellerId,
                                                     String productCode) {
         productRepository.findBySellerAndCode(sellerId, productCode)
-                .ifPresent(existingProduction -> {
+                .ifPresent(existingProduct -> {
                     throw new ProductException(PRODUCT_CODE_ALREADY_REGISTERED);
                 });
     }

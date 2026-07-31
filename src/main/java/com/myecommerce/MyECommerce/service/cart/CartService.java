@@ -63,8 +63,7 @@ public class CartService {
         RedisCartDto cartItem = getCartItem(redisKey, redisHashKey);
 
         // 2. 상품수량, 만료일자 셋팅
-        RedisCartDto saveCartItem =
-                setAddCartData(cartItem, requestCartDto);
+        RedisCartDto saveCartItem = setAddCartData(cartItem, requestCartDto);
         // 3. Redis에 상품 등록
         saveServiceCartInRedis(redisKey, redisHashKey, saveCartItem);
 
@@ -166,8 +165,8 @@ public class CartService {
 
     // 장바구니 목록 및 재고 키 목록 생성
     private void buildCartItemAndStockKeys(Map<Object, Object> cart,
-                                      List<String> stockItemKeys,
-                                      List<ResponseCartDetailDto> responseCart) {
+                                           List<String> stockItemKeys,
+                                           List<ResponseCartDetailDto> responseCart) {
         // 재고 key / 장바구니 item을 같은 순서로 구성하기 위해 동일 반복문 내에서 생성
         for (Map.Entry<Object, Object> entry : cart.entrySet()) {
             // 키 추가
@@ -178,9 +177,8 @@ public class CartService {
             // TODO: 조회 트래픽 증가 시 MapStruct 등으로 교체 고려
             // ObjectMapper convertValue 비용 이슈가 발생하면
             // MapStruct 등 컴파일 타임 매퍼로 교체 고려.
-            ResponseCartDetailDto item =
-                    objectMapper.convertValue(
-                            entry.getValue(), ResponseCartDetailDto.class);
+            ResponseCartDetailDto item = objectMapper.convertValue(
+                    entry.getValue(), ResponseCartDetailDto.class);
             responseCart.add(item);
         }
     }

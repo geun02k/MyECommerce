@@ -37,9 +37,8 @@ public class PaymentService {
         PgApiResponse<PgResult> pgResponse = pgClient.requestPayment(payment);
         if (pgResponse.isSuccess()) {
             // 2-2. 결제 도메인에 PG 요청 결과 반영 (결제번호, 결제상태 셋팅)
-            // 결제상태 READY -> IN_PROGRESS로 변경
             payment = paymentTxService.updatePaymentToInProgress(
-                    payment.getId(), pgResponse.getData());
+                    payment.getId(), pgResponse.getData()); // 결제상태 READY -> IN_PROGRESS로 변경
         }
 
         return ResponsePaymentDto.from(payment, pgResponse);
@@ -53,18 +52,18 @@ public class PaymentService {
         Payment payment =
                 findPaymentByPgTransactionId(pgApprovalResult.getPgTransactionId());
 
-        // 2. 종결된 결제의 중복 웹훅 무시 (멱등성 검증: 동일 요청을 여러번 보내도 결과는 동일해야 함)
-        if (payment.isTerminal()) { // 결제 상태 종결 여부 반환
+        // 2. 종결된 결제의 중복 웹훅 무시 (멱등성 검증: 동일 요청을 여러번 보내도 결과는 동일하도록 함.)
+        if (payment.isTerminal()) {
             return; // 예외가 안 터지면 Spring은 200 OK를 보내 pg 승인결과 반영 재요청 받지 않게 종료.
         }
 
-        // 결제 승인, 실패 처리 (동시성 제어)
+        // 3. 결제 승인 결과 반영 (상태 기반 업데이트로 동시성 제어)
         int updateCnt = updatePaymentApprove(payment, pgApprovalResult);
-        if (updateCnt == 0) {
+        if (updateCnt <= 0) {
             return; // Spring은 200 OK를 보내 pg 승인결과 반영 재요청 받지 않게 종료.
         }
 
-        // 결제 완료된 경우 주문상태 변경 (웹 훅 결과 반영)
+        // 4. 결제승인 시 주문 결제완료 처리
          if(payment.getPaymentStatus().equals(APPROVED)) {
              updatePaidOrderStatus(payment);
          }
@@ -95,14 +94,14 @@ public class PaymentService {
                 payment.approve(pgApprovalResult); // 결제 완료
 
             } else if (approvalStatus == FAILED) {
-                payment.fail(pgApprovalResult); // 재결제 시도가능
+                payment.fail(pgApprovalResult);    // 재결제 시도가능
             }
         }
 
         return updateCnt;
     }
 
-    // 주문상태 변경 (웹 훅 결과 반영)
+    // 주문상태 결제완료로 변경
     private void updatePaidOrderStatus(Payment payment) {
         Long orderId = payment.getOrder().getId();
         // 결제완료되지 않은 주문 조회

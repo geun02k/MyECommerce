@@ -175,7 +175,7 @@ class ProductPolicyTest {
     }
 
     @Test
-    @DisplayName("상품등록정책실패 - 이미 등록된 옵션코드 입력 시 예외발생")
+    @DisplayName("상품등록정책 실패 - 이미 등록된 옵션코드 입력 시 예외발생")
     void validateRegister_shouldFail_whenAlreadyRegisteredOptionCode() {
        // given
         ServiceProductDto product = productForInsert();

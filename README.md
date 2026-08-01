@@ -307,24 +307,24 @@
 #### 9. 상품 옵션 시스템 식별 체계 개선
    - 설계 배경: 상품코드가 전역 식별자가 아니므로, 기존 Redis Key는 productCode-optionCode를 기반으로 구성되어 있어 서로 다른 판매자가 동일한 상품코드를 사용할 경우 Key 충돌 가능성 존재.
      이를 검증하기 위해 테스트를 작성하는 과정에서 문제의 원인이 Redis Key가 아니라 시스템 전반에서 비즈니스 식별자와 시스템 식별자가 혼용되고 있다는 점임을 확인.
-   - 결정: 상품 옵션의 시스템 내부 식별 기준을 optionId로 일원화하고, optionCode는 도메인 의미를 표현하는 비즈니스 식별자로만 사용하도록 역할 분리.
+   - 결정: Product 도메인에서는 Business Key를 사용하고, 다른 도메인의 상품/옵션 참조 및 Redis 등 저장소의 식별 키에는 시스템 식별자인 PK를 사용하도록 역할을 분리.
    - 구현
      - 상품옵션 중복 검증 시 seller 조건 추가  
-       [[상품옵션 중복 검증 - ProductPolicy.validateRegister()]]() 
+       [[상품옵션 중복 검증 - ProductPolicy.validateRegister()]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/product/ProductPolicy.java#L40-L42) 
      - 상품 및 상품옵션 복합 Unique 제약 추가   
-       [[상품 Unique 제약 - Product]]()
-       [[상품옵션 Unique 제약 - ProductOption]]()   
+       [[상품 Unique 제약 - Product]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/entity/product/Product.java#L12-L19)
+       [[상품옵션 Unique 제약 - ProductOption]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/entity/product/ProductOption.java#L11-L14)   
      - Redis 재고 및 장바구니 Key를 optionId 기반으로 변경  
-       [[재고 Redis Key - StockCacheService]]()
-       [[장바구니 Redis Hash Key - CartService]]()
+       [[재고 Redis Key - StockCacheService]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/stock/StockCacheService.java#L36)
+       [[장바구니 Redis Hash Key - CartService]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/cart/CartService.java#L60)
      - 주문 생성 및 재고 처리 로직을 optionId 기반으로 변경  
-       [[주문 로직 변경 과정 - CartService]]()
-       [[재고 로직 변경 과정 - StockCacheService]]()
+       [[주문 로직 변경 과정 - OrderService]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/order/OrderService.java#L81-L87)
+       [[재고 로직 변경 과정 - StockCacheService]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/stock/StockCacheService.java#L36)
      - 테스트를 optionId 기반으로 개선하여 상품 식별자 변경에 따른 데이터 연결 검증 강화 
-       [[상품옵션 optionId 연결 검증 - OrderCreateIntegrationTest]]()
-       [[장바구니 optionId 조회 검증 - CartAddIntegrationTest]]()
-   - 의의: 비즈니스 식별자(seller + productCode, optionCode)는 도메인 의미를 표현하는 용도로 유지하고, 
-     시스템 내부의 참조와 연관관계는 optionId를 사용하도록 역할을 분리. 
+       [[상품옵션 optionId 연결 검증 - OrderCreateIntegrationTest]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/integration/order/OrderCreateIntegrationTest.java#L303-L331)
+       [[장바구니 optionId 조회 검증 - CartAddIntegrationTest]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/integration/cart/CartAddIntegrationTest.java#L140-L159)
+   - 의의: 비즈니스 식별자(seller + productCode, optionCode)는 도메인 의미를 표현하는 용도로 유지하고,
+     다른 도메인의 참조와 Redis Key에는 시스템 식별자인 productId, optionId를 사용하도록 역할을 분리. 
      이를 통해 식별 기준이 명확해졌으며 Redis, 주문, 장바구니, 재고 처리에서 동일한 시스템 식별자를 사용해 유지보수성과 일관성 향상.
    <br>
 

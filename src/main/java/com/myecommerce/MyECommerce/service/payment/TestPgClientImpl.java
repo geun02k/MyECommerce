@@ -44,7 +44,7 @@ public class TestPgClientImpl implements PgClient {
                 return PgApiResponse.fail(
                         "INVALID_AMOUNT", "결제 금액이 올바르지 않습니다.");
             }
-
+        // TODO: 외부 시스템 장애 전략 - 결제 과정에서 발생할 수 있는 다양한 예외 상황(잔액 부족, 네트워크 오류 등)에 대응하는 예외 처리 전략을 촘촘하게 설계
         // 외부 api 요청 후 네트워크 등 Exception 발생
         } catch (Exception e) {
             log.error("PG API 호출 실패", e);

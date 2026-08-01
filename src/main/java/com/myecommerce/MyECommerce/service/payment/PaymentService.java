@@ -44,7 +44,9 @@ public class PaymentService {
         return ResponsePaymentDto.from(payment, pgResponse);
     }
 
-    // TODO: 이중 결제 불가를 위해 Order 락을 걸고 paid 상태를 우선 점검한 후 마지막에 update로 변경
+    // FIXME: 결제 승인 webhook 중복 요청 시 이중 결제가 발생하지 않도록 동시성 제어 필요.
+    // 결제 상태를 검증한 후 상태 변경이 원자적으로 처리되도록 보장해야 하며,
+    // 비관적 락 또는 멱등성 처리 등 적절한 방식 검토 필요.
     /** 결제 생성 웹훅 처리 - 결제 상태 변경해 결제 종료 **/
     @Transactional
     public void handlePgWebHook(PgApprovalResult pgApprovalResult) {

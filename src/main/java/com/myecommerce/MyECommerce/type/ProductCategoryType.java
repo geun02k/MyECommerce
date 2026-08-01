@@ -11,7 +11,7 @@ public enum ProductCategoryType {
     BEAUTY("뷰티"),
     ELECTRONICS("전자제품"),
     OUTDOOR("아웃도어"),
-    BABY_PRODUCTION("유아용품"),
+    BABY_PRODUCT("유아용품"),
     ETC("기타"),
     ;
 

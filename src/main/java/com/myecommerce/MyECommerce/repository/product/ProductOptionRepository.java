@@ -42,6 +42,4 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<ProductOption> findByIdIn(List<Long> optionIds);
 
-    // 품절된 상품 옵션 목록 조회
-    List<ProductOption> findByProductIdInAndQuantity(List<Long> idList, int quantity);
 }

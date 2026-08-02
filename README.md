@@ -82,8 +82,8 @@
    - 설계 배경: Service 내부에 DTO 변환, 유효성 검증, Entity 생성, 저장 로직 등이 모두 포함된 구조로 인해 로직 파악 및 수정 난이도 상승.   
    - 결정: Service는 비즈니스 흐름 조합 역할에 집중하고, 세부 로직은 메서드로 위임.
    - 구현: 특정 기능을 독립된 메서드로 분리하여 코드 가독성 향상   
-          [[변경 과정 ProductService - registerProduction()]](https://github.com/geun02k/MyECommerce/pull/7/files#diff-0514dafdde336b4ac6e3e96da19c17171bb8b1040808268b5b737dbc6ce6714fR34-R61)   
-          [[최종 개선 결과 ProductService - registerProduction()]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/product/ProductService.java#L42-L65)
+          [[변경 과정 ProductService - registerProduct()]](https://github.com/geun02k/MyECommerce/pull/7/files#diff-0514dafdde336b4ac6e3e96da19c17171bb8b1040808268b5b737dbc6ce6714fR34-R61)   
+          [[최종 개선 결과 ProductService - registerProduct()]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/product/ProductService.java#L42-L65)
    - 의의: 기능 간 결합도를 낮춰 향후 Policy 분리 및 요구사항 변경에 유연하게 대응할 수 있는 기반 마련.   
    <br>
 
@@ -91,7 +91,7 @@
    - 설계 배경: 웹 요청 중심의 테스트로 인해 피드백 사이클이 느림.
    - 결정: 계층별 단위 테스트 도입 및 피드백 속도 최적화.
    - 구현: 외부 의존성 제거를 위한 Mockito 기반의 Service 로직 검증과 MockMvc 기반의 API 규약 검증으로 테스트 범위 이원화.   
-          [[변경 과정 ProductServiceTest - successSaveProduction()]](https://github.com/geun02k/MyECommerce/pull/7/files#diff-56603b707aa6b5ecc1820c4673d2185eec20421e5d90f8f333f0a51789ebc34cR50-R191)   
+          [[변경 과정 ProductServiceTest - successSaveProduct()]](https://github.com/geun02k/MyECommerce/pull/7/files#diff-56603b707aa6b5ecc1820c4673d2185eec20421e5d90f8f333f0a51789ebc34cR50-R191)   
           [[최종 개선 결과 ProductServiceTest - registerProduct_shouldInsertProductAndOption_whenValidProduct()]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/service/product/ProductServiceTest.java#L138-L202)
    - 의의: '수정 -> 테스트 -> 검증' 사이클 단축하여 리팩토링 안정성을 확보.
    <br>
@@ -307,24 +307,24 @@
 #### 9. 상품 옵션 시스템 식별 체계 개선
    - 설계 배경: 상품코드가 전역 식별자가 아니므로, 기존 Redis Key는 productCode-optionCode를 기반으로 구성되어 있어 서로 다른 판매자가 동일한 상품코드를 사용할 경우 Key 충돌 가능성 존재.
      이를 검증하기 위해 테스트를 작성하는 과정에서 문제의 원인이 Redis Key가 아니라 시스템 전반에서 비즈니스 식별자와 시스템 식별자가 혼용되고 있다는 점임을 확인.
-   - 결정: 상품 옵션의 시스템 내부 식별 기준을 optionId로 일원화하고, optionCode는 도메인 의미를 표현하는 비즈니스 식별자로만 사용하도록 역할 분리.
+   - 결정: Product 도메인에서는 Business Key를 사용하고, 다른 도메인의 상품/옵션 참조 및 Redis 등 저장소의 식별 키에는 시스템 식별자인 PK를 사용하도록 역할을 분리.
    - 구현
      - 상품옵션 중복 검증 시 seller 조건 추가  
-       [[상품옵션 중복 검증 - ProductPolicy.validateRegister()]]() 
+       [[상품옵션 중복 검증 - ProductPolicy.validateRegister()]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/product/ProductPolicy.java#L40-L42) 
      - 상품 및 상품옵션 복합 Unique 제약 추가   
-       [[상품 Unique 제약 - Product]]()
-       [[상품옵션 Unique 제약 - ProductOption]]()   
+       [[상품 Unique 제약 - Product]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/entity/product/Product.java#L12-L19)
+       [[상품옵션 Unique 제약 - ProductOption]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/entity/product/ProductOption.java#L11-L14)   
      - Redis 재고 및 장바구니 Key를 optionId 기반으로 변경  
-       [[재고 Redis Key - StockCacheService]]()
-       [[장바구니 Redis Hash Key - CartService]]()
+       [[재고 Redis Key - StockCacheService]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/stock/StockCacheService.java#L36)
+       [[장바구니 Redis Hash Key - CartService]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/cart/CartService.java#L60)
      - 주문 생성 및 재고 처리 로직을 optionId 기반으로 변경  
-       [[주문 로직 변경 과정 - CartService]]()
-       [[재고 로직 변경 과정 - StockCacheService]]()
+       [[주문 로직 변경 과정 - OrderService]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/order/OrderService.java#L81-L87)
+       [[재고 로직 변경 과정 - StockCacheService]](https://github.com/geun02k/MyECommerce/blob/main/src/main/java/com/myecommerce/MyECommerce/service/stock/StockCacheService.java#L36)
      - 테스트를 optionId 기반으로 개선하여 상품 식별자 변경에 따른 데이터 연결 검증 강화 
-       [[상품옵션 optionId 연결 검증 - OrderCreateIntegrationTest]]()
-       [[장바구니 optionId 조회 검증 - CartAddIntegrationTest]]()
-   - 의의: 비즈니스 식별자(seller + productCode, optionCode)는 도메인 의미를 표현하는 용도로 유지하고, 
-     시스템 내부의 참조와 연관관계는 optionId를 사용하도록 역할을 분리. 
+       [[상품옵션 optionId 연결 검증 - OrderCreateIntegrationTest]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/integration/order/OrderCreateIntegrationTest.java#L303-L331)
+       [[장바구니 optionId 조회 검증 - CartAddIntegrationTest]](https://github.com/geun02k/MyECommerce/blob/main/src/test/java/com/myecommerce/MyECommerce/integration/cart/CartAddIntegrationTest.java#L140-L159)
+   - 의의: 비즈니스 식별자(seller + productCode, optionCode)는 도메인 의미를 표현하는 용도로 유지하고,
+     다른 도메인의 참조와 Redis Key에는 시스템 식별자인 productId, optionId를 사용하도록 역할을 분리. 
      이를 통해 식별 기준이 명확해졌으며 Redis, 주문, 장바구니, 재고 처리에서 동일한 시스템 식별자를 사용해 유지보수성과 일관성 향상.
    <br>
 

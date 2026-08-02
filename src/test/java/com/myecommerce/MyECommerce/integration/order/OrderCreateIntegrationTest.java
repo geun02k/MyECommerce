@@ -187,8 +187,8 @@ public class OrderCreateIntegrationTest {
 
     /** 테스트 데이터 정리 */
     void cleanUpSavedDataForConcurrency(List<Long> orderIds,
-                          Product savedProduct,
-                          Member savedMember) {
+                                        Product savedProduct,
+                                        Member savedMember) {
         transactionTemplate.executeWithoutResult(status -> {
             orderRepository.deleteByIdIn(orderIds);
             productRepository.deleteById(savedProduct.getId());
@@ -373,6 +373,7 @@ public class OrderCreateIntegrationTest {
     }
 
     // TODO: 통합테스트와 동시성 테스트 클래스 분리
+    // TODO: 동시성 테스트와 영속성 컨텍스트 오염 방지를 위한 방법 고민해 개선하기
     @Test
     @DisplayName("주문생성 성공 - 동시에 여러 주문 요청 시 옵션 재고 차감")
     void createOrder_shouldDecreaseOptionStock_whenConcurrentlyOrderRequest()

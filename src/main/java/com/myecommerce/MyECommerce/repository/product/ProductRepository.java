@@ -25,9 +25,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByIdInAndSaleStatusNot(List<Long> idList,
                                              ProductSaleStatusType status);
 
-    // 상품 ID 목록 조회
-    List<Product> findByIdIn(List<Long> idList);
-
     // keyword를 포함하는 상품목록조회 - 최신등록순
     Page<Product> findByNameLikeAndSaleStatusAndCategoryOrderByCreateDt(
             String name, ProductSaleStatusType saleStatus,

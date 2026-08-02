@@ -109,6 +109,8 @@ public class ProductRegisterIntegrationTest {
         assertEquals("productCode", response.getCode());
     }
 
+    // TODO: 상품등록 통합테스트 - Redis 재고 캐시 생성 검증 테스트 필요성 검토.
+    // 캐시가 도메인 결과인지 단순 조회 최적화 용도인지에 따라 테스트 범위 결정.
     // 기존 설계 문제 재현
     // 서로 다른 판매자가 동일한 productCode를 사용할 수 있음에도
     // 상품옵션 중복 조회 시 seller 조건이 없어 등록에 실패하는 문제를 검증한다.

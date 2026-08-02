@@ -181,7 +181,7 @@ public class ProductService {
         }
     }
 
-    // 상품ID, 셀러ID와 일치하는 상품 단건 조회
+    // 상품ID, 셀러ID와 일치하는 상품 단건 조회 (수정 요청자가 셀러가 아니면 접근불가를 위해 pk + sellerId 함께 전달)
     private Product getProductEntityByIdAndSeller(Long productId, Long sellerId) {
         return productRepository.findByIdAndSeller(productId, sellerId)
                 .orElseThrow(() -> new ProductException(PRODUCT_EDIT_FORBIDDEN));

@@ -143,8 +143,7 @@ public class CartAddIntegrationTest {
         // given
         // 동일한 상품코드로 두 셀러가 상품 등록
         registerProduct(1L, "productCode", "option1");
-        ProductOption productOption = registerProduct(
-                2L, "productCode", "option2");
+        ProductOption productOption = registerProduct(2L, "productCode", "option2");
         // 장바구니 추가를 위한 객체 생성
         Member member = customer();
         RequestCartDto requestCartDto = requestCartDto(productOption.getId());

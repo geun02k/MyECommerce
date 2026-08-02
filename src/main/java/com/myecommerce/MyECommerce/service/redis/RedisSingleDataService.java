@@ -16,9 +16,9 @@ public class RedisSingleDataService {
 
     /** Redis 단일 데이터 등록 (만료시간포함) **/
     public void saveSingleDataWithDuration(RedisNamespaceType nameSpace,
-                               String key,
-                               Object value,
-                               Duration duration) {
+                                           String key,
+                                           Object value,
+                                           Duration duration) {
         redisTemplate.opsForValue()
                 .set(setKey(nameSpace, key), setObjectValue(value), duration);
     }
@@ -32,8 +32,7 @@ public class RedisSingleDataService {
     }
 
     /** Redis 단일 데이터 삭제&조회 **/
-    public Object deleteSingleData(RedisNamespaceType nameSpace,
-                                         String key) {
+    public Object deleteSingleData(RedisNamespaceType nameSpace, String key) {
         return redisTemplate.delete(setKey(nameSpace, key));
     }
 

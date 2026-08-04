@@ -2,29 +2,27 @@ package com.myecommerce.MyECommerce.service.payment;
 
 import com.myecommerce.MyECommerce.dto.payment.*;
 import com.myecommerce.MyECommerce.entity.member.Member;
-import com.myecommerce.MyECommerce.entity.order.Order;
 import com.myecommerce.MyECommerce.entity.payment.Payment;
 import com.myecommerce.MyECommerce.exception.PaymentException;
-import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
-import com.myecommerce.MyECommerce.type.PaymentStatusType;
+import com.myecommerce.MyECommerce.service.order.OrderTxService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.*;
-import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
 import static com.myecommerce.MyECommerce.type.PaymentStatusType.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
 
     private final PgClient pgClient;
 
+    private final OrderTxService orderTxService;
     private final PaymentTxService paymentTxService;
 
-    private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
 
     /** 결제 생성 - 결제 시작 **/
@@ -44,11 +42,7 @@ public class PaymentService {
         return ResponsePaymentDto.from(payment, pgResponse);
     }
 
-    // FIXME: 결제 승인 webhook 중복 요청 시 이중 결제가 발생하지 않도록 동시성 제어 필요.
-    // 결제 상태를 검증한 후 상태 변경이 원자적으로 처리되도록 보장해야 하며,
-    // 비관적 락 또는 멱등성 처리 등 적절한 방식 검토 필요.
     /** 결제 생성 웹훅 처리 - 결제 상태 변경해 결제 종료 **/
-    @Transactional
     public void handlePgWebHook(PgApprovalResult pgApprovalResult) {
         // 1. transactionId로 승인할 결제 조회
         Payment payment =
@@ -60,15 +54,23 @@ public class PaymentService {
         }
 
         // 3. 결제 승인 결과 반영 (상태 기반 업데이트로 동시성 제어)
-        int updateCnt = updatePaymentApprove(payment, pgApprovalResult);
+        int updateCnt = paymentTxService.updatePaymentApprove(payment, pgApprovalResult);
         if (updateCnt <= 0) {
             return; // Spring은 200 OK를 보내 pg 승인결과 반영 재요청 받지 않게 종료.
         }
 
         // 4. 결제승인 시 주문 결제완료 처리
-         if(payment.getPaymentStatus().equals(APPROVED)) {
-             updatePaidOrderStatus(payment);
-         }
+        try {
+            if(payment.getPaymentStatus().equals(APPROVED)) {
+                orderTxService.updatePaidOrderStatus(payment);
+            }
+
+        } catch (Exception e) {
+            // TODO: 별도 보상 이벤트/스케줄러 작업 필요
+            // Order 처리 실패 시 Payment 승인 결과를 롤백하지 않고 재처리를 위한 로그 기록
+            log.error("Payment 승인 완료 후 Order 결제완료 상태 업데이트 실패 - orderId: {}",
+                    payment.getOrder().getId(), e);
+        }
     }
 
     // transactionId로 결제(Payment) 객체 조회
@@ -76,42 +78,6 @@ public class PaymentService {
         return paymentRepository.findByPgTransactionIdWithOrder(pgTransactionId)
                 .orElseThrow(() ->
                         new PaymentException(PG_TRANSACTION_ID_NOT_EXISTS));
-    }
-
-    // 결제 승인 및 실패 처리
-    private int updatePaymentApprove(Payment payment,
-                                     PgApprovalResult pgApprovalResult) {
-        int updateCnt = 0;
-        PaymentStatusType approvalStatus = pgApprovalResult.getApprovalStatus();
-
-        // 조건부로 결제상태 우선변경 (동시성 제어, JPA 더티체킹 전 수행을 위해 우선 실행)
-        if (approvalStatus == APPROVED || approvalStatus == FAILED) {
-            updateCnt = paymentRepository.approveIfInProgress(
-                    payment.getId(), approvalStatus);
-        }
-
-        // 결제 승인 및 실패 처리
-        if (updateCnt > 0) {
-            if (approvalStatus == APPROVED) {
-                payment.approve(pgApprovalResult); // 결제 완료
-
-            } else if (approvalStatus == FAILED) {
-                payment.fail(pgApprovalResult);    // 재결제 시도가능
-            }
-        }
-
-        return updateCnt;
-    }
-
-    // 주문상태 결제완료로 변경
-    private void updatePaidOrderStatus(Payment payment) {
-        Long orderId = payment.getOrder().getId();
-        // 결제완료되지 않은 주문 조회
-        Order order = orderRepository.findByIdAndOrderStatus(orderId, CREATED)
-                .orElseThrow(() -> new PaymentException(ORDER_STATUS_NOT_CREATED));
-
-        // 주문 결제완료 처리
-        order.paid(payment);
     }
 
 }

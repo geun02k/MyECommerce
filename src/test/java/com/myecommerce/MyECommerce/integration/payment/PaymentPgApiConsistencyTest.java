@@ -18,10 +18,7 @@ import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.service.payment.PaymentService;
 import com.myecommerce.MyECommerce.type.PaymentStatusType;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -203,10 +200,9 @@ public class PaymentPgApiConsistencyTest {
         PG 결제승인 웹훅 Test
        --------------------- */
 
-    // Order 실패 -> Payment rollback 확인
-    // 주문 변경 실패 시 결제 승인 내역까지 함께 롤백되어 PG 승인 완료와 내부 DB 미승인 간의 상태 불일치가 일어나는 기존 한계를 검증
     @Test
-    @DisplayName("PG 결제승인 웹훅 실패 - 주문 처리 실패로 Payment 승인까지 rollback 되는 트랜잭션 정합성 문제 재현")
+    @Disabled("기존 PG 결제승인 웹훅 정합성 문제 재현 후 버그 수정 완료로 테스트 제외")
+    @DisplayName("PG 결제승인 웹훅 실패 - 주문 결제 처리 실패 시 Payment 승인까지 rollback 되는 트랜잭션 정합성 문제 재현")
     void handlePgWebHook_shouldRollbackPaymentApproval_whenOrderUpdateFailed() {
         // given
         // 주문

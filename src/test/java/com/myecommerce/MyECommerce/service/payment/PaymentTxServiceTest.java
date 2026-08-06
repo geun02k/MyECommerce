@@ -411,4 +411,22 @@ class PaymentTxServiceTest {
     }
 
     // 결제생성 실패 - 결제객체 저장 실패 시 예외발생
+
+    /* ----------------------------
+        PG 결제승인 정상 시나리오 Tests
+       ---------------------------- */
+
+    // updatePgApprovalResult() 검증 - payment 객체값 변경 검증 위임
+    // Payment 엔티티 자체의 비즈니스 로직(approve(), fail())을 검증하는
+    // PaymentTest(도메인 단위테스트)가 있으므로,
+    // DB 반영 및 영속성 트랜잭션 단위의 동작(업데이트 횟수/반환값)에 집중
+    // 변경, 중요값 검증
+//    assertEquals(pgTransactionId, payment.getPgTransactionId());
+//    assertEquals(paidAmount, payment.getApprovedAmount());
+//    assertEquals(APPROVED, payment.getPaymentStatus()); // 결제 승인완료
+
+    // TODO: 결제상태 분기 - APPROVED일 때 업데이트 여부 및 1반환 검증
+    // TODO: 결제상태 분기 - FAILED일 때 업데이트 여부 및 1반환 검증
+    // TODO: 결제상태 분기 - APPROVED, FAILED 외(IN_PROGRESS) 업데이트 미수행 후 0 반환 검증
+
 }

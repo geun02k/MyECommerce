@@ -177,7 +177,9 @@ public class PaymentPgApiConcurrencyTest {
         payment.requestPgPayment(pgResult);
 
         // 결제 저장
-        return paymentRepository.save(payment);
+        Payment saved = paymentRepository.save(payment);
+        paymentRepository.flush();
+        return saved;
     }
 
     /** PG 결제승인 웹훅 동시성 실행

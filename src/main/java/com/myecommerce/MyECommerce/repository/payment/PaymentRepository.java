@@ -25,6 +25,14 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             select p
             from Payment p
             join fetch p.order
+            where p.id = :paymentId
+    """)
+    Optional<Payment> findByIdWithOrder(Long paymentId);
+
+    @Query("""
+            select p
+            from Payment p
+            join fetch p.order
             where p.pgTransactionId = :pgTransactionId
     """)
     Optional<Payment> findByPgTransactionIdWithOrder(String pgTransactionId);

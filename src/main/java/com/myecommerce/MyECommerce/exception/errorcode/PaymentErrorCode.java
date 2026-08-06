@@ -17,6 +17,8 @@ public enum PaymentErrorCode implements CommonErrorCode {
             "error.payment.available.only.buyer"),
 
     // 결제 validation check
+    PAYMENT_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            "error.payment.not.found"),
     PAYMENT_ORDER_NOT_EXISTS(HttpStatus.BAD_REQUEST.value(),
             "error.payment.order.not.exists"),
     ORDER_STATUS_NOT_CREATED(HttpStatus.CONFLICT.value(),

@@ -48,22 +48,23 @@ public class PaymentService {
         Payment payment =
                 findPaymentByPgTransactionId(pgApprovalResult.getPgTransactionId());
 
+        Long paymentId = payment.getId();
+        Long orderId = payment.getOrder().getId();
+
         // 2. 종결된 결제의 중복 웹훅 무시 (멱등성 검증: 동일 요청을 여러번 보내도 결과는 동일하도록 함.)
         if (payment.isTerminal()) {
             return; // 예외가 안 터지면 Spring은 200 OK를 보내 pg 승인결과 반영 재요청 받지 않게 종료.
         }
 
         // 3. 결제 승인 결과 반영 (상태 기반 업데이트로 동시성 제어)
-        int updateCnt = paymentTxService.updatePaymentApprove(payment, pgApprovalResult);
+        int updateCnt = paymentTxService.updatePgApprovalResult(paymentId, pgApprovalResult);
         if (updateCnt <= 0) {
             return; // Spring은 200 OK를 보내 pg 승인결과 반영 재요청 받지 않게 종료.
         }
 
         // 4. 결제승인 시 주문 결제완료 처리
         try {
-            if(payment.getPaymentStatus().equals(APPROVED)) {
-                orderTxService.updatePaidOrderStatus(payment);
-            }
+            orderTxService.updatePaidOrderStatus(orderId, paymentId);
 
         } catch (Exception e) {
             // TODO: 별도 보상 이벤트/스케줄러 작업 필요

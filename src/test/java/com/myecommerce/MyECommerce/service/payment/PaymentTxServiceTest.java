@@ -1,5 +1,7 @@
 package com.myecommerce.MyECommerce.service.payment;
 
+import com.myecommerce.MyECommerce.dto.payment.PgApprovalResult;
+import com.myecommerce.MyECommerce.dto.payment.PgResult;
 import com.myecommerce.MyECommerce.dto.payment.RequestPaymentDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
@@ -31,7 +33,8 @@ import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.*
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
 import static com.myecommerce.MyECommerce.type.PaymentMethodType.CARD;
-import static com.myecommerce.MyECommerce.type.PaymentStatusType.READY;
+import static com.myecommerce.MyECommerce.type.PaymentStatusType.*;
+import static com.myecommerce.MyECommerce.type.PgProviderType.MOCK_PG;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -96,6 +99,55 @@ class PaymentTxServiceTest {
         return order;
     }
 
+    /** 저장된 결제 (id 추가) */
+    Payment payment(Order order,
+                    PaymentMethodType requestPaymentMethod,
+                    PgProviderType pgProvider) {
+        Payment payment = Payment.createPayment(
+                order, requestPaymentMethod, pgProvider);
+        ReflectionTestUtils.setField(payment, "id", 10L);
+
+        return payment;
+    }
+
+    /** PG 요청에 대한 응답 */
+    PgResult pgRequestResult(String pgTransactionId) {
+        return PgResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .build();
+    }
+
+    /** PG 요청에 대한 응답 */
+    PgApprovalResult pgApprovalResult(String pgTransactionId) {
+        return PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(APPROVED)
+                .paidAmount(new BigDecimal(10000))
+                .build();
+    }
+
+    /** PG 요청한 결제 */
+    Payment inProgressPayment(Order order, String pgTransactionId) {
+        PgResult pgRequestResult = pgRequestResult(pgTransactionId);
+        Payment payment = payment(order, CARD, MOCK_PG);
+        
+        payment.requestPgPayment(pgRequestResult); // 결제상태 = IN_PROGRESS
+
+        return payment;
+    }
+
+    /** PG 승인된 결제 */
+    Payment approvedPayment(Order order, String pgTransactionId) {
+        PgResult pgRequestResult = pgRequestResult(pgTransactionId);
+        PgApprovalResult pgApprovalResult = pgApprovalResult(pgTransactionId);
+
+        Payment payment = payment(order, CARD, MOCK_PG);
+        payment.requestPgPayment(pgRequestResult); // 결제상태 = IN_PROGRESS
+        payment.approve(pgApprovalResult); // 결제상태 = APPROVED
+
+        return payment;
+    }
+
     /** 고객 권한 */
     MemberAuthority customerRole() {
         return MemberAuthority.builder()
@@ -124,6 +176,10 @@ class PaymentTxServiceTest {
                         invocationOnMock.getArgument(0));
     }
 
+    // BigDecimal 금액 반환
+    BigDecimal price(String price) {
+        return new BigDecimal(price);
+    }
     /* ---------------------------
         결제생성 정상 시나리오 Tests
        --------------------------- */
@@ -416,17 +472,174 @@ class PaymentTxServiceTest {
         PG 결제승인 정상 시나리오 Tests
        ---------------------------- */
 
-    // updatePgApprovalResult() 검증 - payment 객체값 변경 검증 위임
-    // Payment 엔티티 자체의 비즈니스 로직(approve(), fail())을 검증하는
-    // PaymentTest(도메인 단위테스트)가 있으므로,
-    // DB 반영 및 영속성 트랜잭션 단위의 동작(업데이트 횟수/반환값)에 집중
-    // 변경, 중요값 검증
-//    assertEquals(pgTransactionId, payment.getPgTransactionId());
-//    assertEquals(paidAmount, payment.getApprovedAmount());
-//    assertEquals(APPROVED, payment.getPaymentStatus()); // 결제 승인완료
 
-    // TODO: 결제상태 분기 - APPROVED일 때 업데이트 여부 및 1반환 검증
-    // TODO: 결제상태 분기 - FAILED일 때 업데이트 여부 및 1반환 검증
-    // TODO: 결제상태 분기 - APPROVED, FAILED 외(IN_PROGRESS) 업데이트 미수행 후 0 반환 검증
+    // TODO: 검증 대상 금액 테스트에 노출되도록 수정 필요
+    @Test
+    @DisplayName("PG 결제승인 상태 분기 - PG 결과가 승인(APPROVED)일 때 결제상태 변경하여 1반환 검증")
+    void updatePgApprovalResult_shouldReturn1_whenPgResultIsApproved() {
+        // given
+        String pgTransactionId = "pgTransactionId";
+        Long paymentId = 10L;
+        BigDecimal expectedAmount = price("10000");
+
+        Member member = customer();
+        Order order = order(member);
+        Payment payment = inProgressPayment(order, pgTransactionId);
+
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(APPROVED)
+                .paidAmount(expectedAmount)
+                .build();
+
+        // 결제 조회
+        given(paymentRepository.findByIdWithOrder(eq(paymentId)))
+                .willReturn(Optional.of(payment));
+        // 조건부로 결제상태 우선변경
+        given(paymentRepository.approveIfInProgress(any(), any()))
+                .willReturn(1);
+
+        // when
+        int response = paymentTxService
+                .updatePgApprovalResult(paymentId, pgApprovalResult);
+
+        // then
+        // 올바른 식별자와 APPROVED 상태값으로 Repository UPDATE 메서드의 호출 여부 검증
+        verify(paymentRepository).approveIfInProgress(eq(paymentId), eq(APPROVED));
+        // 최종 반환 결과 검증
+        assertEquals(1, response);
+
+        // 결제승인 정보 검증
+        assertEquals(APPROVED, payment.getPaymentStatus());
+        assertEquals(expectedAmount, payment.getApprovedAmount());
+    }
+
+    @Test
+    @DisplayName("PG 결제승인 상태 분기 - PG 결과가 실패(FAILED)일 때 결제상태 변경하여 1반환 검증")
+    void updatePgApprovalResult_shouldReturn1_whenPgResultIsFailed() {
+        // given
+        String pgTransactionId = "pgTransactionId";
+        Long paymentId = 10L;
+
+        Member member = customer();
+        Order order = order(member);
+        Payment payment = inProgressPayment(order, pgTransactionId);
+
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(FAILED)
+                .build();
+
+        // 결제 조회
+        given(paymentRepository.findByIdWithOrder(eq(paymentId)))
+                .willReturn(Optional.of(payment));
+        // 조건부로 결제상태 우선변경
+        given(paymentRepository.approveIfInProgress(any(), any()))
+                .willReturn(1);
+
+        // when
+        int response = paymentTxService
+                .updatePgApprovalResult(paymentId, pgApprovalResult);
+
+        // then
+        // 올바른 식별자와 FAILED 상태값으로 Repository UPDATE 메서드의 호출 여부 검증
+        verify(paymentRepository).approveIfInProgress(eq(paymentId), eq(FAILED));
+        // 최종 반환 결과 검증
+        assertEquals(1, response);
+
+        // 결제승인 정보 검증
+        assertEquals(FAILED, payment.getPaymentStatus());
+    }
+
+    @Test
+    @DisplayName("PG 결제승인 상태 분기 - PG 결과가 PG요청 진행중(IN_PROGRESS)일 때 결제상태 미변경으로 0반환 검증")
+    void updatePgApprovalResult_shouldReturn0_whenPgResultIsInProgress() {
+        // given
+        String pgTransactionId = "pgTransactionId";
+        Long paymentId = 10L;
+
+        Member member = customer();
+        Order order = order(member);
+        Payment payment = inProgressPayment(order, pgTransactionId);
+
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(IN_PROGRESS)
+                .build();
+
+        // 결제 조회
+        given(paymentRepository.findByIdWithOrder(eq(paymentId)))
+                .willReturn(Optional.of(payment));
+
+        // when
+        int response = paymentTxService.updatePgApprovalResult(paymentId, pgApprovalResult);
+
+        // then
+        // Repository UPDATE 메서드의 미호출 검증
+        verify(paymentRepository, never()).approveIfInProgress(any(), any());
+        // 최종 반환 결과 검증
+        assertEquals(0, response);
+
+        // 결제승인 정보 미변경 검증
+        assertEquals(IN_PROGRESS, payment.getPaymentStatus());
+    }
+
+    @Test
+    @DisplayName("PG 결제승인 상태 분기 - 결제가 이미 승인된 상태였다면 결제상태 미변경으로 0반환 검증")
+    void updatePgApprovalResult_shouldReturn0_whenPaymentAlreadyApproved() {
+        // given
+        String pgTransactionId = "pgTransactionId";
+        Long paymentId = 10L;
+
+        Member member = customer();
+        Order order = order(member);
+        Payment payment = approvedPayment(order, pgTransactionId); // 이미 승인된 결제
+
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(FAILED) // 승인된 결제건에 대해 FAILED 재응답 시도
+                .build();
+
+        // 결제 조회
+        given(paymentRepository.findByIdWithOrder(eq(paymentId)))
+                .willReturn(Optional.of(payment));
+        // 조건부로 결제상태 우선변경
+        given(paymentRepository.approveIfInProgress(any(), any()))
+                .willReturn(0);
+
+        // when
+        int response = paymentTxService.updatePgApprovalResult(paymentId, pgApprovalResult);
+
+        // then
+        // 올바른 식별자와 FAILED 상태값으로 Repository UPDATE 메서드의 호출 여부 검증
+        verify(paymentRepository).approveIfInProgress(eq(paymentId), eq(FAILED));
+        // 최종 반환 결과 검증
+        assertEquals(0, response);
+
+        // 결제승인 정보 미변경 검증
+        assertEquals(APPROVED, payment.getPaymentStatus());
+    }
+
+    /* ----------------------------
+        PG 결제승인 실패 시나리오 Tests
+       ---------------------------- */
+
+    @Test
+    @DisplayName("PG 결제승인 상태 분기 - 결제 ID에 대한 결제 미존재 시 예외발생")
+    void updatePgApprovalResult_shouldThrowException_whenNotExistsPayment() {
+        // given
+        Long invalidPaymentId = 10L;
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder().build();
+
+        // paymentId로 결제 조회
+        given(paymentRepository.findByIdWithOrder(any()))
+                .willReturn(Optional.empty());
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                paymentTxService.updatePgApprovalResult(invalidPaymentId, pgApprovalResult));
+        assertEquals(PAYMENT_NOT_FOUND, e.getErrorCode());
+    }
 
 }

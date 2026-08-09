@@ -9,6 +9,7 @@ import com.myecommerce.MyECommerce.entity.order.OrderItem;
 import com.myecommerce.MyECommerce.entity.payment.Payment;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
+import com.myecommerce.MyECommerce.exception.OrderException;
 import com.myecommerce.MyECommerce.exception.PaymentException;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.service.payment.PaymentTxService;
@@ -22,10 +23,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 
-import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.ORDER_STATUS_NOT_CREATED;
-import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.PAYMENT_NOT_FOUND;
+import static com.myecommerce.MyECommerce.exception.errorcode.OrderErrorCode.ORDER_STATUS_NOT_CREATED;
+import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.*;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
 import static com.myecommerce.MyECommerce.type.OrderStatusType.PAID;
@@ -158,8 +158,6 @@ class OrderTxServiceTest {
         주문 결제처리 정상 시나리오 Tests
        ---------------------------------- */
 
-    // updatePaidOrderStatus() 검증
-    // paymentTxService.findPaymentById()가 APPROVED 상태인 엔티티를 반환하게 stub
     @Test
     @DisplayName("주문 결제 성공 - 결제가 승인(APPROVED)된 경우 주문 결제상태(PAID)로 변경")
     void updatePaidOrderStatus_shouldUpdateOrderToPaid_whenPaymentIsApproved() {
@@ -170,12 +168,9 @@ class OrderTxServiceTest {
         Order createdOrder = createdOrder(orderId);
         Payment approvedPayment = approvedPayment(paymentId, createdOrder);
 
-        // 결제 조회
+        // 결제, 주문 조회
         given(paymentTxService.findPaymentByIdWithOrder(paymentId))
                 .willReturn(approvedPayment);
-        // 주문 조회
-        given(orderRepository.findByIdAndOrderStatus(orderId, CREATED))
-                .willReturn(Optional.of(createdOrder));
 
         // when
         orderTxService.updatePaidOrderStatus(orderId, paymentId);
@@ -183,7 +178,6 @@ class OrderTxServiceTest {
         // then
         // 의존성 호출 검증
         verify(paymentTxService).findPaymentByIdWithOrder(paymentId);
-        verify(orderRepository).findByIdAndOrderStatus(orderId, CREATED);
 
         // 주문 상태변경 검증
         assertEquals(PAID, createdOrder.getOrderStatus());
@@ -246,18 +240,42 @@ class OrderTxServiceTest {
         Order createdOrder = createdOrder(5L); // 조회 id와 다른 주문
         Payment approvedPayment = approvedPayment(paymentId, createdOrder);
 
-        // 결제 조회
+        // 결제에 대한 주문 누락
+        ReflectionTestUtils.setField(approvedPayment, "order", null);
+
+        // 결제, 주문 조회
         given(paymentTxService.findPaymentByIdWithOrder(paymentId))
                 .willReturn(approvedPayment);
-        // 주문 조회 불가
-        given(orderRepository.findByIdAndOrderStatus(invalidOrderId, CREATED))
-                .willReturn(Optional.empty());
 
         // when
         // then
         PaymentException e = assertThrows(PaymentException.class, () ->
                 orderTxService.updatePaidOrderStatus(invalidOrderId, paymentId));
-        assertEquals(ORDER_STATUS_NOT_CREATED, e.getErrorCode());
+        assertEquals(PAYMENT_ORDER_MISMATCH_INTERNAL_ERROR, e.getErrorCode());
     }
 
+    @Test
+    @DisplayName("주문 결제 실패 - 주문상태가 CREATED가 아니면 예외발생")
+    void updatePaidOrderStatus_shouldThrowException_whenStatusIsNotCreated() {
+        // given
+        Long oderId = 5L;
+        Long paymentId = 10L;
+
+        Order createdOrder = createdOrder(oderId);
+        Payment approvedPayment = approvedPayment(paymentId, createdOrder);
+
+        // 주문상태 강제로 결제완료(PAID)로 변경
+        ReflectionTestUtils.setField(createdOrder, "orderStatus", PAID);
+        ReflectionTestUtils.setField(approvedPayment, "order", createdOrder);
+
+        // 결제, 주문 조회
+        given(paymentTxService.findPaymentByIdWithOrder(paymentId))
+                .willReturn(approvedPayment);
+
+        // when
+        // then
+        OrderException e = assertThrows(OrderException.class, () ->
+                orderTxService.updatePaidOrderStatus(oderId, paymentId));
+        assertEquals(ORDER_STATUS_NOT_CREATED, e.getErrorCode());
+    }
 }

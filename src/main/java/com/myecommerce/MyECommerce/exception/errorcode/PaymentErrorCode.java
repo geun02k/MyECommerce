@@ -46,7 +46,11 @@ public enum PaymentErrorCode implements CommonErrorCode {
     PG_TRANSACTION_ID_MISMATCH(HttpStatus.CONFLICT.value(),
             "error.payment.pg.transaction.id.mismatch"),
     PG_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR.value(),
-            "error.payment.pg.api.error")
+            "error.payment.pg.api.error"),
+
+    // PG 결제 승인 validation check
+    PAYMENT_ORDER_MISMATCH_INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            "error.payment.order.mismatch.internal.error"),
     ;
 
     private final int statusCode;

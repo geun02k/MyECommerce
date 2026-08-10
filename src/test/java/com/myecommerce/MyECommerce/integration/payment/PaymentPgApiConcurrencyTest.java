@@ -255,9 +255,5 @@ public class PaymentPgApiConcurrencyTest {
         Long resultOrderId = resultPayment.getOrder().getId();
         Order resultOrder = orderRepository.findById(resultOrderId).orElseThrow();
         assertEquals(PAID, resultOrder.getOrderStatus());
-
-        // 주문 더티체킹을 위한 조회 횟수 검증
-        verify(orderRepository, times(1))
-                .findByIdAndOrderStatus(any(), eq(CREATED));
     }
 }

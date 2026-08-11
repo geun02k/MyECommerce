@@ -189,7 +189,7 @@ public class PaymentPgApiTest {
 
    /* --------------------------
         PG 결제승인 웹훅 성공 Test
-       ------------------------- */
+      -------------------------- */
 
     @Test
     @DisplayName("PG 결제승인 웹훅 성공 - 결제승인 웹훅 요청 시 주문, 결제상태 변경 후 200 OK 반환")
@@ -252,7 +252,9 @@ public class PaymentPgApiTest {
                 .andExpect(status().isOk());
 
         // 결제상태 검증
-        Payment resultPayment = paymentRepository.findByPgTransactionIdWithOrder("pgTransactionId").orElseThrow();
+        Payment resultPayment =
+                paymentRepository.findByPgTransactionIdWithOrder("pgTransactionId")
+                        .orElseThrow();
         assertEquals(FAILED, resultPayment.getPaymentStatus()); // 결제상태 IN_PROGRESS -> FAILED
 
         // 주문상태 검증
@@ -269,8 +271,8 @@ public class PaymentPgApiTest {
     // TODO: Order 처리 실패 시에도 Payment 승인은 유지되고 예외를 전파하지 않음 검증
 
    /* --------------------------------
-        PG 결제승인 웹훅 멱등성 성공 Test
-       ------------------------------- */
+        PG 결제승인 웹훅 성공 멱등성 Test
+      -------------------------------- */
 
     @Test
     @DisplayName("PG 결제승인 웹훅 멱등성 성공 - 이미 결제종결된 경우 주문, 결제상태 변경하지 않고 200 OK 반환")
@@ -306,9 +308,9 @@ public class PaymentPgApiTest {
         assertEquals(CREATED, resultOrder.getOrderStatus()); // 주문상태 CREATED 유지
     }
 
-   /* --------------------------
+   /* ---------------------------
         PG 결제승인 웹훅 실패 Test
-       ------------------------- */
+      --------------------------- */
 
     // 외부 PG가 잘못된 요청 보낼 수도 있어서 반드시 필요
     @Test

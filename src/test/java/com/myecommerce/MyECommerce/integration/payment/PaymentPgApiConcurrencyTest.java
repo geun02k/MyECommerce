@@ -62,7 +62,7 @@ public class PaymentPgApiConcurrencyTest {
     private PaymentRepository paymentRepository;
     @Autowired
     private MemberRepository memberRepository;
-    @MockitoSpyBean
+    @MockitoSpyBean // verify() 호출을 위함
     private OrderRepository orderRepository;
     @Autowired
     private ProductRepository productRepository;
@@ -225,8 +225,8 @@ public class PaymentPgApiConcurrencyTest {
        --------------------- */
 
     @Test
-    @DisplayName("PG 결제승인 웹훅 성공 - 동일 주문에 대한 여러 건의 PG 결제승인 웹훅 시도 시 결제 1건만 반영")
-    void handlePgWebHook_shouldSuccess_whenConcurrentRequestsForSamePaymentOccur()
+    @DisplayName("PG 결제승인 웹훅 성공 - 동일 결제에 대한 다건의 PG 결제승인 웹훅 시도 시 1건만 반영")
+    void handlePgWebHook_shouldUpdatePaymentOfOne_whenConcurrentRequestsForSamePayment()
             throws Exception {
         // given
         // 주문
@@ -243,12 +243,14 @@ public class PaymentPgApiConcurrencyTest {
                 .build();
 
         // when
-        // PG 결제승인 웹훅 동시성 실행 (중복처리방지, 멱등성, 상태전이 안정성 검증으로, 동시성 코드 분리)
+        // PG 결제승인 웹훅 동시 실행
         executeConcurrentPgWebhookRequests(request);
 
         // then
         // 결제상태 검증
-        Payment resultPayment = paymentRepository.findByPgTransactionIdWithOrder("pgTransactionId").orElseThrow();
+        Payment resultPayment =
+                paymentRepository.findByPgTransactionIdWithOrder("pgTransactionId")
+                        .orElseThrow();
         assertEquals(APPROVED, resultPayment.getPaymentStatus());
 
         // 주문상태 검증

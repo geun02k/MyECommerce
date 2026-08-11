@@ -140,11 +140,6 @@ class PaymentServiceTest {
         return payment;
     }
 
-    /** PG 요청 실패응답 */
-    PgApiResponse<PgResult> pgApiResponseOfFail() {
-        return PgApiResponse.fail("errorCode", "에러메시지");
-    }
-
     /** PG 요청에 대한 응답 */
     PgResult pgResult() {
         return PgResult.builder()
@@ -244,47 +239,6 @@ class PaymentServiceTest {
         결제시작 책임 행위 검증 Tests
        ---------------------------- */
 
-    @Test
-    @DisplayName("결제시작 책임 - 유효한 요청 시 결제 객체 반환 위임 검증")
-    void startPayment_shouldCallCreatePayment_whenValidRequest() {
-        // given
-        Long requestOrderId = 1L;
-        PaymentMethodType requestPaymentMethod = CARD;
-        // 요청 결제 정보
-        RequestPaymentDto request = RequestPaymentDto.builder()
-                .orderId(requestOrderId)
-                .paymentMethod(requestPaymentMethod)
-                .build();
-        // 결제 요청 고객
-        Member member = customer();
-
-        // PG 결제대행사
-        PgProviderType pgProvider = PgProviderType.MOCK_PG;
-        // 요청 결제에 대한 주문
-        Order order = order(member);
-        // 저장된 신규 결제
-        Payment savedPayment =Payment.createPayment(
-                order, requestPaymentMethod, pgProvider);
-        ReflectionTestUtils.setField(savedPayment, "id", 10L);
-        // PG 결제대행사에 결제 요청 결과
-        PgApiResponse<PgResult> pgApiResponse = pgApiResponseOfFail();
-
-        // 정책 검증 및 결제 Entity 반환
-        given(paymentTxService.createPayment(any(), any()))
-                .willReturn(savedPayment);
-        // PG 결제대행사에 결제 요청
-        given(pgClient.requestPayment(savedPayment)).willReturn(pgApiResponse);
-
-        // when
-        paymentService.startPayment(request, member);
-
-        // then
-        // 결제 객체 반환 위임 검증
-        verify(paymentTxService).createPayment(any(), eq(member));
-        verify(pgClient).requestPayment(savedPayment);
-    }
-
-
     // TODO: 호출순서검증 별도 분리할 것
     @Test
     @DisplayName("결제시작 책임 - 결제 객체 존재 시 PG 결제 요청 검증") // 정상 시나리오에서 응답 검증을 통해 확인가능하지만 행위 검증을 위해 테스트 코드 작성
@@ -340,60 +294,6 @@ class PaymentServiceTest {
         inOrder.verify(paymentTxService).createPayment(any(), any());
         inOrder.verify(pgClient).requestPayment(any());
         inOrder.verify(paymentTxService).updatePaymentToInProgress(any(), any());
-
-        // PG 요청 후 응답 검증
-        assertEquals(requestOrderId, response.getOrderId());
-        assertEquals(pgResult.getRedirectUrl(), response.getRedirectUrl());
-        assertEquals(IN_PROGRESS, response.getPaymentStatus()); // 결제 상태 PG 요청으로 변경
-    }
-
-    @Test
-    @DisplayName("결제시작 책임 - PG 요청 성공 시 결제 상태 업데이트 위임 검증")
-    void startPayment_shouldUpdatePaymentStatus_whenPgRequestSuccess() {
-        // given
-        Long requestOrderId = 1L;
-        PaymentMethodType requestPaymentMethod = CARD;
-        String pgTransactionId = "pgTransactionId";
-        String redirectUrl = "redirectUrl";
-
-        // 요청 결제 정보
-        RequestPaymentDto request = RequestPaymentDto.builder()
-                .orderId(requestOrderId)
-                .paymentMethod(requestPaymentMethod)
-                .build();
-        // 결제 요청 고객
-        Member member = customer();
-
-        // PG 결제대행사
-        PgProviderType pgProvider = PgProviderType.MOCK_PG;
-        // 요청 결제에 대한 주문
-        Order order = order(member);
-        // 저장된 신규 결제
-        Payment savedPayment =
-                savedPayment(order, requestPaymentMethod, pgProvider);
-        // PG 결제대행사에 결제 요청
-        PgResult pgResult = PgResult.builder()
-                .pgTransactionId(pgTransactionId)
-                .redirectUrl(redirectUrl)
-                .build();
-        PgApiResponse<PgResult> pgApiResponse = PgApiResponse.success(pgResult);
-
-        // 정책 검증 및 결제 Entity 반환
-        given(paymentTxService.createPayment(any(), any()))
-                .willReturn(savedPayment);
-        // PG 결제대행사에 결제 요청
-        given(pgClient.requestPayment(savedPayment))
-                .willReturn(pgApiResponse);
-        // 결제 도메인에 PG 요청 결과 반영 (트랜잭션ID, 결제상태 셋팅)
-        givenUpdatePaymentToInProgress(savedPayment, pgResult);
-
-        // when
-        paymentService.startPayment(request, member);
-
-        // then
-        // 결제상태변경 메서드 호출 여부 검증
-        verify(paymentTxService).updatePaymentToInProgress(
-                eq(savedPayment.getId()), eq(pgResult));
     }
 
     // 결제시작 책임 - 응답값 검증
@@ -426,15 +326,16 @@ class PaymentServiceTest {
         Order invalidOrder = order(member);
         ReflectionTestUtils.setField(invalidOrder, "totalPrice", BigDecimal.ZERO);
         // 저장된 신규 결제
-        Payment savedPayment = savedPayment(invalidOrder, requestPaymentMethod, pgProvider);
+        Payment savedPayment =
+                savedPayment(invalidOrder, requestPaymentMethod, pgProvider);
         // PG 결제 요청 응답 (결제 실패 응답)
         PgApiResponse<PgResult> pgApiResponse = PgApiResponse.fail(
                 "INVALID_AMOUNT", "결제 금액이 올바르지 않습니다.");
 
-        // 정책 검증 및 결제 Entity 반환
-        given(paymentTxService.createPayment(any(), any()))
-                .willReturn(savedPayment);
-        givenRequestPayment(savedPayment, pgApiResponse); // PG 결제대행사에 결제 요청
+        // 정책 검증 및 결제 반환
+        given(paymentTxService.createPayment(any(), any())).willReturn(savedPayment);
+        // PG 결제대행사에 결제 요청
+        givenRequestPayment(savedPayment, pgApiResponse);
 
         // when
         ResponsePaymentDto response = paymentService.startPayment(request, member);
@@ -459,16 +360,15 @@ class PaymentServiceTest {
        ---------------------------------- */
 
     @Test
-    @DisplayName("PG 결제승인 웹훅 성공 - 트랜잭션ID에 맞는 결제 존재 시 결제 승인")
-    void handlePgWebHook_shouldApprovePayment_whenExistsTransactionId() {
+    @DisplayName("PG 결제승인 웹훅 성공 - 승인가능한 결제 존재 시 Payment 승인 처리 및 Order 완료 처리 요청")
+    void handlePgWebHook_shouldUpdatePaymentAndOrder_whenValidPgApprovalResult() {
         // given
         String pgTransactionId = "pgTransactionId";
-        BigDecimal paidAmount = new BigDecimal(10000);
         // PG 결제승인 요청에 대한 웹훅 응답
         PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
                 .pgTransactionId(pgTransactionId)
                 .approvalStatus(APPROVED) // PG 결제 승인
-                .paidAmount(paidAmount)
+                .paidAmount(new BigDecimal(10000))
                 .build();
 
         // 결제 대한 주문
@@ -652,10 +552,6 @@ class PaymentServiceTest {
         // 예외를 밖으로 전파하지 않음을 검증
         assertDoesNotThrow(() -> paymentService.handlePgWebHook(pgApprovalResult));
     }
-
-    // TODO: paymentTxServiceTest에서 결제 승인결과 반영 검증
-    // TODO: orderTxServiceTest에서 주문 결제완료 상태변경 검증
-
 
     // 금액 검증, TransactionId 검증, 상태 전이 검증 등의 경우
     // PaymentTest에 이미 존재하므로, 이미 검증된 책임에 대해서는 검증 제외

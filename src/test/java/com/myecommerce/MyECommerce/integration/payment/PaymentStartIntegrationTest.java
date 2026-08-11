@@ -131,8 +131,7 @@ public class PaymentStartIntegrationTest {
                 .build();
 
         // when
-        ResponsePaymentDto response =
-                paymentService.startPayment(request, member);
+        ResponsePaymentDto response = paymentService.startPayment(request, member);
 
         // then
         assertEquals(savedOrder.getId(), response.getOrderId());

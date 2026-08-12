@@ -17,6 +17,8 @@ public enum PaymentErrorCode implements CommonErrorCode {
             "error.payment.available.only.buyer"),
 
     // 결제 validation check
+    PAYMENT_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            "error.payment.not.found"),
     PAYMENT_ORDER_NOT_EXISTS(HttpStatus.BAD_REQUEST.value(),
             "error.payment.order.not.exists"),
     ORDER_STATUS_NOT_CREATED(HttpStatus.CONFLICT.value(),
@@ -44,7 +46,11 @@ public enum PaymentErrorCode implements CommonErrorCode {
     PG_TRANSACTION_ID_MISMATCH(HttpStatus.CONFLICT.value(),
             "error.payment.pg.transaction.id.mismatch"),
     PG_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR.value(),
-            "error.payment.pg.api.error")
+            "error.payment.pg.api.error"),
+
+    // PG 결제 승인 validation check
+    PAYMENT_ORDER_MISMATCH_INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            "error.payment.order.mismatch.internal.error"),
     ;
 
     private final int statusCode;

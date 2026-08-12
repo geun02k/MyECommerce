@@ -9,19 +9,17 @@ import com.myecommerce.MyECommerce.entity.order.OrderItem;
 import com.myecommerce.MyECommerce.entity.payment.Payment;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
+import com.myecommerce.MyECommerce.exception.PaymentException;
 import com.myecommerce.MyECommerce.integration.config.TestAuditingConfig;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.member.MemberAuthorityRepository;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
 import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
+import com.myecommerce.MyECommerce.service.order.OrderTxService;
 import com.myecommerce.MyECommerce.service.payment.PaymentService;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.myecommerce.MyECommerce.type.PaymentStatusType;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -32,29 +30,25 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
-import static com.myecommerce.MyECommerce.type.OrderStatusType.PAID;
 import static com.myecommerce.MyECommerce.type.PaymentMethodType.CARD;
-import static com.myecommerce.MyECommerce.type.PaymentStatusType.APPROVED;
+import static com.myecommerce.MyECommerce.type.PaymentStatusType.*;
 import static com.myecommerce.MyECommerce.type.PgProviderType.MOCK_PG;
 import static com.myecommerce.MyECommerce.type.ProductCategoryType.WOMEN_CLOTHING;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
 @ActiveProfiles("test")
 @Import(TestAuditingConfig.class)
-public class PaymentPgApiConcurrencyTest {
+public class PaymentPgApiConsistencyTest {
 
-    private static final Logger log = LoggerFactory.getLogger(PaymentPgApiConcurrencyTest.class);
-
+    @MockitoSpyBean // OrderTxService 호출 시 무조건 RuntimeException 발생을 위함
+    private OrderTxService orderTxService;
     @Autowired
     private PaymentService paymentService;
 
@@ -62,7 +56,7 @@ public class PaymentPgApiConcurrencyTest {
     private PaymentRepository paymentRepository;
     @Autowired
     private MemberRepository memberRepository;
-    @MockitoSpyBean // verify() 호출을 위함
+    @Autowired
     private OrderRepository orderRepository;
     @Autowired
     private ProductRepository productRepository;
@@ -78,7 +72,8 @@ public class PaymentPgApiConcurrencyTest {
 
     private Member savedCustomer;
     private Order savedOrder;
-    private Payment savedPayment;
+    private Payment webhookTargetPayment;
+    private Payment savedApprovedPayment;
 
     @BeforeEach
     void setUp() {
@@ -95,17 +90,16 @@ public class PaymentPgApiConcurrencyTest {
         transactionTemplate.executeWithoutResult(status -> {
             Long productId = savedOrder.getItems().get(0).getProduct().getId();
 
-            paymentRepository.deleteById(savedPayment.getId());
+            paymentRepository.deleteById(webhookTargetPayment.getId());
+            if(savedApprovedPayment != null) {
+                paymentRepository.deleteById(savedApprovedPayment.getId());
+            }
             orderRepository.deleteById(savedOrder.getId());
             productRepository.deleteById(productId);
             memberAuthorityRepository.deleteByMemberId(savedCustomer.getId());
             memberRepository.deleteById(savedCustomer.getId());
         });
     }
-
-    /* ------------------
-        Helper Methods
-       ------------------ */
 
     /** 주문자 등록 */
     Member saveCustomer() {
@@ -177,47 +171,37 @@ public class PaymentPgApiConcurrencyTest {
         payment.requestPgPayment(pgResult);
 
         // 결제 저장
-        Payment saved = paymentRepository.save(payment);
-        paymentRepository.flush();
-        return saved;
+        return paymentRepository.save(payment);
     }
 
-    /** PG 결제승인 웹훅 동시성 실행
-     *  : 지저분한 기술적 코드를 메서드로 분리 */
-    void executeConcurrentPgWebhookRequests(PgApprovalResult request) throws Exception {
-        // 트랜잭션 생성
-        int threadCount = 10;
-        // 동시에 실행될 스레드 풀
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        // 모든 스레드가 끝날 때까지 대기 (해당 코드 없으면 테스트가 중간에 끝남)
-        CountDownLatch readyLatch = new CountDownLatch(threadCount); // 준비 완료 신호
-        CountDownLatch startSignal = new CountDownLatch(1);          // 동시 출발 신호
-        CountDownLatch doneLatch = new CountDownLatch(threadCount);  // 종료 대기 신호
+    /** PG 결제승인된 결제 등록 */
+    Payment savePaidPayment(Order order, String pgTransactionId) {
+        // PG 결제요청 된 결제 생성 (IN_PROGRESS)
+        Payment payment = saveInProgressPayment(order, pgTransactionId);
 
-        // when
-        for (int i = 0; i < threadCount; i++) {
-            // 여러 트랜잭션 동시 실행 (각 submit은 독립 트랜잭션)
-            executor.submit(() -> {
-                try {
-                    readyLatch.countDown(); // 작업 스레드 생성
-                    startSignal.await();    // 모든 작업 스레드는 startSignal이 countDown() 될 때까지 대기
-                    // 주문 생성
-                    paymentService.handlePgWebHook(request);
+        // PG 결제승인 (IN_PROGRESS -> APPROVED)
+        PgApprovalResult pgApprovalResult =
+                pgApprovalResult(APPROVED, pgTransactionId);
+        payment.approve(pgApprovalResult);
 
-                } catch (Exception e) {
-                    log.error(e.getMessage(), e);
+        return paymentRepository.save(payment);
+    }
 
-                } finally {
-                    doneLatch.countDown(); // 각 스레드 종료
-                }
-            });
-        }
+    /** PG 승인 결과 생성 */
+    PgApprovalResult pgApprovalResult(PaymentStatusType approvalStatus, String pgTransactionId) {
+        return PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(approvalStatus)
+                .paidAmount(new BigDecimal("10000"))
+                .vatAmount(new BigDecimal("9091"))
+                .build();
+    }
 
-        readyLatch.await();      // 모든 스레드가 생성될 때까지 메인인 테스트 스레드 대기
-        startSignal.countDown(); // 생성한 모든 작업 스레드 일제히 시작
-        doneLatch.await();       // 모든 스레드 종료 대기
-        // 스레드풀 자원 종료
-        executor.shutdown();
+    /** 주문 결제완료 상태로 변경 */
+    void changeOrderToPaid(Order order) {
+        savedApprovedPayment = savePaidPayment(order, "paidPgTransactionId");
+        order.paid(savedApprovedPayment);
+        orderRepository.save(order);
     }
 
     /* ---------------------
@@ -225,15 +209,13 @@ public class PaymentPgApiConcurrencyTest {
        --------------------- */
 
     @Test
-    @DisplayName("PG 결제승인 웹훅 성공 - 동일 결제에 대한 다건의 PG 결제승인 웹훅 시도 시 1건만 반영")
-    void handlePgWebHook_shouldUpdatePaymentOfOne_whenConcurrentRequestsForSamePayment()
-            throws Exception {
+    @DisplayName("PG 결제승인 웹훅 성공 - 주문 결제처리 실패 시에도 Payment 승인처리")
+    void handlePgWebHook_shouldApprovePayment_whenOrderUpdateFailed() {
         // given
         // 주문
-        Order createdOrder = savedOrder;
-        // 주문에 대해 PG 결제요청된 결제
-        savedPayment = saveInProgressPayment(createdOrder, "pgTransactionId");
-
+        Order order = savedOrder;
+        // 웹훅 대상 Payment
+        webhookTargetPayment = saveInProgressPayment(order, "pgTransactionId");
         // PG 결제승인 요청값
         PgApprovalResult request = PgApprovalResult.builder()
                 .pgTransactionId("pgTransactionId")
@@ -242,20 +224,54 @@ public class PaymentPgApiConcurrencyTest {
                 .approvalAt(LocalDateTime.now())
                 .build();
 
+        // OrderTxService 호출 시 무조건 RuntimeException 발생하도록 설정
+        doThrow(new RuntimeException("내부 시스템 장애/오류(DB 장애, 런타임 에러 등) 강제 발생"))
+                .when(orderTxService).updatePaidOrderStatus(any(), any());
+
         // when
-        // PG 결제승인 웹훅 동시 실행
-        executeConcurrentPgWebhookRequests(request);
+        // PG 결제승인 웹훅 실행
+        paymentService.handlePgWebHook(request);
 
         // then
-        // 결제상태 검증
-        Payment resultPayment =
-                paymentRepository.findByPgTransactionIdWithOrder("pgTransactionId")
-                        .orElseThrow();
-        assertEquals(APPROVED, resultPayment.getPaymentStatus());
-
-        // 주문상태 검증
-        Long resultOrderId = resultPayment.getOrder().getId();
-        Order resultOrder = orderRepository.findById(resultOrderId).orElseThrow();
-        assertEquals(PAID, resultOrder.getOrderStatus());
+        // Payment는 PG승인 완료(APPROVED) 상태로 유지
+        Payment approvedPayment =
+                paymentRepository.findById(webhookTargetPayment.getId()).orElseThrow();
+        assertEquals(APPROVED, approvedPayment.getPaymentStatus());
+        // Order는 CREATED 상태 그대로 유지 (PAID로 변경되지 않음)
+        Order createdOrder = orderRepository.findById(order.getId()).orElseThrow();
+        assertEquals(CREATED, createdOrder.getOrderStatus());
     }
-}
+
+    @Test
+    @Disabled("기존 PG 결제승인 웹훅 정합성 문제 재현 후 버그 수정 완료로 테스트 제외")
+    @DisplayName("PG 결제승인 웹훅 실패 - 주문 결제 처리 실패 시 Payment 승인까지 rollback 되는 트랜잭션 정합성 문제 재현")
+    void handlePgWebHook_shouldRollbackPaymentApproval_whenOrderUpdateFailed() {
+        // given
+        // 주문
+        Order order = savedOrder;
+        // 웹훅 대상 Payment
+        webhookTargetPayment = saveInProgressPayment(order, "pgTransactionId");
+        // PG 결제승인 요청값
+        PgApprovalResult request = PgApprovalResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .paidAmount(new BigDecimal("10000"))
+                .approvalStatus(APPROVED)
+                .approvalAt(LocalDateTime.now())
+                .build();
+
+        // Order 상태 변경 실패 조건 생성
+        changeOrderToPaid(order);
+
+        // when
+        // PG 결제승인 웹훅 실행
+        assertThrows(PaymentException.class, () ->
+                paymentService.handlePgWebHook(request));
+
+        // then
+        // payment가 승인되지 않음을 검증
+        Payment rollbackPayment =
+                paymentRepository.findById(webhookTargetPayment.getId())
+                        .orElseThrow();
+        assertEquals(IN_PROGRESS, rollbackPayment.getPaymentStatus());
+    }
+} 

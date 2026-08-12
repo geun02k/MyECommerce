@@ -48,7 +48,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Transactional
 @ActiveProfiles("test")
 @Import(TestAuditingConfig.class)
 public class PaymentPgApiTest {
@@ -70,6 +69,8 @@ public class PaymentPgApiTest {
 
     private Member savedCustomer;
     private Product savedProduct;
+    private Order savedCreatedOrder;
+    private Payment savedPayment;
 
     @BeforeEach
     void setUp() {
@@ -79,8 +80,14 @@ public class PaymentPgApiTest {
 
     @AfterEach
     void cleanUp() {
-        memberRepository.delete(savedCustomer);
+        if(savedPayment != null) {
+            paymentRepository.delete(savedPayment);
+        }
+        if(savedCreatedOrder != null) {
+            orderRepository.delete(savedCreatedOrder);
+        }
         productRepository.delete(savedProduct);
+        memberRepository.delete(savedCustomer);
     }
 
     /* ------------------
@@ -182,16 +189,16 @@ public class PaymentPgApiTest {
 
    /* --------------------------
         PG 결제승인 웹훅 성공 Test
-       ------------------------- */
+      -------------------------- */
 
     @Test
     @DisplayName("PG 결제승인 웹훅 성공 - 결제승인 웹훅 요청 시 주문, 결제상태 변경 후 200 OK 반환")
     void handlePgApprovalWebhook_shouldReturn200_whenApprovalRequest() throws Exception {
         // given
         // 주문
-        Order order = createCreatedOrder();
+        savedCreatedOrder = createCreatedOrder();
         // 주문에 대한 PG 결제요청한 결제생성
-        createInProgressPayment(order); // 트랜잭션ID = pgTransactionId인 결제
+        savedPayment = createInProgressPayment(savedCreatedOrder); // 트랜잭션ID = pgTransactionId인 결제
 
         // PG 승인 응답
         PgWebHookRequestDto request = PgWebHookRequestDto.builder()
@@ -225,9 +232,9 @@ public class PaymentPgApiTest {
     void handlePgApprovalWebhook_shouldReturn200_whenFailRequest() throws Exception {
         // given
         // 주문
-        Order order = createCreatedOrder();
+        savedCreatedOrder = createCreatedOrder();
         // 주문에 대한 PG 결제요청한 결제생성
-        createInProgressPayment(order); // 트랜잭션ID = pgTransactionId인 결제
+        savedPayment = createInProgressPayment(savedCreatedOrder); // 트랜잭션ID = pgTransactionId인 결제
 
         // PG 승인 응답
         PgWebHookRequestDto request = PgWebHookRequestDto.builder()
@@ -245,7 +252,9 @@ public class PaymentPgApiTest {
                 .andExpect(status().isOk());
 
         // 결제상태 검증
-        Payment resultPayment = paymentRepository.findByPgTransactionIdWithOrder("pgTransactionId").orElseThrow();
+        Payment resultPayment =
+                paymentRepository.findByPgTransactionIdWithOrder("pgTransactionId")
+                        .orElseThrow();
         assertEquals(FAILED, resultPayment.getPaymentStatus()); // 결제상태 IN_PROGRESS -> FAILED
 
         // 주문상태 검증
@@ -255,17 +264,24 @@ public class PaymentPgApiTest {
     }
 
    /* --------------------------------
-        PG 결제승인 웹훅 멱등성 성공 Test
-       ------------------------------- */
+        PG 결제승인 웹훅 성공 정합성 Test
+      -------------------------------- */
+
+    // TODO: PaymentApiConcurrencyTest 테스트 이전해오기
+    // TODO: Order 처리 실패 시에도 Payment 승인은 유지되고 예외를 전파하지 않음 검증
+
+   /* --------------------------------
+        PG 결제승인 웹훅 성공 멱등성 Test
+      -------------------------------- */
 
     @Test
     @DisplayName("PG 결제승인 웹훅 멱등성 성공 - 이미 결제종결된 경우 주문, 결제상태 변경하지 않고 200 OK 반환")
     void handlePgApprovalWebhook_shouldReturn200_whenDuplicatedRequest() throws Exception {
         // given
         // 결제
-        Order order = createCreatedOrder();
+        savedCreatedOrder = createCreatedOrder();
         // 승인실패한 결제
-        createFailedPayment(order); // 트랜잭션ID = pgTransactionId인 결제
+        savedPayment = createFailedPayment(savedCreatedOrder); // 트랜잭션ID = pgTransactionId인 결제
 
         // PG 승인 응답 (이미 승인종결된 동일 트랜잭션ID에 대한 승인완료 응답)
         PgWebHookRequestDto request = PgWebHookRequestDto.builder()
@@ -292,9 +308,9 @@ public class PaymentPgApiTest {
         assertEquals(CREATED, resultOrder.getOrderStatus()); // 주문상태 CREATED 유지
     }
 
-   /* --------------------------
+   /* ---------------------------
         PG 결제승인 웹훅 실패 Test
-       ------------------------- */
+      --------------------------- */
 
     // 외부 PG가 잘못된 요청 보낼 수도 있어서 반드시 필요
     @Test
@@ -302,9 +318,9 @@ public class PaymentPgApiTest {
     void handlePgApprovalWebhook_shouldReturn404_whenNotExistsTransactionId() throws Exception {
         // given
         // 결제
-        Order order = createCreatedOrder();
+        savedCreatedOrder = createCreatedOrder();
         // 주문에 대한 PG 결제요청한 결제생성
-        createInProgressPayment(order); // 트랜잭션ID = pgTransactionId인 결제
+        savedPayment = createInProgressPayment(savedCreatedOrder); // 트랜잭션ID = pgTransactionId인 결제
 
         // PG 승인 응답 (존재하지 않는 트랜잭션ID에 대한 승인 응답)
         PgWebHookRequestDto request = PgWebHookRequestDto.builder()
@@ -333,6 +349,7 @@ public class PaymentPgApiTest {
         assertEquals(CREATED, resultOrder.getOrderStatus()); // 주문상태 CREATED 유지
     }
 
+    // TODO: JSON 바인딩 실패를 위한 CommonExceptionHandler에 HttpMessageNotReadableException 처리 로직을 추가 고려
     @Test
     @DisplayName("PG 결제승인 웹훅 실패 - 잘못된 승인상태 요청 시 400 BadRequest 반환")
     void handlePgApprovalWebhook_shouldReturn400_whenInvalidApprovalStatus() throws Exception {

@@ -81,8 +81,7 @@ class CartPolicyTest {
         given(redisMultiDataService.getSizeOfHashData(CART, customer.getUserId()))
                 .willReturn(1L);
         // 요청한 상품은 판매중인 상품으로 반환
-        given(productRepository.findByIdAndSaleStatus(
-                eq(productOptionId), eq(ON_SALE)))
+        given(productRepository.findByOptionIdAndSaleStatusOnSale(eq(productOptionId)))
                 .willReturn(Optional.of(Product.builder()
                         .id(productOptionId)
                         .saleStatus(ON_SALE).build()));
@@ -119,8 +118,7 @@ class CartPolicyTest {
         // 사용자 장바구니 사이즈 (타정책 통과용)
         givenUserCartSize(customer);
         // 판매중단된 상품으로 조회되지 않음
-        given(productRepository.findByIdAndSaleStatus(
-                eq(productOptionId), eq(ON_SALE)))
+        given(productRepository.findByOptionIdAndSaleStatusOnSale(eq(productOptionId)))
                 .willReturn(Optional.empty());
 
         // when
@@ -130,7 +128,7 @@ class CartPolicyTest {
         assertEquals(PRODUCT_NOT_ON_SALE, e.getErrorCode());
         // 판매상태 조회 실행여부 검증
         verify(productRepository, times(1))
-                .findByIdAndSaleStatus(productOptionId, ON_SALE);
+                .findByOptionIdAndSaleStatusOnSale(productOptionId);
     }
 
     @Test

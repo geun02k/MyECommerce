@@ -15,7 +15,7 @@ public class RequestPaymentDto {
     @Min(value = 1, message = "{validation.payment.order.id.min}")
     private Long orderId;
 
-    @NotBlank(message = "{validation.payment.method.not.blank}")
+    @NotNull(message = "{validation.payment.method.not.null}")
     @EnumValid(enumClass = PaymentMethodType.class,
                message = "{validation.payment.method.enum.valid}")
     private PaymentMethodType paymentMethod;

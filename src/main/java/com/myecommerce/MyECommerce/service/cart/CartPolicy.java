@@ -14,7 +14,6 @@ import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_SIZE_EXCEEDED;
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_ON_SALE;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
-import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 
 @Component
@@ -28,13 +27,13 @@ public class CartPolicy {
     private final ProductRepository productRepository;
 
     /** 장바구니 추가 정책 **/
-    public void validateAdd(Long productId, Member member) {
+    public void validateAdd(Long productOptionId, Member member) {
         // 고객 한정 장바구니 접근 제한
         validateCartAccessPolicy(member);
         // 장바구니 물품 100건 제한
         checkUserCartSizePolicy(member.getUserId());
         // 장바구니에 추가 가능한 상품은 판매중인 경우로 제한
-        validateOnSaleProductPolicy(productId);
+        validateOnSaleProductPolicy(productOptionId);
     }
 
     // 장바구니 제품 수량 체크 정책
@@ -47,8 +46,8 @@ public class CartPolicy {
     }
 
     // 상품 판매상태(ON_SALE) 검증 정책
-    private void validateOnSaleProductPolicy(Long productId) {
-        productRepository.findByIdAndSaleStatus(productId, ON_SALE)
+    private void validateOnSaleProductPolicy(Long productOptionId) {
+        productRepository.findByOptionIdAndSaleStatusOnSale(productOptionId)
                 .orElseThrow(() -> new ProductException(PRODUCT_NOT_ON_SALE));
     }
 

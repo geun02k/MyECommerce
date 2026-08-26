@@ -34,7 +34,7 @@ public class PaymentTxService {
     private final PaymentRepository paymentRepository;
 
     /** 정책검증 후 결제 Entity 생성 **/
-    @Transactional
+    @Transactional(propagation = REQUIRES_NEW)
     protected Payment createPayment(RequestPaymentDto requestPaymentDto,
                                     Member member) {
         // 사전 정책 검증
@@ -70,7 +70,7 @@ public class PaymentTxService {
     }
 
     /** 결제 도메인에 PG 요청 결과 반영 (결제번호, 결제상태 셋팅) **/
-    @Transactional
+    @Transactional(propagation = REQUIRES_NEW)
     protected Payment updatePaymentToInProgress(Long paymentId, PgResult pgResult) {
         // 결제 다건 조회 (비관적 락)
         Payment targetPayment = paymentRepository.findLockedById(paymentId)

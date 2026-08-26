@@ -11,15 +11,18 @@ import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.integration.config.TestAuditingConfig;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
+import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.service.payment.PaymentService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -32,7 +35,6 @@ import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
-@Transactional
 @ActiveProfiles("test")
 @Import(TestAuditingConfig.class)
 public class PaymentStartIntegrationTest {
@@ -46,11 +48,42 @@ public class PaymentStartIntegrationTest {
     private ProductRepository productRepository;
     @Autowired
     private OrderRepository orderRepository;
+    @Autowired
+    private PaymentRepository paymentRepository;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     /* ------------------
         Test Fixtures
        ------------------ */
 
+    private Member savedMember;
+    private Product savedProduct;
+    private Order savedOrder;
+    private Long createdPaymentId;
+
+    @BeforeEach
+    void setUp() {
+        // given
+        // 결제를 위한 회원
+        savedMember = saveCustomer();
+        // 주문을 위한 상품
+        savedProduct = saveProduct();
+
+        // 결제를 위한 주문 등록
+        savedOrder  = saveOrder(savedMember, savedProduct.getOptions().get(0));
+    }
+
+    @AfterEach
+    void cleanUp() {
+        transactionTemplate.executeWithoutResult(status -> {
+            paymentRepository.deleteById(createdPaymentId);
+            orderRepository.deleteById(savedOrder.getId());
+            productRepository.deleteById(savedProduct.getId());
+            memberRepository.deleteById(savedMember.getId());
+        });
+    }
     /* ------------------
         Helper Methods
        ------------------ */
@@ -74,14 +107,10 @@ public class PaymentStartIntegrationTest {
     }
 
     /** 주문 등록 */
-    Order saveOrder(Member member) {
-        // 상품등록
-        Product savedProduct = saveProduct();
-        ProductOption savedOption = savedProduct.getOptions().get(0);
-
+    Order saveOrder(Member member, ProductOption option) {
         // 주문물품 생성
         OrderItem orderItem =
-                OrderItem.createOrderItem(savedOption, 1);
+                OrderItem.createOrderItem(option, 1);
 
         // 주문 생성 및 등록
         Order order = Order.createOrder(List.of(orderItem), member);
@@ -120,21 +149,24 @@ public class PaymentStartIntegrationTest {
     void startPayment_shouldReturnPgInfo_whenValidRequest() {
         // given
         // 결제를 위한 회원
-        Member member = saveCustomer();
+        Member member = savedMember;
         // 결제를 위한 주문 등록
-        Order savedOrder  = saveOrder(member);
+        Order order = savedOrder;
 
         // 결제 요청
         RequestPaymentDto request = RequestPaymentDto.builder()
-                .orderId(savedOrder.getId())
+                .orderId(order.getId())
                 .paymentMethod(CARD)
                 .build();
 
         // when
         ResponsePaymentDto response = paymentService.startPayment(request, member);
 
+        // 생성된 결제 데이터 수동 삭제를 위한 변수 할당
+        createdPaymentId = response.getPaymentId();
+
         // then
-        assertEquals(savedOrder.getId(), response.getOrderId());
+        assertEquals(order.getId(), response.getOrderId());
         assertEquals(IN_PROGRESS, response.getPaymentStatus());
         assertEquals("redirectUrl", response.getRedirectUrl());
     }

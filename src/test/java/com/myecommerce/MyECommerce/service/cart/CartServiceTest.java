@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -298,4 +299,17 @@ class CartServiceTest {
         verify(redisMultiDataService, never()).deleteMultiHashData(any(), any(), any());
     }
 
+    @Test
+    @DisplayName("장바구니에서 주문물품제거 실패 - 주문물품이 없으면 주문물품제거 미수행")
+    void removeOrderItems_shouldNotCallDeleteMethod_whenNotExistOrderItem() {
+        // given
+        OrderPathType orderPath = OrderPathType.CART;
+        List<OrderItem> emptyOrderItems = Collections.emptyList();
+
+        // when
+        cartService.removeOrderItems(orderPath, null, emptyOrderItems);
+
+        // then
+        verify(redisMultiDataService, never()).deleteMultiHashData(any(), any(), any());
+    }
 }

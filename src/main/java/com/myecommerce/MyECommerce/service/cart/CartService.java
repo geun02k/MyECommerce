@@ -105,6 +105,11 @@ public class CartService {
           return;
         }
 
+        // 주문물품이 없으면 미수행
+        if(items == null || items.isEmpty()) {
+            return;
+        }
+
         // 주문한 옵션 목록 추출
         List<String> optionIds = items.stream()
                 .map(item -> createCartRedisHashKey(item.getOption().getId()))

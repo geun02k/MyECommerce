@@ -1,6 +1,6 @@
 package com.myecommerce.MyECommerce.controller;
 
-import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderDtoList;
 import com.myecommerce.MyECommerce.dto.order.ResponseOrderDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.service.order.OrderService;
@@ -29,11 +29,11 @@ public class OrderController {
     @PostMapping
     @PreAuthorize("hasAnyAuthority('CUSTOMER')")
     public ResponseEntity<ResponseOrderDto> createOrder(
-            @RequestBody @Valid List<RequestOrderDto> requestOrderDto,
+            @RequestBody @Valid RequestOrderDtoList requestOrderDtoList,
             @AuthenticationPrincipal Member member) {
 
         ResponseOrderDto responseOrderDto =
-                orderService.createOrder(requestOrderDto, member);
+                orderService.createOrder(requestOrderDtoList, member);
 
         return ResponseEntity.ok(responseOrderDto);
     }

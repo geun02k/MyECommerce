@@ -1,6 +1,7 @@
 package com.myecommerce.MyECommerce.service.order;
 
 import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderDtoList;
 import com.myecommerce.MyECommerce.dto.order.ResponseOrderDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.order.Order;
@@ -9,6 +10,7 @@ import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.mapper.OrderMapper;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.service.cart.CartService;
 import com.myecommerce.MyECommerce.service.stock.StockCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ public class OrderService {
     private final OrderPolicy orderPolicy;
 
     private final StockCacheService stockCacheService;
+    private final CartService cartService;
 
     private final ProductOptionRepository productOptionRepository;
     private final OrderRepository orderRepository;
@@ -42,17 +45,17 @@ public class OrderService {
 
     /** 주문 생성 **/
     @Transactional
-    public ResponseOrderDto createOrder(List<RequestOrderDto> requestOrder, Member member) {
+    public ResponseOrderDto createOrder(RequestOrderDtoList requestOrder, Member member) {
         // 1. 주문 요청 옵션 조회 (재고 차감을 위해 비관적 락)
         Map<Long, ProductOption> registeredOptions =
-                findOrderRequestOptionsWithLock(requestOrder);
+                findOrderRequestOptionsWithLock(requestOrder.getOrderItems());
 
         // 2. 정책검증
-        orderPolicy.validateCreate(requestOrder, registeredOptions, member);
+        orderPolicy.validateCreate(requestOrder.getOrderItems(), registeredOptions, member);
 
         // 2. 주문 물품 목록 생성
         List<OrderItem> orderItems =
-                createOrderItems(requestOrder, registeredOptions);
+                createOrderItems(requestOrder.getOrderItems(), registeredOptions);
 
         // 3. 주문 생성 및 저장
         Order order = Order.createOrder(orderItems, member);
@@ -64,10 +67,11 @@ public class OrderService {
         // 5. 재고 캐시 데이터 차감 (원자적 감소)
         stockCacheService.decrementProductStock(savedOrder.getItems());
 
-        // FIXME: 로직추가 -> 6. 장바구니 캐시 데이터 제거
-        // 주문 생성 경로에 따른 장바구니 처리 필요
-        // 바구니 주문(CART)인 경우 주문 완료 후 장바구니 데이터를 제거해야 한다.
-        // 단, 상품 상세에서 바로 주문(DIRECT)하는 경우 장바구니 데이터를 유지해야 하므로 문 생성 출처를 구분하는 구조 검토 필요.
+        // 6. 장바구니 캐시 데이터 제거
+        cartService.removeOrderItems(requestOrder.getOrderPathType(),
+                                     member.getUserId(),
+                                     savedOrder.getItems());
+
         // 7. Entity -> responseDTO로 변환해 반환
         return orderMapper.toResponseDto(savedOrder);
     }

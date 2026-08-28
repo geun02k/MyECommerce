@@ -6,9 +6,15 @@ import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
+import com.myecommerce.MyECommerce.entity.order.OrderItem;
+import com.myecommerce.MyECommerce.entity.product.Product;
+import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
+import com.myecommerce.MyECommerce.type.OrderPathType;
+import com.myecommerce.MyECommerce.type.RedisNamespaceType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,13 +25,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import static com.myecommerce.MyECommerce.service.cart.CartService.EXPIRATION_PERIOD;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
-import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
-import static org.junit.jupiter.api.Assertions.*;
+import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
+ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
@@ -40,6 +47,8 @@ class CartServiceTest {
 
     @Mock
     private RedisSingleDataService redisSingleDataService;
+    @Mock
+    private RedisMultiDataService redisMultiDataService;
 
     @Mock
     private ProductOptionRepository productOptionRepository;
@@ -79,6 +88,25 @@ class CartServiceTest {
                 .build();
     }
 
+    /** 상품옵션 생성 */
+    ProductOption productOption(Long optionId) {
+        return ProductOption.builder()
+                .id(optionId)
+                .price(new BigDecimal("10000"))
+                .quantity(10)
+                .product(Product.builder()
+                        .saleStatus(ON_SALE)
+                        .build())
+                .build();
+    }
+
+    /** 주문물품 생성 */
+    List<OrderItem> orderItems(List<Long> orderOptionIds) {
+        return orderOptionIds.stream()
+                .map(optionId -> OrderItem.createOrderItem(
+                        productOption(optionId), 1))
+                .toList();
+    }
 
     /* ----------------------
         장바구니추가 Tests
@@ -110,7 +138,7 @@ class CartServiceTest {
                 .build();
 
         // 요청 상품 Redis 장바구니에서 조회
-        given(redisSingleDataService.getSingleHashValueData(eq(CART), eq(redisKey), eq(redisHashKey)))
+        given(redisSingleDataService.getSingleHashValueData(eq(RedisNamespaceType.CART), eq(redisKey), eq(redisHashKey)))
                 .willReturn(targetRedisCartDto);
         given(objectMapper.convertValue(targetRedisCartDto, RedisCartDto.class))
                 .willReturn(targetRedisCartDto);
@@ -132,10 +160,10 @@ class CartServiceTest {
         // redis 저장 실행여부 검증
         verify(redisSingleDataService, times(1))
                 .saveSingleHashValueData(
-                        eq(CART), eq(redisKey), eq(redisHashKey), redisCartDtoCaptor.capture());
+                        eq(RedisNamespaceType.CART), eq(redisKey), eq(redisHashKey), redisCartDtoCaptor.capture());
         // redis 만료 기간 갱신 검증
         verify(redisSingleDataService, times(1))
-                .setExpire(eq(CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
+                .setExpire(eq(RedisNamespaceType.CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
         // 캡쳐 결과 검증
         RedisCartDto capturedRedisCartDto = redisCartDtoCaptor.getValue();
         assertEquals(2, capturedRedisCartDto.getQuantity());
@@ -172,7 +200,7 @@ class CartServiceTest {
 
         // 요청 상품 Redis 장바구니에서 조회
         given(redisSingleDataService.getSingleHashValueData(
-                eq(CART), eq(redisKey), eq(redisHashKey)))
+                eq(RedisNamespaceType.CART), eq(redisKey), eq(redisHashKey)))
                 .willReturn(null);
         // 판매중인 상품옵션 DB에서 조회.
         given(productOptionRepository.findByIdOfOnSale(
@@ -199,15 +227,75 @@ class CartServiceTest {
                 ArgumentCaptor.forClass(RedisCartDto.class);
         verify(redisSingleDataService, times(1))
                 .saveSingleHashValueData(
-                        eq(CART), eq(redisKey), eq(redisHashKey),
+                        eq(RedisNamespaceType.CART), eq(redisKey), eq(redisHashKey),
                         redisCartDtoCaptor.capture());
         // redis 만료 기간 셋팅 검증
         verify(redisSingleDataService, times(1))
-                .setExpire(eq(CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
+                .setExpire(eq(RedisNamespaceType.CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
         // 캡쳐 결과 검증
         assertEquals(5, redisCartDtoCaptor.getValue().getQuantity());
         // 반환 결과 검증
         assertEquals(requestCartDto.getProductOptionId(), responseCartDto.getOptionId());
         assertEquals(5, responseCartDto.getQuantity());
     }
+
+    /* ----------------------
+        장바구니 조회 Tests
+       ---------------------- */
+
+    /* -------------------------------
+        장바구니에서 주문물품 제거 Tests
+       ------------------------------- */
+
+    @Test
+    @DisplayName("장바구니에서 주문물품제거 성공 - 단건 주문물품 존재 시 주문물품삭제 메서드 호출")
+    void removeOrderItems_shouldCallDeleteMethod_whenExistAOrderItem() {
+        // given
+        Long orderOptionId = 13L;
+
+        OrderPathType orderPath = OrderPathType.CART;
+        String userId = member().getUserId();
+        List<OrderItem> orderItems = List.of(
+                OrderItem.createOrderItem(productOption(orderOptionId), 1));
+
+        // when
+        cartService.removeOrderItems(orderPath, userId, orderItems);
+
+        // then
+        verify(redisMultiDataService).deleteMultiHashData(
+                RedisNamespaceType.CART, userId, List.of(String.valueOf(orderOptionId)));
+    }
+
+    @Test
+    @DisplayName("장바구니에서 주문물품제거 성공 - 다건 주문물품 존재 시 주문물품삭제 메서드 호출")
+    void removeOrderItems_shouldCallDeleteMethod_whenExistOrderItemList() {
+        // given
+        List<Long> orderOptionIds = Arrays.asList(1L, 2L);
+
+        OrderPathType orderPath = OrderPathType.CART;
+        String userId = member().getUserId();
+        List<OrderItem> orderItems = orderItems(orderOptionIds);
+
+        // when
+        cartService.removeOrderItems(orderPath, userId, orderItems);
+
+        // then
+        List<String> strOrderOptionIds = orderOptionIds.stream().map(String::valueOf).toList();
+        verify(redisMultiDataService).deleteMultiHashData(
+                RedisNamespaceType.CART, userId, strOrderOptionIds);
+    }
+
+    @Test
+    @DisplayName("장바구니에서 주문물품제거 실패 - 주문경로가 장바구니가 아니면 주문물품제거 미수행")
+    void removeOrderItems_shouldNotCallDeleteMethod_whenNotCartOfOrderPath() {
+        // given
+        OrderPathType orderPathOfNotCartDelete = OrderPathType.DIRECT;
+
+        // when
+        cartService.removeOrderItems(orderPathOfNotCartDelete, null, null);
+
+        // then
+        verify(redisMultiDataService, never()).deleteMultiHashData(any(), any(), any());
+    }
+
 }

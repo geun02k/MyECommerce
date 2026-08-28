@@ -1,6 +1,7 @@
 package com.myecommerce.MyECommerce.integration.order;
 
 import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderDtoList;
 import com.myecommerce.MyECommerce.dto.order.ResponseOrderDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
@@ -111,18 +112,18 @@ public class OrderCreateIntegrationTest {
     }
 
     /** optionIds로 전달된 옵션에 대한 요청 상품 옵션 목록 */
-    List<RequestOrderDto> givenRequestOrders(List<Long> optionIds) {
+    RequestOrderDtoList givenRequestOrders(List<Long> optionIds) {
         // 간접적으로 옵션 순서 순서 단정가능.
         // optionIds 리스트의 첫 번째 요소(get(0))에 수량 1,
         // 두 번째 요소(get(1))에 수량 2를 순서대로 할당합니다.
-        List<RequestOrderDto> requestOrders = new ArrayList<>();
+        RequestOrderDtoList requestOrders = new RequestOrderDtoList();
         int quantity = 1;
         for(Long optionId : optionIds) {
             RequestOrderDto request = RequestOrderDto.builder()
                     .productOptionId(optionId)
                     .quantity(quantity++)
                     .build();
-            requestOrders.add(request);
+            requestOrders.getOrderItems().add(request);
         }
         return requestOrders;
     }
@@ -252,7 +253,7 @@ public class OrderCreateIntegrationTest {
 
     /** 주문요청 10건 동시 실행 -> 주문 10건 생성
      *  : 지저분한 기술적 코드를 메서드로 분리 */
-    List<Long> executeConcurrentOrderRequests(List<RequestOrderDto> requestOrders,
+    List<Long> executeConcurrentOrderRequests(RequestOrderDtoList requestOrders,
                                               Member member) throws InterruptedException {
         // 트랜잭션 생성
         int threadCount = 10;
@@ -310,7 +311,7 @@ public class OrderCreateIntegrationTest {
         Member member = customer(memberId);
         // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
         List<Long> optionIds = optionIds(savedProduct);
-        List<RequestOrderDto> requestOrder = givenRequestOrders(optionIds);
+        RequestOrderDtoList requestOrder = givenRequestOrders(optionIds);
 
         // when
         ResponseOrderDto response =
@@ -356,11 +357,10 @@ public class OrderCreateIntegrationTest {
         Member member = customer(memberId);
         // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
         List<Long> optionIds = optionIds(savedProduct);
-        List<RequestOrderDto> requestOrder = givenRequestOrders(optionIds);
+        RequestOrderDtoList requestOrder = givenRequestOrders(optionIds);
 
         // when
-        ResponseOrderDto response =
-                orderService.createOrder(requestOrder, member);
+        orderService.createOrder(requestOrder, member);
 
         // then
         // 재고 차감 여부 검증
@@ -383,7 +383,7 @@ public class OrderCreateIntegrationTest {
         Member member = customer(savedMember.getId());
         // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
         List<Long> optionIds = optionIds(savedProduct);
-        List<RequestOrderDto> requestOrders = givenRequestOrders(optionIds);
+        RequestOrderDtoList requestOrders = givenRequestOrders(optionIds);
 
         // when
         // 주문 요청 동시 10번 수행 (테스트 목적: 동시 요청 시 재고가 안전하게 차감되는가 -> 동시성 메서드를 테스트에서 분리)

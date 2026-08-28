@@ -1,6 +1,7 @@
 package com.myecommerce.MyECommerce.service.order;
 
 import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderDtoList;
 import com.myecommerce.MyECommerce.dto.order.ResponseOrderDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
@@ -12,7 +13,9 @@ import com.myecommerce.MyECommerce.exception.OrderException;
 import com.myecommerce.MyECommerce.mapper.OrderMapper;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.service.cart.CartService;
 import com.myecommerce.MyECommerce.service.stock.StockCacheService;
+import com.myecommerce.MyECommerce.type.OrderPathType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +45,8 @@ class OrderServiceTest {
 
     @Mock
     private StockCacheService stockCacheService;
+    @Mock
+    private CartService cartService;
 
     @Mock
     private ProductOptionRepository productOptionRepository;
@@ -102,17 +107,22 @@ class OrderServiceTest {
         주문 생성 Test
        ------------------------ */
 
+    // TODO: 주문생성, 재고감소, 장바구니에서 상품옵션 제거 테스트 분할해 테스트케이스 책임분리
+    // TODO: 요청 주문물품 외 픽스쳐 메서드로 분리하는 것 고려하기
     @Test
-    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 주문 생성 및 재고 감소")
+    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 주문 생성 및 재고 감소 및 장바구니에서 상품옵션 제거")
     void createOrder_shouldCreateOrderAndDecreaseStock_whenValidOrderRequest() {
         // given
         // 요청 고객
         Member member = customer();
         // 요청 주문물품
+        RequestOrderDtoList requestOrder = new RequestOrderDtoList();
         RequestOrderDto requestItem = RequestOrderDto.builder()
                 .productOptionId(10L)
                 .quantity(5)
                 .build();
+        requestOrder.setOrderItems(List.of(requestItem));
+        requestOrder.setOrderPathType(OrderPathType.CART);
         // 주문 요청에 대한 상품옵션 조회
         ProductOption registeredOption = registeredOption();
         given(productOptionRepository.findByIdIn(List.of(requestItem.getProductOptionId())))
@@ -131,7 +141,7 @@ class OrderServiceTest {
                 .willReturn(mock(ResponseOrderDto.class));
 
         // when
-        orderService.createOrder(List.of(requestItem), member);
+        orderService.createOrder(requestOrder, member);
 
         // then
         // 정책 실행 여부 검증
@@ -141,6 +151,9 @@ class OrderServiceTest {
         verify(stockCacheService, times(1))
                 .decrementProductStock(any());
         // 재고 차감 검증은 통합테스트에서 수행
+        // 장바구니에서 주문한 상품옵션 제거 실행 여부 검증
+        verify(cartService, times(1))
+                .removeOrderItems(any(), eq(member.getUserId()), any());
 
         // 주문 생성 검증
         Order capturedOrder = capturedOrderBeforeSave.getValue();
@@ -165,10 +178,12 @@ class OrderServiceTest {
         // 요청 고객
         Member member = customer();
         // 요청 주문물품
+        RequestOrderDtoList invalidRequestOrder = new RequestOrderDtoList();
         RequestOrderDto invalidRequestItem = RequestOrderDto.builder()
                 .productOptionId(5L)
                 .quantity(51) // 주문 정책 제한: 물품 당 최대 주문 수량 초과
                 .build();
+        invalidRequestOrder.setOrderItems(List.of(invalidRequestItem));
 
         // 정책에서 예외 발생
         doThrow(new OrderException(ORDER_ITEM_MAX_QUANTITY_EXCEEDED))
@@ -180,7 +195,7 @@ class OrderServiceTest {
         // 정책이 왜 실패했는지가 아니라, 정책 실패 시 Service가 어떻게 반응하는지 검증.
         // -> OrderService는 정책 검증 실패 시 어떤 부작용도 일으키지 않고 즉시 중단한다
         OrderException e = assertThrows(OrderException.class, () ->
-                orderService.createOrder(List.of(invalidRequestItem), member));
+                orderService.createOrder(invalidRequestOrder, member));
         verify(orderRepository, never()).save(any());
         verify(stockCacheService, never()).decrementProductStock(any());
         verify(orderMapper, never()).toResponseDto(any());

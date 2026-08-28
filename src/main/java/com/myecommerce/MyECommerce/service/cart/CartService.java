@@ -6,12 +6,14 @@ import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDetailDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
+import com.myecommerce.MyECommerce.entity.order.OrderItem;
 import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import com.myecommerce.MyECommerce.service.stock.StockCacheService;
+import com.myecommerce.MyECommerce.type.OrderPathType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -92,6 +94,22 @@ public class CartService {
         setStockInfoForCartItems(targetCartItems, itemStock);
 
         return targetCartItems;
+    }
+
+    /** 장바구니에서 주문물품 제거 **/
+    public void removeOrderItems(OrderPathType orderPathType,
+                                 String userId,
+                                 List<OrderItem> items) {
+        // 주문 경로가 장바구니가 아니면 미수행
+        if(orderPathType != OrderPathType.CART) {
+          return;
+        }
+
+        // 장바구니에서 주문물품 제거
+        for (OrderItem item : items) {
+            String optionId = createCartRedisHashKey(item.getOption().getId());
+            redisSingleDataService.deleteSingleHashValueData(CART, userId, optionId);
+        }
     }
 
     // 장바구니 조회 Redis Hash Key 생성

@@ -105,11 +105,13 @@ public class CartService {
           return;
         }
 
-        // 장바구니에서 주문물품 제거
-        for (OrderItem item : items) {
-            String optionId = createCartRedisHashKey(item.getOption().getId());
-            redisSingleDataService.deleteSingleHashValueData(CART, userId, optionId);
-        }
+        // 주문한 옵션 목록 추출
+        List<String> optionIds = items.stream()
+                .map(item -> createCartRedisHashKey(item.getOption().getId()))
+                .toList();
+
+        // 장바구니에서 주문물품 일괄 제거
+        redisMultiDataService.deleteMultiHashData(CART, userId, optionIds);
     }
 
     // 장바구니 조회 Redis Hash Key 생성

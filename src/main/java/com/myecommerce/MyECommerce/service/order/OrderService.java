@@ -1,7 +1,7 @@
 package com.myecommerce.MyECommerce.service.order;
 
-import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
 import com.myecommerce.MyECommerce.dto.order.RequestOrderDtoList;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderItemDto;
 import com.myecommerce.MyECommerce.dto.order.ResponseOrderDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.order.Order;
@@ -47,7 +47,7 @@ public class OrderService {
     @Transactional
     public ResponseOrderDto createOrder(RequestOrderDtoList requestOrder, Member member) {
         // 요청한 주문 물품
-        List<RequestOrderDto> requestOrderItems = requestOrder.getOrderItems();
+        List<RequestOrderItemDto> requestOrderItems = requestOrder.getOrderItems();
 
         // 1. 주문 요청 옵션 조회 (재고 차감을 위해 비관적 락)
         Map<Long, ProductOption> registeredOptions =
@@ -76,7 +76,7 @@ public class OrderService {
     }
 
     // 주문 저장
-    private Order saveOrder(List<RequestOrderDto> requestOrderItems,
+    private Order saveOrder(List<RequestOrderItemDto> requestOrderItems,
                             Map<Long, ProductOption> registeredOptions,
                             Member member) {
         // 주문물품 생성
@@ -104,10 +104,10 @@ public class OrderService {
 
     // 주문 요청 옵션 조회
     private Map<Long, ProductOption> findOrderRequestOptionsWithLock(
-            List<RequestOrderDto> requestOrder) {
+            List<RequestOrderItemDto> requestOrder) {
         // 상품 옵션 아이디 목록 생성
         List<Long> optionIds = requestOrder.stream()
-                .map(RequestOrderDto::getProductOptionId)
+                .map(RequestOrderItemDto::getProductOptionId)
                 .toList();
         // 상품 옵션 목록 조회 (트랜잭션 비관적 락)
         List<ProductOption> requestOptionList =
@@ -119,11 +119,11 @@ public class OrderService {
     }
 
     // 주문 물품 목록 생성
-    private List<OrderItem> createOrderItems(List<RequestOrderDto> requestOrder,
+    private List<OrderItem> createOrderItems(List<RequestOrderItemDto> requestOrder,
                                              Map<Long, ProductOption> registeredOptions) {
         List<OrderItem> orderItems = new ArrayList<>();
 
-        for(RequestOrderDto requestItem : requestOrder) {
+        for(RequestOrderItemDto requestItem : requestOrder) {
             // 요청한 주문물품 대상 옵션
             Long optionId = requestItem.getProductOptionId();
             ProductOption registeredOption = registeredOptions.get(optionId);

@@ -1,12 +1,10 @@
 package com.myecommerce.MyECommerce.service.order;
 
-import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderItemDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
-import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.exception.OrderException;
-import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +22,7 @@ public class OrderPolicy {
     private final static int ITEM_MAX_QUANTITY = 50; // 물품 당 최대 주문 수량
 
     /** 주문 생성 정책 **/
-    public void validateCreate(List<RequestOrderDto> orderItemList,
+    public void validateCreate(List<RequestOrderItemDto> orderItemList,
                                Map<Long, ProductOption> registeredOptions,
                                Member member) {
         // 1, 서비스 정책 검증 (받아도 되는 요청인가?)
@@ -66,7 +64,7 @@ public class OrderPolicy {
     }
 
     // 최대 주문 가능 물품 수량 제한 정책
-    private void validateMaxOrderItemsPolicy(List<RequestOrderDto> orderItemList) {
+    private void validateMaxOrderItemsPolicy(List<RequestOrderItemDto> orderItemList) {
         if (ORDER_ITEM_MAX_CNT < orderItemList.size()) {
             throw new OrderException(ORDER_COUNT_EXCEEDED , ORDER_ITEM_MAX_CNT);
         }
@@ -74,10 +72,10 @@ public class OrderPolicy {
 
     // 물품 중복 요청에 대한 정책
     private void validateDuplicatedItemRequestPolicy(
-            List<RequestOrderDto> orderItemList) {
+            List<RequestOrderItemDto> orderItemList) {
         // 중복 제거된 물품 목록 set
         Set<Long> deduplicatedSet = orderItemList.stream()
-                .map(RequestOrderDto::getProductOptionId)
+                .map(RequestOrderItemDto::getProductOptionId)
                 .collect(Collectors.toSet());
         // 중복 요청 거부
         if (deduplicatedSet.size() != orderItemList.size()) {
@@ -86,7 +84,7 @@ public class OrderPolicy {
     }
 
     // 요청 물품 수량 제한 정책
-    private void validateQuantityOfItemPolicy(List<RequestOrderDto> orderItemList) {
+    private void validateQuantityOfItemPolicy(List<RequestOrderItemDto> orderItemList) {
         // 1. 요청 최대 수량 검증
         long itemsAboveMinQuantity = orderItemList.stream()
                 .filter(item ->
@@ -99,11 +97,11 @@ public class OrderPolicy {
 
     // 상품 옵션 정책
     private void validateNotRegisteredProductOptionPolicy(
-            List<RequestOrderDto> orderItemList,
+            List<RequestOrderItemDto> orderItemList,
             Map<Long, ProductOption> registeredOptions) {
 
         // 등록되지 않은 상품 옵션 요청 거부
-        for(RequestOrderDto orderItem : orderItemList) {
+        for(RequestOrderItemDto orderItem : orderItemList) {
             Long optionId = orderItem.getProductOptionId();
 
             if(!registeredOptions.containsKey(optionId)) {

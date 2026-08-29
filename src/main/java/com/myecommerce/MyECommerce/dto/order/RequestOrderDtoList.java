@@ -28,6 +28,6 @@ public class RequestOrderDtoList {
     @Size(max = 100, message = "{validation.order.item.size}")
     @Valid
     @Builder.Default // 필드 초기화 방식을 유지하면서 빌더 패턴에서도 safe-default를 보장
-    List<RequestOrderDto> orderItems = new ArrayList<>(); // 주문 상품옵션 및 수량
+    List<RequestOrderItemDto> orderItems = new ArrayList<>(); // 주문 상품옵션 및 수량
 
 }

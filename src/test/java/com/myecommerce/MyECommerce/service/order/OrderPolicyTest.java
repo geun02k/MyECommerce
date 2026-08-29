@@ -1,6 +1,6 @@
 package com.myecommerce.MyECommerce.service.order;
 
-import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderItemDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
@@ -41,16 +41,16 @@ class OrderPolicyTest {
     }
 
     /** 요청 주문물품 목록 */
-    RequestOrderDto requestOrderItem() {
-        return RequestOrderDto.builder()
+    RequestOrderItemDto requestOrderItem() {
+        return RequestOrderItemDto.builder()
                 .productOptionId(1L)
                 .quantity(10)
                 .build();
     }
 
     /** 유효하지 않은 요청 주문물품 목록 - 최대 주문 가능한 물품 수량 초과 */
-    List<RequestOrderDto> orderItemsOfMaxCountExceeded() {
-        List<RequestOrderDto> result = new ArrayList<>();
+    List<RequestOrderItemDto> orderItemsOfMaxCountExceeded() {
+        List<RequestOrderItemDto> result = new ArrayList<>();
         int orderItemsMaxCount = 100;
 
         for(int i = 0; i < orderItemsMaxCount + 1; i++) {
@@ -60,8 +60,8 @@ class OrderPolicyTest {
     }
 
     /** 유효하지 않은 요청 주문물품 목록 - 중복된 상품옵션 요청 */
-    List<RequestOrderDto> orderItemsOfDuplicatedOptionRequest() {
-        List<RequestOrderDto> result = new ArrayList<>();
+    List<RequestOrderItemDto> orderItemsOfDuplicatedOptionRequest() {
+        List<RequestOrderItemDto> result = new ArrayList<>();
 
         for(int i = 0; i < 2; i++) {
             result.add(requestOrderItem());
@@ -84,7 +84,7 @@ class OrderPolicyTest {
                         .build()))
                 .build();
         // 요청 주문물품
-        RequestOrderDto requestItem = RequestOrderDto.builder()
+        RequestOrderItemDto requestItem = RequestOrderItemDto.builder()
                 .productOptionId(1L)
                 .quantity(10)
                 .build();
@@ -128,7 +128,7 @@ class OrderPolicyTest {
         // 요청 고객
         Member member = customer();
         // 요청 주문물품
-        List<RequestOrderDto> invalidRequestItems =
+        List<RequestOrderItemDto> invalidRequestItems =
                 orderItemsOfMaxCountExceeded(); // 최대 주문 가능 물품 수량 초과
 
         // when
@@ -145,7 +145,7 @@ class OrderPolicyTest {
         // 요청 고객
         Member member = customer();
         // 요청 주문물품
-        List<RequestOrderDto> invalidRequestItems =
+        List<RequestOrderItemDto> invalidRequestItems =
                 orderItemsOfDuplicatedOptionRequest(); // 동일 상품옵션의 중복된 물품 요청
 
         // when
@@ -162,7 +162,7 @@ class OrderPolicyTest {
         // 요청 고객
         Member member = customer();
         // 요청 주문물품
-        RequestOrderDto invalidRequestItem = RequestOrderDto.builder()
+        RequestOrderItemDto invalidRequestItem = RequestOrderItemDto.builder()
                 .productOptionId(1L)
                 .quantity(51) // 주문물품의 구매가능 최대수량 초과
                 .build();
@@ -182,7 +182,7 @@ class OrderPolicyTest {
         // 요청 고객
         Member member = customer();
         // 요청 주문물품
-        RequestOrderDto invalidRequestItem = RequestOrderDto.builder()
+        RequestOrderItemDto invalidRequestItem = RequestOrderItemDto.builder()
                 .productOptionId(1L) // 등록되지 않은 상품옵션
                 .quantity(10)
                 .build();

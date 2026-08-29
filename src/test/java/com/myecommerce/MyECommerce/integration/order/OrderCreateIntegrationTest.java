@@ -1,8 +1,8 @@
 package com.myecommerce.MyECommerce.integration.order;
 
 import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
-import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
 import com.myecommerce.MyECommerce.dto.order.RequestOrderDtoList;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderItemDto;
 import com.myecommerce.MyECommerce.dto.order.ResponseOrderDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
@@ -119,7 +119,7 @@ public class OrderCreateIntegrationTest {
         RequestOrderDtoList requestOrders = new RequestOrderDtoList();
         int quantity = 1;
         for(Long optionId : optionIds) {
-            RequestOrderDto request = RequestOrderDto.builder()
+            RequestOrderItemDto request = RequestOrderItemDto.builder()
                     .productOptionId(optionId)
                     .quantity(quantity++)
                     .build();
@@ -131,14 +131,14 @@ public class OrderCreateIntegrationTest {
     /** 옵션ID에 대한 단건 요청 주문 */
     RequestOrderDtoList givenRequestOrder(OrderPathType orderPath, Long optionId) {
         return RequestOrderDtoList.builder()
-                .orderItems(List.of(requestOrderDto(optionId, 1)))
+                .orderItems(List.of(requestOrderItemDto(optionId, 1)))
                 .orderPathType(orderPath)
                 .build();
     }
 
-    /** 요청한 주문 */
-    RequestOrderDto requestOrderDto(Long optionId, int quantity) {
-        return RequestOrderDto.builder()
+    /** 요청한 주문물품 */
+    RequestOrderItemDto requestOrderItemDto(Long optionId, int quantity) {
+        return RequestOrderItemDto.builder()
                 .productOptionId(optionId)
                 .quantity(quantity)
                 .build();

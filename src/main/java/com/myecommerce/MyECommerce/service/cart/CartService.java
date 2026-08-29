@@ -48,11 +48,11 @@ public class CartService {
     /** 장바구니 상품 등록 **/
     @Transactional
     public ResponseCartDto addCart(RequestCartDto requestCartDto, Member member) {
-        // redis 장바구니에 상품 단건 등록
-        // key = 사용자아이디(토큰값을 사용하게되면 만료 시 장바구니내역 사용불가로)
-        // value = 상품목록(해시,같은 필드명에 대해서는 새로운 값으로 덮어씌움)
-        //       - hashKey = 상품옵션아이디
-        //       - hashValue = 등록할 상품 및 옵션 정보
+        /* redis 장바구니에 상품 단건 등록
+           key = 사용자아이디(토큰값을 사용하게되면 만료 시 장바구니내역 사용불가로)
+           value = 상품목록(해시,같은 필드명에 대해서는 새로운 값으로 덮어씌움)
+                 - hashKey = 상품옵션아이디
+                 - hashValue = 등록할 상품 및 옵션 정보 */
 
         // 0. 정책검증
         Long productOptionId = requestCartDto.getProductOptionId();

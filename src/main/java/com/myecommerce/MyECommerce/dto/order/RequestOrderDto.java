@@ -17,7 +17,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RequestOrderDtoList {
+public class RequestOrderDto {
 
     @NotNull(message = "{validation.order.path.type.not.null}")
     @EnumValid(enumClass = OrderPathType.class,

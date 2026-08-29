@@ -1,6 +1,6 @@
 package com.myecommerce.MyECommerce.service.order;
 
-import com.myecommerce.MyECommerce.dto.order.RequestOrderDtoList;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
 import com.myecommerce.MyECommerce.dto.order.RequestOrderItemDto;
 import com.myecommerce.MyECommerce.dto.order.ResponseOrderDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
@@ -45,7 +45,7 @@ public class OrderService {
 
     /** 주문 생성 **/
     @Transactional
-    public ResponseOrderDto createOrder(RequestOrderDtoList requestOrder, Member member) {
+    public ResponseOrderDto createOrder(RequestOrderDto requestOrder, Member member) {
         // 요청한 주문 물품
         List<RequestOrderItemDto> requestOrderItems = requestOrder.getOrderItems();
 

@@ -1,6 +1,6 @@
 package com.myecommerce.MyECommerce.service.order;
 
-import com.myecommerce.MyECommerce.dto.order.RequestOrderDtoList;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
 import com.myecommerce.MyECommerce.dto.order.RequestOrderItemDto;
 import com.myecommerce.MyECommerce.dto.order.ResponseOrderDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
@@ -116,7 +116,7 @@ class OrderServiceTest {
         // 요청 고객
         Member member = customer();
         // 요청 주문물품
-        RequestOrderDtoList requestOrder = new RequestOrderDtoList();
+        RequestOrderDto requestOrder = new RequestOrderDto();
         RequestOrderItemDto requestItem = RequestOrderItemDto.builder()
                 .productOptionId(10L)
                 .quantity(5)
@@ -178,7 +178,7 @@ class OrderServiceTest {
         // 요청 고객
         Member member = customer();
         // 요청 주문물품
-        RequestOrderDtoList invalidRequestOrder = new RequestOrderDtoList();
+        RequestOrderDto invalidRequestOrder = new RequestOrderDto();
         RequestOrderItemDto invalidRequestItem = RequestOrderItemDto.builder()
                 .productOptionId(5L)
                 .quantity(51) // 주문 정책 제한: 물품 당 최대 주문 수량 초과

@@ -1,7 +1,7 @@
 package com.myecommerce.MyECommerce.integration.order;
 
 import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
-import com.myecommerce.MyECommerce.dto.order.RequestOrderDtoList;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
 import com.myecommerce.MyECommerce.dto.order.RequestOrderItemDto;
 import com.myecommerce.MyECommerce.dto.order.ResponseOrderDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
@@ -112,11 +112,11 @@ public class OrderCreateIntegrationTest {
     }
 
     /** optionIds로 전달된 옵션에 대한 다건 요청 주문 목록 */
-    RequestOrderDtoList givenRequestOrders(List<Long> optionIds) {
+    RequestOrderDto givenRequestOrders(List<Long> optionIds) {
         // 간접적으로 옵션 순서 순서 단정가능.
         // optionIds 리스트의 첫 번째 요소(get(0))에 수량 1,
         // 두 번째 요소(get(1))에 수량 2를 순서대로 할당합니다.
-        RequestOrderDtoList requestOrders = new RequestOrderDtoList();
+        RequestOrderDto requestOrders = new RequestOrderDto();
         int quantity = 1;
         for(Long optionId : optionIds) {
             RequestOrderItemDto request = RequestOrderItemDto.builder()
@@ -129,8 +129,8 @@ public class OrderCreateIntegrationTest {
     }
 
     /** 옵션ID에 대한 단건 요청 주문 */
-    RequestOrderDtoList givenRequestOrder(OrderPathType orderPath, Long optionId) {
-        return RequestOrderDtoList.builder()
+    RequestOrderDto givenRequestOrder(OrderPathType orderPath, Long optionId) {
+        return RequestOrderDto.builder()
                 .orderItems(List.of(requestOrderItemDto(optionId, 1)))
                 .orderPathType(orderPath)
                 .build();
@@ -281,7 +281,7 @@ public class OrderCreateIntegrationTest {
 
     /** 주문요청 10건 동시 실행 -> 주문 10건 생성
      *  : 지저분한 기술적 코드를 메서드로 분리 */
-    List<Long> executeConcurrentOrderRequests(RequestOrderDtoList requestOrders,
+    List<Long> executeConcurrentOrderRequests(RequestOrderDto requestOrder,
                                               Member member) throws InterruptedException {
         // 트랜잭션 생성
         int threadCount = 10;
@@ -302,7 +302,7 @@ public class OrderCreateIntegrationTest {
 
                     // 주문 생성
                     ResponseOrderDto response =
-                            orderService.createOrder(requestOrders, member);
+                            orderService.createOrder(requestOrder, member);
 
                     // 데이터 일괄 삭제를 위한 주문 키 추가
                     orderIds.add(response.getId());
@@ -344,7 +344,7 @@ public class OrderCreateIntegrationTest {
         Member member = savedMember;
         // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
         List<Long> optionIds = optionIds(savedProduct);
-        RequestOrderDtoList requestOrder = givenRequestOrders(optionIds);
+        RequestOrderDto requestOrder = givenRequestOrders(optionIds);
 
         // when
         ResponseOrderDto response =
@@ -389,7 +389,7 @@ public class OrderCreateIntegrationTest {
         Member member = savedMember;
         // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
         List<Long> optionIds = optionIds(savedProduct);
-        RequestOrderDtoList requestOrder = givenRequestOrders(optionIds);
+        RequestOrderDto requestOrder = givenRequestOrders(optionIds);
 
         // when
         orderService.createOrder(requestOrder, member);
@@ -415,7 +415,7 @@ public class OrderCreateIntegrationTest {
         Member member = savedMember;
         // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
         List<Long> optionIds = optionIds(savedProduct);
-        RequestOrderDtoList requestOrders = givenRequestOrders(optionIds);
+        RequestOrderDto requestOrders = givenRequestOrders(optionIds);
 
         // when
         // 주문 요청 동시 10번 수행 (테스트 목적: 동시 요청 시 재고가 안전하게 차감되는가 -> 동시성 메서드를 테스트에서 분리)
@@ -455,7 +455,7 @@ public class OrderCreateIntegrationTest {
         Long optionId = optionIds(savedProduct).get(0); // 저장된 상품옵션 중 하나
         addProductOptionInCart(member, optionId);
         // 요청 주문 단건
-        RequestOrderDtoList requestOrder = givenRequestOrder(OrderPathType.CART, optionId);
+        RequestOrderDto requestOrder = givenRequestOrder(OrderPathType.CART, optionId);
 
         // when
         orderService.createOrder(requestOrder, member);
@@ -476,7 +476,7 @@ public class OrderCreateIntegrationTest {
         Long optionId = optionIds(savedProduct).get(0); // 저장된 상품옵션 중 하나
         addProductOptionInCart(member, optionId);
         // 요청 주문 단건
-        RequestOrderDtoList requestOrder = givenRequestOrder(OrderPathType.DIRECT, optionId);
+        RequestOrderDto requestOrder = givenRequestOrder(OrderPathType.DIRECT, optionId);
 
         // when
         orderService.createOrder(requestOrder, member);

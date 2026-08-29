@@ -46,34 +46,45 @@ public class OrderService {
     /** 주문 생성 **/
     @Transactional
     public ResponseOrderDto createOrder(RequestOrderDtoList requestOrder, Member member) {
+        // 요청한 주문 물품
+        List<RequestOrderDto> requestOrderItems = requestOrder.getOrderItems();
+
         // 1. 주문 요청 옵션 조회 (재고 차감을 위해 비관적 락)
         Map<Long, ProductOption> registeredOptions =
-                findOrderRequestOptionsWithLock(requestOrder.getOrderItems());
+                findOrderRequestOptionsWithLock(requestOrderItems);
 
         // 2. 정책검증
-        orderPolicy.validateCreate(requestOrder.getOrderItems(), registeredOptions, member);
-
-        // 2. 주문 물품 목록 생성
-        List<OrderItem> orderItems =
-                createOrderItems(requestOrder.getOrderItems(), registeredOptions);
+        orderPolicy.validateCreate(requestOrderItems, registeredOptions, member);
 
         // 3. 주문 생성 및 저장
-        Order order = Order.createOrder(orderItems, member);
-        Order savedOrder = orderRepository.save(order);
+        Order savedOrder =
+                saveOrder(requestOrderItems, registeredOptions, member);
+        List<OrderItem> savedOrderItems = savedOrder.getItems();
 
-        // 4. 상품옵션 목록 재고 차감 (dirty checking)
-        decreaseStockOfProductOptions(savedOrder.getItems(), registeredOptions);
+        // 4. 상품옵션 재고 차감 (dirty checking)
+        decreaseStockOfProductOptions(savedOrderItems, registeredOptions);
+        // 5. 상품옵션 재고 캐시 차감 (원자적 감소)
+        stockCacheService.decrementProductStock(savedOrderItems);
 
-        // 5. 재고 캐시 데이터 차감 (원자적 감소)
-        stockCacheService.decrementProductStock(savedOrder.getItems());
-
-        // 6. 장바구니 캐시 데이터 제거
+        // 6. 장바구니 캐시 제거
         cartService.removeOrderItems(requestOrder.getOrderPathType(),
                                      member.getUserId(),
-                                     savedOrder.getItems());
+                                     savedOrderItems);
 
         // 7. Entity -> responseDTO로 변환해 반환
         return orderMapper.toResponseDto(savedOrder);
+    }
+
+    // 주문 저장
+    private Order saveOrder(List<RequestOrderDto> requestOrderItems,
+                            Map<Long, ProductOption> registeredOptions,
+                            Member member) {
+        // 주문물품 생성
+        List<OrderItem> orderItems =
+                createOrderItems(requestOrderItems, registeredOptions);
+        // 주문 생성 및 저장
+        Order order = Order.createOrder(orderItems, member);
+        return orderRepository.save(order);
     }
 
     // 상품옵션 목록 재고 차감

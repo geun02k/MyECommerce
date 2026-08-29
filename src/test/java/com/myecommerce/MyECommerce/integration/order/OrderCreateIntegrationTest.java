@@ -1,5 +1,6 @@
 package com.myecommerce.MyECommerce.integration.order;
 
+import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
 import com.myecommerce.MyECommerce.dto.order.RequestOrderDtoList;
 import com.myecommerce.MyECommerce.dto.order.ResponseOrderDto;
@@ -14,8 +15,10 @@ import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.member.MemberRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
+import com.myecommerce.MyECommerce.service.cart.CartService;
 import com.myecommerce.MyECommerce.service.order.OrderService;
 import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
+import com.myecommerce.MyECommerce.type.OrderPathType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -41,6 +45,7 @@ import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.OrderStatusType.CREATED;
 import static com.myecommerce.MyECommerce.type.ProductCategoryType.WOMEN_CLOTHING;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
+import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.STOCK;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -56,7 +61,11 @@ public class OrderCreateIntegrationTest {
     private OrderService orderService;
 
     @Autowired
+    private CartService cartService;
+    @Autowired
     private RedisMultiDataService redisMultiDataService;
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
     private MemberRepository memberRepository;
@@ -90,17 +99,19 @@ public class OrderCreateIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        // 상품등록으로 인한 테스트 데이터 정리: redis 재고 데이터 delete
+        // 캐시 재고 삭제
         redisMultiDataService.deleteMultiData(
                 savedCacheStock.keySet().stream().toList());
-        // 장바구니에 상품추가로 인한 장바구니 데이터 정리: redis 장바구니 데이터 delete
-       redisMultiDataService.deleteMultiData(
+        // 장바구니 데이터 삭제 (일부 테스트에서 장바구니에 상품추가로 인해)
+       redisMultiDataService.deleteMultiHashData(
+               CART,
+               savedMember.getUserId(),
                savedProduct.getOptions().stream()
                        .map(option -> String.valueOf(option.getId()))
                        .toList());
     }
 
-    /** optionIds로 전달된 옵션에 대한 요청 상품 옵션 목록 */
+    /** optionIds로 전달된 옵션에 대한 다건 요청 주문 목록 */
     RequestOrderDtoList givenRequestOrders(List<Long> optionIds) {
         // 간접적으로 옵션 순서 순서 단정가능.
         // optionIds 리스트의 첫 번째 요소(get(0))에 수량 1,
@@ -115,6 +126,31 @@ public class OrderCreateIntegrationTest {
             requestOrders.getOrderItems().add(request);
         }
         return requestOrders;
+    }
+
+    /** 옵션ID에 대한 단건 요청 주문 */
+    RequestOrderDtoList givenRequestOrder(OrderPathType orderPath, Long optionId) {
+        return RequestOrderDtoList.builder()
+                .orderItems(List.of(requestOrderDto(optionId, 1)))
+                .orderPathType(orderPath)
+                .build();
+    }
+
+    /** 요청한 주문 */
+    RequestOrderDto requestOrderDto(Long optionId, int quantity) {
+        return RequestOrderDto.builder()
+                .productOptionId(optionId)
+                .quantity(quantity)
+                .build();
+    }
+
+    /** 장바구니에 상품옵션 추가 */
+    void addProductOptionInCart(Member member, Long optionId) {
+        RequestCartDto requestCartDto = RequestCartDto.builder()
+                .productOptionId(optionId)
+                .quantity(1)
+                .build();
+        cartService.addCart(requestCartDto, member);
     }
 
     /* ------------------
@@ -289,6 +325,12 @@ public class OrderCreateIntegrationTest {
         return orderIds;
     }
 
+    // 해당 사용자의 장바구니에 해당 옵션이 존재하는가?
+    Boolean hasProductOptionInCart(String userId, Long optionId) {
+        return redisTemplate.opsForHash()
+                .hasKey(CART + ":" + userId, String.valueOf(optionId));
+    }
+
     /* ------------------
         주문생성 Test
        ------------------ */
@@ -402,4 +444,45 @@ public class OrderCreateIntegrationTest {
         cleanUpSavedDataForConcurrency(orderIds, savedProduct, savedMember);
     }
 
+    @Test
+    @DisplayName("주문생성 성공 - 장바구니에서 단건의 물품을 주문하면 장바구니에서 해당 상품옵션 제거")
+    @Transactional
+    void createOrder_shouldDeleteProductOption_whenOrderInCart() {
+        // given
+        // 요청 사용자
+        Member member = savedMember;
+        // 장바구니에 상품옵션 추가
+        Long optionId = optionIds(savedProduct).get(0); // 저장된 상품옵션 중 하나
+        addProductOptionInCart(member, optionId);
+        // 요청 주문 단건
+        RequestOrderDtoList requestOrder = givenRequestOrder(OrderPathType.CART, optionId);
+
+        // when
+        orderService.createOrder(requestOrder, member);
+
+        // then
+        // 장바구니에서 해당 상품옵션 삭제 검증
+        assertFalse(hasProductOptionInCart(member.getUserId(), optionId));
+    }
+
+    @Test
+    @DisplayName("주문생성 성공 - 상품상세페이지에서 단건 물품을 주문 시 장바구니에 동일 상품옵션이 존재해도 미제거")
+    @Transactional
+    void createOrder_shouldNotDeleteProductOption_whenOrderDirect() {
+        // given
+        // 요청 사용자
+        Member member = savedMember;
+        // 장바구니에 상품옵션 추가
+        Long optionId = optionIds(savedProduct).get(0); // 저장된 상품옵션 중 하나
+        addProductOptionInCart(member, optionId);
+        // 요청 주문 단건
+        RequestOrderDtoList requestOrder = givenRequestOrder(OrderPathType.DIRECT, optionId);
+
+        // when
+        orderService.createOrder(requestOrder, member);
+
+        // then
+        // 장바구니에서 해당 상품옵션 미삭제 검증
+        assertTrue(hasProductOptionInCart(member.getUserId(), optionId));
+    }
 }

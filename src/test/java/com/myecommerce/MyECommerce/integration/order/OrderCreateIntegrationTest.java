@@ -100,17 +100,6 @@ public class OrderCreateIntegrationTest {
                        .toList());
     }
 
-    /** 고객권한 사용자 */
-    Member customer(Long memberId) {
-        return Member.builder()
-                .id(memberId)
-                .userId("customer")
-                .roles(List.of(MemberAuthority.builder()
-                        .authority(CUSTOMER)
-                        .build()))
-                .build();
-    }
-
     /** optionIds로 전달된 옵션에 대한 요청 상품 옵션 목록 */
     RequestOrderDtoList givenRequestOrders(List<Long> optionIds) {
         // 간접적으로 옵션 순서 순서 단정가능.
@@ -140,6 +129,9 @@ public class OrderCreateIntegrationTest {
                 .name("name")
                 .telephone("01011112222")
                 .address("address")
+                .roles(List.of(MemberAuthority.builder()
+                        .authority(CUSTOMER)
+                        .build()))
                 .build();
         return memberRepository.save(member);
     }
@@ -307,8 +299,7 @@ public class OrderCreateIntegrationTest {
     void createOrder_shouldCreateOrder_whenUseOnlyProductOptionId() {
         // given
         // 요청 사용자
-        Long memberId = savedMember.getId();
-        Member member = customer(memberId);
+        Member member = savedMember;
         // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
         List<Long> optionIds = optionIds(savedProduct);
         RequestOrderDtoList requestOrder = givenRequestOrders(optionIds);
@@ -353,8 +344,7 @@ public class OrderCreateIntegrationTest {
     void createOrder_shouldDecreaseOptionStock_whenOrderCreated() {
         // given
         // 요청 사용자
-        Long memberId = savedMember.getId();
-        Member member = customer(memberId);
+        Member member = savedMember;
         // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
         List<Long> optionIds = optionIds(savedProduct);
         RequestOrderDtoList requestOrder = givenRequestOrders(optionIds);
@@ -380,7 +370,7 @@ public class OrderCreateIntegrationTest {
             throws InterruptedException {
         // given
         // 요청 사용자
-        Member member = customer(savedMember.getId());
+        Member member = savedMember;
         // 요청 주문 (단일 상품 2개의 옵션으로, 요청 주문 2건 생성)
         List<Long> optionIds = optionIds(savedProduct);
         RequestOrderDtoList requestOrders = givenRequestOrders(optionIds);

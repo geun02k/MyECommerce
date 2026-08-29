@@ -59,7 +59,7 @@ public class RedisMultiDataService {
         }
 
         return redisTemplate.opsForHash()
-                .delete(redisSingleDataService.setKey(nameSpace, key), hashKeys);
+                .delete(redisSingleDataService.setKey(nameSpace, key), hashKeys.toArray());
     }
 
     /** Redis 해시 데이터 사이즈 조회 **/

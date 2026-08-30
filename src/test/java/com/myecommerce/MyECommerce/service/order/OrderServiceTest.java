@@ -72,21 +72,42 @@ class OrderServiceTest {
                 .build();
     }
 
-    /** 등록된 상품 옵션 */
-    ProductOption registeredOption(Long optionId) {
-        Product registeredProduct = Product.builder()
+    /** 등록된 상품 */
+    Product registeredProduct() {
+        return Product.builder()
                 .id(5L)
                 .code("productCode")
                 .seller(1L)
                 .saleStatus(ON_SALE)
                 .build();
+    }
 
+    /** 등록된 상품 옵션 */
+    ProductOption registeredOption() {
+        return ProductOption.builder()
+                .id(10L)
+                .optionCode("optionCode")
+                .quantity(100)
+                .price(new BigDecimal("10000"))
+                .product(registeredProduct())
+                .build();
+    }
+    ProductOption registeredOption(Long optionId) {
         return ProductOption.builder()
                 .id(optionId)
                 .optionCode("optionCode")
                 .quantity(100)
                 .price(new BigDecimal("10000"))
-                .product(registeredProduct)
+                .product(registeredProduct())
+                .build();
+    }
+    ProductOption registeredOption(Long optionId, int quantity) {
+        return ProductOption.builder()
+                .id(optionId)
+                .optionCode("optionCode")
+                .quantity(quantity)
+                .price(new BigDecimal("10000"))
+                .product(registeredProduct())
                 .build();
     }
 
@@ -106,7 +127,12 @@ class OrderServiceTest {
                 .quantity(quantity)
                 .build();
     }
-
+    RequestOrderItemDto requestOrderItemDto() {
+        return RequestOrderItemDto.builder()
+                .productOptionId(10L)
+                .quantity(5)
+                .build();
+    }
     /** 요청 주문 */
     RequestOrderDto requestOrderDto(OrderPathType orderPathType, RequestOrderItemDto requestItem) {
         return RequestOrderDto.builder()
@@ -117,6 +143,11 @@ class OrderServiceTest {
     RequestOrderDto requestOrderDto(RequestOrderItemDto requestItem) {
         return RequestOrderDto.builder()
                 .orderItems(List.of(requestItem))
+                .build();
+    }
+    RequestOrderDto requestOrderDto() {
+        return RequestOrderDto.builder()
+                .orderItems(List.of(requestOrderItemDto()))
                 .build();
     }
 
@@ -133,11 +164,150 @@ class OrderServiceTest {
         주문 생성 Test
        ------------------------ */
 
-    // TODO: 주문생성, 재고감소, 장바구니에서 상품옵션 제거 테스트 분할해 테스트케이스 책임분리
-    // TODO: 요청 주문물품 외 픽스쳐 메서드로 분리하는 것 고려하기
     @Test
-    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 주문 생성 및 재고 감소 및 장바구니에서 상품옵션 제거")
-    void createOrder_shouldCreateOrderAndDecreaseStock_whenValidOrderRequest() {
+    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 정책 검증")
+    void createOrder_shouldPassValidationCheck_whenValidOrderRequest() {
+        // given
+        // 요청 고객
+        Member member = customer();
+        // 요청 주문
+        RequestOrderDto requestOrder = requestOrderDto();
+
+        // 요청한 주문 상품옵션 조회
+        given(productOptionRepository.findByIdIn(any()))
+                .willReturn(List.of(registeredOption()));
+        // 주문 저장
+        given(orderRepository.save(any())).willReturn(mock(Order.class));
+        // 저장된 주문 Entity -> response DTO로 변환
+        given(orderMapper.toResponseDto(any())).willReturn(mock(ResponseOrderDto.class));
+
+        // when
+        orderService.createOrder(requestOrder, member);
+
+        // then
+        // 정책 실행 여부 검증
+        verify(orderPolicy, times(1))
+                .validateCreate(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 주문 Entity 저장")
+    void createOrder_shouldSaveOrder_whenValidOrderRequest() {
+        // given
+        // 요청 고객
+        Member member = customer();
+        // 요청 주문
+        Long optionId = 10L;
+        int quantity = 5;
+        RequestOrderItemDto requestItem = requestOrderItemDto(optionId, quantity);
+        RequestOrderDto requestOrder = requestOrderDto(OrderPathType.CART, requestItem);
+
+        // 요청한 주문 상품옵션 조회
+        ProductOption registeredOption = registeredOption(optionId);
+        given(productOptionRepository.findByIdIn(List.of(optionId))) // 저장할 객체인 주문물품의 정보를 조회하므로 비즈니스 로직의 핵심이기 때문에 구체적인 값 명시
+                .willReturn(List.of(registeredOption));
+
+        // 주문 저장
+        Order savedOrder = savedOrder(registeredOption, member, quantity);
+        ArgumentCaptor<Order> capturedOrderBeforeSave =
+                ArgumentCaptor.forClass(Order.class);
+        given(orderRepository.save(capturedOrderBeforeSave.capture()))
+                .willReturn(savedOrder);
+
+        // 저장된 주문 Entity -> response DTO로 변환
+        given(orderMapper.toResponseDto(any())).willReturn(mock(ResponseOrderDto.class));
+
+        // when
+        orderService.createOrder(requestOrder, member);
+
+        // then
+        // 주문 생성 검증
+        Order capturedOrder = capturedOrderBeforeSave.getValue();
+        assertEquals(CREATED, capturedOrder.getOrderStatus());
+        assertEquals(price("50000"), capturedOrder.getTotalPrice());
+        assertEquals(member, capturedOrder.getBuyer());
+        assertEquals(1, capturedOrder.getItems().size());
+        assertNotNull(capturedOrder.getOrderNumber());
+        assertNotNull(capturedOrder.getOrderedAt());
+
+        // 주문물품 생성 검증
+        OrderItem capturedOrderItem = capturedOrder.getItems().get(0);
+        assertEquals(requestItem.getQuantity(), capturedOrderItem.getQuantity());
+        assertEquals(price("10000"), capturedOrderItem.getUnitPrice());
+        assertEquals(price("50000"), capturedOrderItem.getTotalPrice());
+        assertEquals(registeredOption, capturedOrderItem.getOption());
+    }
+
+    @Test
+    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 상풉옵션 재고 감소")
+    void createOrder_shouldDecreaseStock_whenValidOrderRequest() {
+        // given
+        // 요청 고객
+        Member member = customer();
+        // 요청 주문
+        Long optionId = 10L;
+        int quantity = 5; // 요청한 옵션의 주문 수량
+        RequestOrderItemDto requestItem = requestOrderItemDto(optionId, quantity);
+        RequestOrderDto requestOrder = requestOrderDto(requestItem);
+
+        // 요청한 주문 상품옵션 조회
+        ProductOption registeredOption = registeredOption(optionId, 100); // 옵션의 재고 100개
+        given(productOptionRepository.findByIdIn(List.of(optionId)))
+                .willReturn(List.of(registeredOption));
+
+        // 주문 저장
+        Order savedOrder = savedOrder(registeredOption, member, quantity);
+        given(orderRepository.save(any())).willReturn(savedOrder);
+
+        // 저장된 주문 Entity -> response DTO로 변환
+        given(orderMapper.toResponseDto(any())).willReturn(mock(ResponseOrderDto.class));
+
+        // when
+        orderService.createOrder(requestOrder, member);
+
+        // then
+        // 재고 차감 수량 검증 (Service 내부 연산에 의한 Java Entity 객체 메모리 상태 변경 검증)
+        assertEquals(95, registeredOption.getQuantity());
+        // 더티체킹으로 인해 실제 재고 감소 검증은 통합테스트로 수행 - createOrder_shouldDecreaseOptionStock_whenOrderCreated()
+    }
+
+    @Test
+    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 캐시 재고 감소")
+    void createOrder_shouldDecreaseStockCache_whenValidOrderRequest() {
+        // given
+        // 요청 고객
+        Member member = customer();
+        // 요청 주문
+        Long optionId = 10L;
+        int quantity = 5; // 요청한 옵션의 주문 수량
+        RequestOrderItemDto requestItem = requestOrderItemDto(optionId, quantity);
+        RequestOrderDto requestOrder = requestOrderDto(requestItem);
+
+        // 요청한 주문 상품옵션 조회
+        ProductOption registeredOption = registeredOption(optionId, 100); // 옵션의 재고 100개
+        given(productOptionRepository.findByIdIn(List.of(optionId)))
+                .willReturn(List.of(registeredOption));
+
+        // 주문 저장
+        Order savedOrder = savedOrder(registeredOption, member, quantity);
+        given(orderRepository.save(any())).willReturn(savedOrder);
+
+        // 저장된 주문 Entity -> response DTO로 변환
+        given(orderMapper.toResponseDto(any())).willReturn(mock(ResponseOrderDto.class));
+
+        // when
+        orderService.createOrder(requestOrder, member);
+
+        // then
+        // 재고 캐시 데이터 차감 실행 여부 검증
+        verify(stockCacheService, times(1))
+                .decrementProductStock(savedOrder.getItems());
+    }
+
+    // TODO: CartService에서는 장바구니에서 상품옵션을 제거하는 로직만 가지고, OrderService에서 주문경로에 따라 removeOrderItems() 호출 여부를 결정하는 메서드를 두는 것 고려하기
+    @Test
+    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 장바구니에서 상품옵션 제거")
+    void createOrder_shouldDeleteProductOptionInCart_whenValidOrderRequest() {
         // given
         // 요청 고객
         Member member = customer();
@@ -154,45 +324,22 @@ class OrderServiceTest {
 
         // 주문 저장
         Order savedOrder = savedOrder(registeredOption, member, quantity);
-        ArgumentCaptor<Order> capturedOrderBeforeSave =
-                ArgumentCaptor.forClass(Order.class);
-        given(orderRepository.save(capturedOrderBeforeSave.capture()))
-                .willReturn(savedOrder);
+        given(orderRepository.save(any())).willReturn(savedOrder);
 
         // 저장된 주문 Entity -> response DTO로 변환
-        given(orderMapper.toResponseDto(any()))
-                .willReturn(mock(ResponseOrderDto.class));
+        given(orderMapper.toResponseDto(any())).willReturn(mock(ResponseOrderDto.class));
 
         // when
         orderService.createOrder(requestOrder, member);
 
         // then
-        // 정책 실행 여부 검증
-        verify(orderPolicy, times(1))
-                .validateCreate(any(), any(), any());
-        // 재고 캐시 데이터 차감 실행 여부 검증
-        verify(stockCacheService, times(1))
-                .decrementProductStock(any());
-        // 재고 차감 검증은 통합테스트에서 수행
         // 장바구니에서 주문한 상품옵션 제거 실행 여부 검증
+        // 주문 경로에 따라 장바구니에서 상품옵션 제거여부가 상이하나, 해당 메서드 호출은 주문 경로에 관계없이 호출
         verify(cartService, times(1))
-                .removeOrderItems(any(), eq(member.getUserId()), any());
-
-        // 주문 생성 검증
-        Order capturedOrder = capturedOrderBeforeSave.getValue();
-        assertEquals(CREATED, capturedOrder.getOrderStatus());
-        assertEquals(price("50000"), capturedOrder.getTotalPrice());
-        assertEquals(member, capturedOrder.getBuyer());
-        assertEquals(1, capturedOrder.getItems().size());
-        assertNotNull(capturedOrder.getOrderNumber());
-        assertNotNull(capturedOrder.getOrderedAt());
-
-        // 주문물품 생성 검증
-        OrderItem capturedOrderItem = capturedOrder.getItems().get(0);
-        assertEquals(requestItem.getQuantity(), capturedOrderItem.getQuantity());
-        assertEquals(price("10000"), capturedOrderItem.getUnitPrice());
-        assertEquals(price("50000"), capturedOrderItem.getTotalPrice());
-        assertEquals(registeredOption, capturedOrderItem.getOption());
+                .removeOrderItems(
+                        eq(OrderPathType.CART),
+                        eq(member.getUserId()),
+                        eq(savedOrder.getItems()));
     }
 
     @Test

@@ -29,7 +29,7 @@ public class OrderController {
     @PostMapping
     @PreAuthorize("hasAnyAuthority('CUSTOMER')")
     public ResponseEntity<ResponseOrderDto> createOrder(
-            @RequestBody @Valid List<RequestOrderDto> requestOrderDto,
+            @RequestBody @Valid RequestOrderDto requestOrderDto,
             @AuthenticationPrincipal Member member) {
 
         ResponseOrderDto responseOrderDto =

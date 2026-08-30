@@ -6,12 +6,14 @@ import com.myecommerce.MyECommerce.dto.cart.RequestCartDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDetailDto;
 import com.myecommerce.MyECommerce.dto.cart.ResponseCartDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
+import com.myecommerce.MyECommerce.entity.order.OrderItem;
 import com.myecommerce.MyECommerce.exception.ProductException;
 import com.myecommerce.MyECommerce.mapper.RedisCartMapper;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.service.redis.RedisMultiDataService;
 import com.myecommerce.MyECommerce.service.redis.RedisSingleDataService;
 import com.myecommerce.MyECommerce.service.stock.StockCacheService;
+import com.myecommerce.MyECommerce.type.OrderPathType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,11 +48,11 @@ public class CartService {
     /** 장바구니 상품 등록 **/
     @Transactional
     public ResponseCartDto addCart(RequestCartDto requestCartDto, Member member) {
-        // redis 장바구니에 상품 단건 등록
-        // key = 사용자아이디(토큰값을 사용하게되면 만료 시 장바구니내역 사용불가로)
-        // value = 상품목록(해시,같은 필드명에 대해서는 새로운 값으로 덮어씌움)
-        //       - hashKey = 상품옵션아이디
-        //       - hashValue = 등록할 상품 및 옵션 정보
+        /* redis 장바구니에 상품 단건 등록
+           key = 사용자아이디(토큰값을 사용하게되면 만료 시 장바구니내역 사용불가로)
+           value = 상품목록(해시,같은 필드명에 대해서는 새로운 값으로 덮어씌움)
+                 - hashKey = 상품옵션아이디
+                 - hashValue = 등록할 상품 및 옵션 정보 */
 
         // 0. 정책검증
         Long productOptionId = requestCartDto.getProductOptionId();
@@ -92,6 +94,29 @@ public class CartService {
         setStockInfoForCartItems(targetCartItems, itemStock);
 
         return targetCartItems;
+    }
+
+    /** 장바구니에서 주문물품 제거 **/
+    public void removeOrderItems(OrderPathType orderPathType,
+                                 String userId,
+                                 List<OrderItem> items) {
+        // 주문 경로가 장바구니가 아니면 미수행
+        if(orderPathType != OrderPathType.CART) {
+          return;
+        }
+
+        // 주문물품이 없으면 미수행
+        if(items == null || items.isEmpty()) {
+            return;
+        }
+
+        // 주문한 옵션 목록 추출
+        List<String> optionIds = items.stream()
+                .map(item -> createCartRedisHashKey(item.getOption().getId()))
+                .toList();
+
+        // 장바구니에서 주문물품 일괄 제거
+        redisMultiDataService.deleteMultiHashData(CART, userId, optionIds);
     }
 
     // 장바구니 조회 Redis Hash Key 생성

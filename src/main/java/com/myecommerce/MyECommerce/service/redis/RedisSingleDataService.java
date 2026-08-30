@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 
-/** Redis를 직접 controller 하기위한 서비스 **/
+/** Redis를 직접 조작하기위한 서비스 **/
 @Service
 @RequiredArgsConstructor
 public class RedisSingleDataService {
@@ -70,6 +70,7 @@ public class RedisSingleDataService {
                 .get(setKey(nameSpace, key), hashKey);
     }
 
+    // TODO: 아래와 같은 공통으로 사용되는 메서드로 인해 RedisSingleDataService에 의존하지 않도록 상위 클래스로 분리해 상속하는 방식 고려하기 (해당 방식보다 객체지향 설계 원칙 중 상속보다 조합을 사용을 고려)
     // key값 셋팅 (네임스페이스를 포함한 키 생성)
     String setKey(RedisNamespaceType namespace, String key) {
         return namespace + ":" + key;

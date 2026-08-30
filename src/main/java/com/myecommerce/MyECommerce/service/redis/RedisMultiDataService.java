@@ -45,6 +45,23 @@ public class RedisMultiDataService {
         return redisTemplate.opsForValue().multiGet(keyList);
     }
 
+    // TODO: Redis 자료구조 기반으로 나누기 (레디스 데이터, 해시 데이터 다루는 서비스 분리 고려)
+    /* ------------------
+        Redis 해시 데이터
+       ------------------ */
+
+    /** Redis 해시 데이터 다건 삭제 **/
+    public Long deleteMultiHashData(RedisNamespaceType nameSpace,
+                                    String key,
+                                    List<String> hashKeys) {
+        if(hashKeys == null || hashKeys.isEmpty()) {
+            return (long) 0;
+        }
+
+        return redisTemplate.opsForHash()
+                .delete(redisSingleDataService.setKey(nameSpace, key), hashKeys.toArray());
+    }
+
     /** Redis 해시 데이터 사이즈 조회 **/
     public Long getSizeOfHashData(RedisNamespaceType nameSpace,
                                   String key) {

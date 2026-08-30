@@ -1,6 +1,7 @@
 package com.myecommerce.MyECommerce.service.order;
 
 import com.myecommerce.MyECommerce.dto.order.RequestOrderDto;
+import com.myecommerce.MyECommerce.dto.order.RequestOrderItemDto;
 import com.myecommerce.MyECommerce.dto.order.ResponseOrderDto;
 import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.order.Order;
@@ -9,6 +10,7 @@ import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.mapper.OrderMapper;
 import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
+import com.myecommerce.MyECommerce.service.cart.CartService;
 import com.myecommerce.MyECommerce.service.stock.StockCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ public class OrderService {
     private final OrderPolicy orderPolicy;
 
     private final StockCacheService stockCacheService;
+    private final CartService cartService;
 
     private final ProductOptionRepository productOptionRepository;
     private final OrderRepository orderRepository;
@@ -42,34 +45,46 @@ public class OrderService {
 
     /** 주문 생성 **/
     @Transactional
-    public ResponseOrderDto createOrder(List<RequestOrderDto> requestOrder, Member member) {
+    public ResponseOrderDto createOrder(RequestOrderDto requestOrder, Member member) {
+        // 요청한 주문 물품
+        List<RequestOrderItemDto> requestOrderItems = requestOrder.getOrderItems();
+
         // 1. 주문 요청 옵션 조회 (재고 차감을 위해 비관적 락)
         Map<Long, ProductOption> registeredOptions =
-                findOrderRequestOptionsWithLock(requestOrder);
+                findOrderRequestOptionsWithLock(requestOrderItems);
 
         // 2. 정책검증
-        orderPolicy.validateCreate(requestOrder, registeredOptions, member);
-
-        // 2. 주문 물품 목록 생성
-        List<OrderItem> orderItems =
-                createOrderItems(requestOrder, registeredOptions);
+        orderPolicy.validateCreate(requestOrderItems, registeredOptions, member);
 
         // 3. 주문 생성 및 저장
-        Order order = Order.createOrder(orderItems, member);
-        Order savedOrder = orderRepository.save(order);
+        Order savedOrder =
+                saveOrder(requestOrderItems, registeredOptions, member);
+        List<OrderItem> savedOrderItems = savedOrder.getItems();
 
-        // 4. 상품옵션 목록 재고 차감 (dirty checking)
-        decreaseStockOfProductOptions(savedOrder.getItems(), registeredOptions);
+        // 4. 상품옵션 재고 차감 (dirty checking)
+        decreaseStockOfProductOptions(savedOrderItems, registeredOptions);
+        // 5. 상품옵션 재고 캐시 차감 (원자적 감소)
+        stockCacheService.decrementProductStock(savedOrderItems);
 
-        // 5. 재고 캐시 데이터 차감 (원자적 감소)
-        stockCacheService.decrementProductStock(savedOrder.getItems());
+        // 6. 장바구니 캐시 제거
+        cartService.removeOrderItems(requestOrder.getOrderPathType(),
+                                     member.getUserId(),
+                                     savedOrderItems);
 
-        // FIXME: 로직추가 -> 6. 장바구니 캐시 데이터 제거
-        // 주문 생성 경로에 따른 장바구니 처리 필요
-        // 바구니 주문(CART)인 경우 주문 완료 후 장바구니 데이터를 제거해야 한다.
-        // 단, 상품 상세에서 바로 주문(DIRECT)하는 경우 장바구니 데이터를 유지해야 하므로 문 생성 출처를 구분하는 구조 검토 필요.
         // 7. Entity -> responseDTO로 변환해 반환
         return orderMapper.toResponseDto(savedOrder);
+    }
+
+    // 주문 저장
+    private Order saveOrder(List<RequestOrderItemDto> requestOrderItems,
+                            Map<Long, ProductOption> registeredOptions,
+                            Member member) {
+        // 주문물품 생성
+        List<OrderItem> orderItems =
+                createOrderItems(requestOrderItems, registeredOptions);
+        // 주문 생성 및 저장
+        Order order = Order.createOrder(orderItems, member);
+        return orderRepository.save(order);
     }
 
     // 상품옵션 목록 재고 차감
@@ -89,10 +104,10 @@ public class OrderService {
 
     // 주문 요청 옵션 조회
     private Map<Long, ProductOption> findOrderRequestOptionsWithLock(
-            List<RequestOrderDto> requestOrder) {
+            List<RequestOrderItemDto> requestOrder) {
         // 상품 옵션 아이디 목록 생성
         List<Long> optionIds = requestOrder.stream()
-                .map(RequestOrderDto::getProductOptionId)
+                .map(RequestOrderItemDto::getProductOptionId)
                 .toList();
         // 상품 옵션 목록 조회 (트랜잭션 비관적 락)
         List<ProductOption> requestOptionList =
@@ -104,11 +119,11 @@ public class OrderService {
     }
 
     // 주문 물품 목록 생성
-    private List<OrderItem> createOrderItems(List<RequestOrderDto> requestOrder,
+    private List<OrderItem> createOrderItems(List<RequestOrderItemDto> requestOrder,
                                              Map<Long, ProductOption> registeredOptions) {
         List<OrderItem> orderItems = new ArrayList<>();
 
-        for(RequestOrderDto requestItem : requestOrder) {
+        for(RequestOrderItemDto requestItem : requestOrder) {
             // 요청한 주문물품 대상 옵션
             Long optionId = requestItem.getProductOptionId();
             ProductOption registeredOption = registeredOptions.get(optionId);

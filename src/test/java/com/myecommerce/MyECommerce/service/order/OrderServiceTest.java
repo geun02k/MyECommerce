@@ -95,9 +95,30 @@ class OrderServiceTest {
     Order savedOrder(ProductOption registeredOption,
                      Member member,
                      int requestedQuantity) {
-        OrderItem orderItem = OrderItem.createOrderItem(registeredOption,
-                requestedQuantity);
+        OrderItem orderItem =
+                OrderItem.createOrderItem(registeredOption, requestedQuantity);
         return Order.createOrder(List.of(orderItem), member);
+    }
+
+    /** 요청 주문 물품 */
+    RequestOrderItemDto requestOrderItemDto(Long productOptionId, int quantity) {
+        return RequestOrderItemDto.builder()
+                .productOptionId(productOptionId)
+                .quantity(quantity)
+                .build();
+    }
+
+    /** 요청 주문 */
+    RequestOrderDto requestOrderDto(OrderPathType orderPathType, RequestOrderItemDto requestItem) {
+        return RequestOrderDto.builder()
+                .orderPathType(orderPathType)
+                .orderItems(List.of(requestItem))
+                .build();
+    }
+    RequestOrderDto requestOrderDto(RequestOrderItemDto requestItem) {
+        return RequestOrderDto.builder()
+                .orderItems(List.of(requestItem))
+                .build();
     }
 
     /* ------------------
@@ -115,14 +136,10 @@ class OrderServiceTest {
         // given
         // 요청 고객
         Member member = customer();
-        // 요청 주문물품
-        RequestOrderDto requestOrder = new RequestOrderDto();
-        RequestOrderItemDto requestItem = RequestOrderItemDto.builder()
-                .productOptionId(10L)
-                .quantity(5)
-                .build();
-        requestOrder.setOrderItems(List.of(requestItem));
-        requestOrder.setOrderPathType(OrderPathType.CART);
+        // 요청 주문
+        RequestOrderItemDto requestItem = requestOrderItemDto(10L, 5);
+        RequestOrderDto requestOrder = requestOrderDto(OrderPathType.CART, requestItem);
+
         // 주문 요청에 대한 상품옵션 조회
         ProductOption registeredOption = registeredOption();
         given(productOptionRepository.findByIdIn(List.of(requestItem.getProductOptionId())))
@@ -178,12 +195,11 @@ class OrderServiceTest {
         // 요청 고객
         Member member = customer();
         // 요청 주문물품
-        RequestOrderDto invalidRequestOrder = new RequestOrderDto();
         RequestOrderItemDto invalidRequestItem = RequestOrderItemDto.builder()
                 .productOptionId(5L)
                 .quantity(51) // 주문 정책 제한: 물품 당 최대 주문 수량 초과
                 .build();
-        invalidRequestOrder.setOrderItems(List.of(invalidRequestItem));
+        RequestOrderDto invalidRequestOrder = requestOrderDto(invalidRequestItem);
 
         // 정책에서 예외 발생
         doThrow(new OrderException(ORDER_ITEM_MAX_QUANTITY_EXCEEDED))
@@ -200,7 +216,6 @@ class OrderServiceTest {
         verify(stockCacheService, never()).decrementProductStock(any());
         verify(orderMapper, never()).toResponseDto(any());
         assertEquals(ORDER_ITEM_MAX_QUANTITY_EXCEEDED, e.getErrorCode());
-
     }
 
 }

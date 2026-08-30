@@ -25,7 +25,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 
 import static com.myecommerce.MyECommerce.exception.errorcode.OrderErrorCode.ORDER_ITEM_MAX_QUANTITY_EXCEEDED;
@@ -74,7 +73,7 @@ class OrderServiceTest {
     }
 
     /** 등록된 상품 옵션 */
-    ProductOption registeredOption() {
+    ProductOption registeredOption(Long optionId) {
         Product registeredProduct = Product.builder()
                 .id(5L)
                 .code("productCode")
@@ -83,7 +82,7 @@ class OrderServiceTest {
                 .build();
 
         return ProductOption.builder()
-                .id(10L)
+                .id(optionId)
                 .optionCode("optionCode")
                 .quantity(100)
                 .price(new BigDecimal("10000"))
@@ -124,6 +123,12 @@ class OrderServiceTest {
     /* ------------------
         Helper Method
        ------------------ */
+
+    // BigDecimal 금액 반환
+    BigDecimal price(String price) {
+        return new BigDecimal(price);
+    }
+
     /* ------------------------
         주문 생성 Test
        ------------------------ */
@@ -137,17 +142,18 @@ class OrderServiceTest {
         // 요청 고객
         Member member = customer();
         // 요청 주문
-        RequestOrderItemDto requestItem = requestOrderItemDto(10L, 5);
+        Long optionId = 10L;
+        int quantity = 5;
+        RequestOrderItemDto requestItem = requestOrderItemDto(optionId, quantity);
         RequestOrderDto requestOrder = requestOrderDto(OrderPathType.CART, requestItem);
 
-        // 주문 요청에 대한 상품옵션 조회
-        ProductOption registeredOption = registeredOption();
-        given(productOptionRepository.findByIdIn(List.of(requestItem.getProductOptionId())))
-                .willReturn(new ArrayList<>(List.of(registeredOption)));
+        // 요청한 주문 상품옵션 조회
+        ProductOption registeredOption = registeredOption(optionId);
+        given(productOptionRepository.findByIdIn(List.of(optionId)))
+                .willReturn(List.of(registeredOption));
 
         // 주문 저장
-        Order savedOrder = savedOrder(
-                registeredOption, member, requestItem.getQuantity());
+        Order savedOrder = savedOrder(registeredOption, member, quantity);
         ArgumentCaptor<Order> capturedOrderBeforeSave =
                 ArgumentCaptor.forClass(Order.class);
         given(orderRepository.save(capturedOrderBeforeSave.capture()))
@@ -175,16 +181,17 @@ class OrderServiceTest {
         // 주문 생성 검증
         Order capturedOrder = capturedOrderBeforeSave.getValue();
         assertEquals(CREATED, capturedOrder.getOrderStatus());
-        assertEquals(new BigDecimal("50000"), capturedOrder.getTotalPrice());
+        assertEquals(price("50000"), capturedOrder.getTotalPrice());
         assertEquals(member, capturedOrder.getBuyer());
         assertEquals(1, capturedOrder.getItems().size());
         assertNotNull(capturedOrder.getOrderNumber());
         assertNotNull(capturedOrder.getOrderedAt());
+
         // 주문물품 생성 검증
         OrderItem capturedOrderItem = capturedOrder.getItems().get(0);
         assertEquals(requestItem.getQuantity(), capturedOrderItem.getQuantity());
-        assertEquals(new BigDecimal("10000"), capturedOrderItem.getUnitPrice());
-        assertEquals(new BigDecimal("50000"), capturedOrderItem.getTotalPrice());
+        assertEquals(price("10000"), capturedOrderItem.getUnitPrice());
+        assertEquals(price("50000"), capturedOrderItem.getTotalPrice());
         assertEquals(registeredOption, capturedOrderItem.getOption());
     }
 

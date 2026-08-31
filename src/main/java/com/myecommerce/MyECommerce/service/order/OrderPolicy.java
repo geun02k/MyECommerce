@@ -41,6 +41,8 @@ public class OrderPolicy {
         // 등록된 상품 옵션 한정 주문 제한
         validateNotRegisteredProductOptionPolicy(
                 orderItemList, registeredOptions);
+
+        // TODO: 판매중 상태 외 상품 주문 요청 시 주문 불가 로직 추가
     }
 
     // 주문 접근 권한 제한 정책

@@ -5,14 +5,15 @@ import com.myecommerce.MyECommerce.entity.member.Member;
 import com.myecommerce.MyECommerce.entity.member.MemberAuthority;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.exception.OrderException;
+import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -31,20 +32,36 @@ class OrderPolicyTest {
        ------------------ */
 
     /** 고객권한 사용자 */
-    Member customer() {
+    Member member(String userId, MemberAuthorityType memberAuthorityType) {
         return Member.builder()
-                .userId("customer")
+                .userId(userId)
                 .roles(List.of(MemberAuthority.builder()
-                        .authority(CUSTOMER)
+                        .authority(memberAuthorityType)
                         .build()))
                 .build();
     }
+    Member customer() {
+        return member("customer", CUSTOMER);
+    }
 
     /** 요청 주문물품 목록 */
-    RequestOrderItemDto requestOrderItem() {
+    RequestOrderItemDto requestOrderItem(Long productOptionId, int quantity) {
         return RequestOrderItemDto.builder()
-                .productOptionId(1L)
-                .quantity(10)
+                .productOptionId(productOptionId)
+                .quantity(quantity)
+                .build();
+    }
+    RequestOrderItemDto requestOrderItem() {
+        return requestOrderItem(1L, 10);
+    }
+
+    /** 등록된 상품 옵션 */
+    ProductOption registeredOption(Long optionId, int quantity) {
+        return ProductOption.builder()
+                .id(optionId)
+                .optionCode("optionCode")
+                .quantity(quantity)
+                .price(new BigDecimal("10000"))
                 .build();
     }
 
@@ -72,36 +89,26 @@ class OrderPolicyTest {
     /* ----------------------
         주문 생성 Tests
        ---------------------- */
+
     @Test
     @DisplayName("주문생성 정책 통과 - 유효한 정책 요청 시 정책 통과")
     void validateCreate_shouldPass_whenAllValid() {
         // given
         // 요청 고객
-        Member member = Member.builder()
-                .userId("customer")
-                .roles(List.of(MemberAuthority.builder()
-                        .authority(CUSTOMER)
-                        .build()))
-                .build();
+        Member member = member("customer", CUSTOMER);
         // 요청 주문물품
-        RequestOrderItemDto requestItem = RequestOrderItemDto.builder()
-                .productOptionId(1L)
-                .quantity(10)
-                .build();
-        // 요청 주문물풀 중 DB에 등록되어 있던 주문물품(옵션)
-        ProductOption option = ProductOption.builder()
-                .id(1L)
-                .quantity(20)
-                .build();
+        RequestOrderItemDto requestItem = requestOrderItem(1L, 10);
+        // 요청 주문물풀 중 DB에 등록되어 있던 옵션
         Map<Long, ProductOption> registeredOption =
-                Collections.singletonMap(option.getId(), option);
+                Map.of(1L, registeredOption(1L, 20));
 
         // when
         // then
-        assertDoesNotThrow(() ->
-                orderPolicy.validateCreate(
+        assertDoesNotThrow(() -> orderPolicy.validateCreate(
                         List.of(requestItem), registeredOption, member));
     }
+
+    // TODO: 주문생성 정책 실패 - 비회원 주문 불가
 
     @Test
     @DisplayName("주문생성 정책 실패 - 고객 외 권한자 주문 불가")
@@ -161,11 +168,10 @@ class OrderPolicyTest {
         // given
         // 요청 고객
         Member member = customer();
-        // 요청 주문물품
-        RequestOrderItemDto invalidRequestItem = RequestOrderItemDto.builder()
-                .productOptionId(1L)
-                .quantity(51) // 주문물품의 구매가능 최대수량 초과
-                .build();
+        // 요청 주문물품 (최대 구매 가능 수량 초과한 51개 요청)
+        int maxQuantity = 50; // 최대 구매 가능 수량
+        RequestOrderItemDto invalidRequestItem =
+                requestOrderItem(1L,  maxQuantity + 1);
 
         // when
         // then
@@ -197,6 +203,6 @@ class OrderPolicyTest {
         assertEquals(PRODUCT_OPTION_NOT_REGISTERED, e.getErrorCode());
     }
 
-    // TODO: 판매종료, 판매중단 상태의 상품 주문 요청 시 주문 불가 테스트코드 작성
+    // TODO: 상품 판매상태 검증 로직 추가 후 판매종료, 판매중단 상태의 상품 주문 요청 시 주문 불가 테스트코드 작성
 
 }

@@ -165,8 +165,8 @@ class OrderServiceTest {
        ------------------------ */
 
     @Test
-    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 정책 검증")
-    void createOrder_shouldPassValidationCheck_whenValidOrderRequest() {
+    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 주문생성 정책 검증")
+    void createOrder_shouldValidatePolicy_whenValidOrderRequest() {
         // given
         // 요청 고객
         Member member = customer();
@@ -239,8 +239,8 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 상풉옵션 재고 감소")
-    void createOrder_shouldDecreaseStock_whenValidOrderRequest() {
+    @DisplayName("주문생성 성공 - 유효한 주문 요청 시 상품옵션 재고 감소")
+    void createOrder_shouldDecreaseOptionStock_whenValidOrderRequest() {
         // given
         // 요청 고객
         Member member = customer();
@@ -273,7 +273,7 @@ class OrderServiceTest {
 
     @Test
     @DisplayName("주문생성 성공 - 유효한 주문 요청 시 캐시 재고 감소")
-    void createOrder_shouldDecreaseStockCache_whenValidOrderRequest() {
+    void createOrder_shouldDecreaseOptionStockCache_whenValidOrderRequest() {
         // given
         // 요청 고객
         Member member = customer();
@@ -307,7 +307,7 @@ class OrderServiceTest {
     // TODO: CartService에서는 장바구니에서 상품옵션을 제거하는 로직만 가지고, OrderService에서 주문경로에 따라 removeOrderItems() 호출 여부를 결정하는 메서드를 두는 것 고려하기
     @Test
     @DisplayName("주문생성 성공 - 유효한 주문 요청 시 장바구니에서 상품옵션 제거")
-    void createOrder_shouldDeleteProductOptionInCart_whenValidOrderRequest() {
+    void createOrder_shouldRemoveOrderItemsFromCart_whenValidOrderRequest() {
         // given
         // 요청 고객
         Member member = customer();
@@ -343,7 +343,7 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("주문생성 실패 - 주문생성 정책 검증 실패 시 어떤 상태 변경도 발생하지 않음.")
+    @DisplayName("주문생성 실패 - 주문생성 정책 검증 실패 시 어떤 상태 변경도 발생하지 않음")
     void createOrder_shouldThrowException_whenInvalidOrderRequest() {
         // given
         // 요청 고객

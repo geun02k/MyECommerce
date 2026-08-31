@@ -83,24 +83,6 @@ class OrderServiceTest {
     }
 
     /** 등록된 상품 옵션 */
-    ProductOption registeredOption() {
-        return ProductOption.builder()
-                .id(10L)
-                .optionCode("optionCode")
-                .quantity(100)
-                .price(new BigDecimal("10000"))
-                .product(registeredProduct())
-                .build();
-    }
-    ProductOption registeredOption(Long optionId) {
-        return ProductOption.builder()
-                .id(optionId)
-                .optionCode("optionCode")
-                .quantity(100)
-                .price(new BigDecimal("10000"))
-                .product(registeredProduct())
-                .build();
-    }
     ProductOption registeredOption(Long optionId, int quantity) {
         return ProductOption.builder()
                 .id(optionId)
@@ -109,6 +91,12 @@ class OrderServiceTest {
                 .price(new BigDecimal("10000"))
                 .product(registeredProduct())
                 .build();
+    }
+    ProductOption registeredOption() {
+        return registeredOption(10L, 100);
+    }
+    ProductOption registeredOption(Long optionId) {
+        return registeredOption(optionId, 100);
     }
 
     /** 생성된 주문 */
@@ -128,11 +116,9 @@ class OrderServiceTest {
                 .build();
     }
     RequestOrderItemDto requestOrderItemDto() {
-        return RequestOrderItemDto.builder()
-                .productOptionId(10L)
-                .quantity(5)
-                .build();
+        return requestOrderItemDto(10L, 5);
     }
+
     /** 요청 주문 */
     RequestOrderDto requestOrderDto(OrderPathType orderPathType, RequestOrderItemDto requestItem) {
         return RequestOrderDto.builder()
@@ -141,14 +127,10 @@ class OrderServiceTest {
                 .build();
     }
     RequestOrderDto requestOrderDto(RequestOrderItemDto requestItem) {
-        return RequestOrderDto.builder()
-                .orderItems(List.of(requestItem))
-                .build();
+        return requestOrderDto(null, requestItem);
     }
     RequestOrderDto requestOrderDto() {
-        return RequestOrderDto.builder()
-                .orderItems(List.of(requestOrderItemDto()))
-                .build();
+        return requestOrderDto(null, requestOrderItemDto());
     }
 
     /* ------------------
@@ -186,8 +168,7 @@ class OrderServiceTest {
 
         // then
         // 정책 실행 여부 검증
-        verify(orderPolicy, times(1))
-                .validateCreate(any(), any(), any());
+        verify(orderPolicy).validateCreate(any(), any(), any());
     }
 
     @Test
@@ -279,12 +260,12 @@ class OrderServiceTest {
         Member member = customer();
         // 요청 주문
         Long optionId = 10L;
-        int quantity = 5; // 요청한 옵션의 주문 수량
+        int quantity = 5;
         RequestOrderItemDto requestItem = requestOrderItemDto(optionId, quantity);
         RequestOrderDto requestOrder = requestOrderDto(requestItem);
 
         // 요청한 주문 상품옵션 조회
-        ProductOption registeredOption = registeredOption(optionId, 100); // 옵션의 재고 100개
+        ProductOption registeredOption = registeredOption(optionId);
         given(productOptionRepository.findByIdIn(List.of(optionId)))
                 .willReturn(List.of(registeredOption));
 
@@ -300,8 +281,7 @@ class OrderServiceTest {
 
         // then
         // 재고 캐시 데이터 차감 실행 여부 검증
-        verify(stockCacheService, times(1))
-                .decrementProductStock(savedOrder.getItems());
+        verify(stockCacheService).decrementProductStock(savedOrder.getItems());
     }
 
     // TODO: CartService에서는 장바구니에서 상품옵션을 제거하는 로직만 가지고, OrderService에서 주문경로에 따라 removeOrderItems() 호출 여부를 결정하는 메서드를 두는 것 고려하기
@@ -335,11 +315,9 @@ class OrderServiceTest {
         // then
         // 장바구니에서 주문한 상품옵션 제거 실행 여부 검증
         // 주문 경로에 따라 장바구니에서 상품옵션 제거여부가 상이하나, 해당 메서드 호출은 주문 경로에 관계없이 호출
-        verify(cartService, times(1))
-                .removeOrderItems(
-                        eq(OrderPathType.CART),
-                        eq(member.getUserId()),
-                        eq(savedOrder.getItems()));
+        verify(cartService).removeOrderItems(eq(OrderPathType.CART),
+                                             eq(member.getUserId()),
+                                             eq(savedOrder.getItems()));
     }
 
     @Test

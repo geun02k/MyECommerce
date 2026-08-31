@@ -32,6 +32,7 @@ public class OrderTxService {
         }
         // 3. 결제완료되지 않은 주문 조회
         Order order = payment.getOrder();
+        // TODO: 승인된 결제에 대한 주문에 대한 두 조건 분리
         if(order == null || !Objects.equals(order.getId(), orderId)) {
             throw new PaymentException(PAYMENT_ORDER_MISMATCH_INTERNAL_ERROR);
         }

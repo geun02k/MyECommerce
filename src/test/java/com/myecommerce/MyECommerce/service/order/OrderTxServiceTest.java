@@ -230,27 +230,46 @@ class OrderTxServiceTest {
         assertEquals(CREATED, createdOrder.getOrderStatus());
     }
 
+    // TODO: 승인된 결제에 대한 주문에 대한 두 조건 분리 시 에러코드 수정
     @Test
-    @DisplayName("주문 결제 실패 - 주문 ID에 대한 주문 미존재 시 예외발생")
-    void updatePaidOrderStatus_shouldThrowException_whenNotExistsOrder() {
+    @DisplayName("주문 결제 실패 - 결제에 대한 주문 미존재 시 예외발생")
+    void updatePaidOrderStatus_shouldThrowException_whenNotExistsOrderOfPayment() {
         // given
-        Long invalidOrderId = 100L;
+        Long requestOrderId = 1L;   // 결제건과 다른 주문ID
+        Long orderIdOfPayment = 5L; // 결제에 대한 주문ID
         Long paymentId = 10L;
 
-        Order createdOrder = createdOrder(5L); // 조회 id와 다른 주문
-        Payment approvedPayment = approvedPayment(paymentId, createdOrder);
-
-        // 결제에 대한 주문 누락
-        ReflectionTestUtils.setField(approvedPayment, "order", null);
-
         // 결제, 주문 조회
+        Payment approvedPayment =
+                approvedPayment(paymentId, createdOrder(orderIdOfPayment));
+        // 결제에 대한 주문 미존재 처리
+        ReflectionTestUtils.setField(approvedPayment, "order", null);
         given(paymentTxService.findPaymentByIdWithOrder(paymentId))
                 .willReturn(approvedPayment);
 
         // when
         // then
         PaymentException e = assertThrows(PaymentException.class, () ->
-                orderTxService.updatePaidOrderStatus(invalidOrderId, paymentId));
+                orderTxService.updatePaidOrderStatus(requestOrderId, paymentId));
+        assertEquals(PAYMENT_ORDER_MISMATCH_INTERNAL_ERROR, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("주문 결제 실패 - 주문 ID와 결제에 대한 주문이 상이하면 예외발생")
+    void updatePaidOrderStatus_shouldThrowException_whenMismatchOrder() {
+        // given
+        Long requestOrderId = 1L;   // 결제건과 다른 주문ID
+        Long orderIdOfPayment = 5L; // 결제에 대한 주문ID
+        Long paymentId = 10L;
+
+        // 결제, 주문 조회
+        given(paymentTxService.findPaymentByIdWithOrder(paymentId))
+                .willReturn(approvedPayment(paymentId, createdOrder(orderIdOfPayment)));
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                orderTxService.updatePaidOrderStatus(requestOrderId, paymentId));
         assertEquals(PAYMENT_ORDER_MISMATCH_INTERNAL_ERROR, e.getErrorCode());
     }
 

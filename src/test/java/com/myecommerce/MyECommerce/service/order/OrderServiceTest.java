@@ -115,8 +115,8 @@ class OrderServiceTest {
                 .quantity(quantity)
                 .build();
     }
-    RequestOrderItemDto requestOrderItemDto() {
-        return requestOrderItemDto(10L, 5);
+    RequestOrderItemDto requestOrderItemDto(Long productOptionId) {
+        return requestOrderItemDto(productOptionId, 5);
     }
 
     /** 요청 주문 */
@@ -128,9 +128,6 @@ class OrderServiceTest {
     }
     RequestOrderDto requestOrderDto(RequestOrderItemDto requestItem) {
         return requestOrderDto(null, requestItem);
-    }
-    RequestOrderDto requestOrderDto() {
-        return requestOrderDto(null, requestOrderItemDto());
     }
 
     /* ------------------
@@ -153,10 +150,11 @@ class OrderServiceTest {
         // 요청 고객
         Member member = customer();
         // 요청 주문
-        RequestOrderDto requestOrder = requestOrderDto();
+        Long optionId = 10L;
+        RequestOrderDto requestOrder = requestOrderDto(requestOrderItemDto(optionId));
 
         // 요청한 주문 상품옵션 조회
-        given(productOptionRepository.findByIdIn(any()))
+        given(productOptionRepository.findByIdIn(List.of(optionId)))
                 .willReturn(List.of(registeredOption()));
         // 주문 저장
         given(orderRepository.save(any())).willReturn(mock(Order.class));
@@ -168,7 +166,9 @@ class OrderServiceTest {
 
         // then
         // 정책 실행 여부 검증
-        verify(orderPolicy).validateCreate(any(), any(), any());
+        verify(orderPolicy).validateCreate(eq(requestOrder.getOrderItems()),
+                                           any(), // 모킹한 DB 조회 결과로 생성된 내부 Map 객체에 의존하지 않도록 유연하게 검증
+                                           eq(member));
     }
 
     @Test
@@ -190,10 +190,7 @@ class OrderServiceTest {
 
         // 주문 저장
         Order savedOrder = savedOrder(registeredOption, member, quantity);
-        ArgumentCaptor<Order> capturedOrderBeforeSave =
-                ArgumentCaptor.forClass(Order.class);
-        given(orderRepository.save(capturedOrderBeforeSave.capture()))
-                .willReturn(savedOrder);
+        given(orderRepository.save(any())).willReturn(savedOrder);
 
         // 저장된 주문 Entity -> response DTO로 변환
         given(orderMapper.toResponseDto(any())).willReturn(mock(ResponseOrderDto.class));
@@ -202,6 +199,10 @@ class OrderServiceTest {
         orderService.createOrder(requestOrder, member);
 
         // then
+        // 주문 저장 메서드 호출 검증
+        ArgumentCaptor<Order> capturedOrderBeforeSave = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(capturedOrderBeforeSave.capture());
+
         // 주문 생성 검증
         Order capturedOrder = capturedOrderBeforeSave.getValue();
         assertEquals(CREATED, capturedOrder.getOrderStatus());
@@ -227,12 +228,12 @@ class OrderServiceTest {
         Member member = customer();
         // 요청 주문
         Long optionId = 10L;
-        int quantity = 5; // 요청한 옵션의 주문 수량
+        int quantity = 5; // 요청한 옵션의 주문 수량 = 5
         RequestOrderItemDto requestItem = requestOrderItemDto(optionId, quantity);
         RequestOrderDto requestOrder = requestOrderDto(requestItem);
 
         // 요청한 주문 상품옵션 조회
-        ProductOption registeredOption = registeredOption(optionId, 100); // 옵션의 재고 100개
+        ProductOption registeredOption = registeredOption(optionId, 100); // 초기 옵션의 재고 = 100
         given(productOptionRepository.findByIdIn(List.of(optionId)))
                 .willReturn(List.of(registeredOption));
 
@@ -248,7 +249,7 @@ class OrderServiceTest {
 
         // then
         // 재고 차감 수량 검증 (Service 내부 연산에 의한 Java Entity 객체 메모리 상태 변경 검증)
-        assertEquals(95, registeredOption.getQuantity());
+        assertEquals(95, registeredOption.getQuantity()); // 100-5 = 95
         // 더티체킹으로 인해 실제 재고 감소 검증은 통합테스트로 수행 - createOrder_shouldDecreaseOptionStock_whenOrderCreated()
     }
 

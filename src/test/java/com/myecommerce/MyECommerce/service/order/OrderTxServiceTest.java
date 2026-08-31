@@ -11,7 +11,6 @@ import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.exception.OrderException;
 import com.myecommerce.MyECommerce.exception.PaymentException;
-import com.myecommerce.MyECommerce.repository.Order.OrderRepository;
 import com.myecommerce.MyECommerce.service.payment.PaymentTxService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,9 +42,6 @@ import static org.mockito.Mockito.*;
 class OrderTxServiceTest {
 
     @Mock
-    OrderRepository orderRepository;
-
-    @Mock
     PaymentTxService paymentTxService;
 
     @InjectMocks
@@ -65,23 +61,20 @@ class OrderTxServiceTest {
                 .build();
     }
 
-    /** 상품 */
-    Product product() {
-        return Product.builder()
+    /** 등록된 상품 옵션 */
+    ProductOption productOption() {
+        Product product = Product.builder()
                 .id(3L)
                 .code("productCode")
                 .seller(1L)
                 .saleStatus(ON_SALE)
                 .build();
-    }
 
-    /** 등록된 상품 옵션 */
-    ProductOption productOption() {
         return ProductOption.builder()
                 .optionCode("optionCode")
                 .quantity(100)
                 .price(new BigDecimal("10000"))
-                .product(product())
+                .product(product)
                 .build();
     }
 
@@ -96,59 +89,47 @@ class OrderTxServiceTest {
         return order;
     }
 
-    /** PG 요청에 대한 응답 */
-    PgResult pgResult() {
-        return PgResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .build();
-    }
-
-    /** PG 요청에 대한 승인 응답 */
-    PgApprovalResult pgApprovalResult() {
-        return PgApprovalResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .approvalStatus(APPROVED)
-                .paidAmount(new BigDecimal(10000))
-                .build();
-    }
-
-    /** PG 요청에 대한 실패 응답 */
-    PgApprovalResult pgFailResult() {
-        return PgApprovalResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .approvalStatus(FAILED)
-                .build();
-    }
-
-    /** 승인된 결제 객체 생성 */
-    Payment approvedPayment(Long paymentId, Order order) {
+    /** PG 요청된 결제 객체 생성 */
+    Payment pgRequestedPayment(Long paymentId, Order order) {
         // 결제 생성
         Payment payment = Payment.createPayment(order, CARD, MOCK_PG);
         ReflectionTestUtils.setField(payment, "id", paymentId);
 
         // PG 결제요청
-        PgResult pgRequestResult = pgResult();
+        PgResult pgRequestResult = PgResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .build();
         payment.requestPgPayment(pgRequestResult); // 결제상태 = IN_PROGRESS
 
+        return payment;
+    }
+
+    /** 승인된 결제 객체 생성 */
+    Payment approvedPayment(Long paymentId, Order order) {
+        // PG 결제요청된 결제 생성
+        Payment payment = pgRequestedPayment(paymentId, order); // 결제상태 = IN_PROGRESS
+
         // PG 결제승인
-        PgApprovalResult pgApprovalResult = pgApprovalResult();
+        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .approvalStatus(APPROVED)
+                .paidAmount(order.getTotalPrice())
+                .build();
         payment.approve(pgApprovalResult); // 결제상태 = APPROVED
 
         return payment;
     }
 
-    /** 미승인 결제 객체 생성 */
+    /** 승인실패된 결제 객체 생성 */
     Payment failedPayment(Long paymentId, Order order) {
-        // 결제 생성
-        Payment payment = Payment.createPayment(order, CARD, MOCK_PG);
-        ReflectionTestUtils.setField(payment, "id", paymentId);
+        // PG 결제요청된 결제 생성
+        Payment payment = pgRequestedPayment(paymentId, order); // 결제상태 = IN_PROGRESS
 
-        // PG 결제요청
-        PgResult pgRequestResult = pgResult();
-        payment.requestPgPayment(pgRequestResult); // 결제상태 = IN_PROGRESS
-
-        // PG 결제승인
-        PgApprovalResult pgFailResult = pgFailResult();
+        // PG 결제승인 실패
+        PgApprovalResult pgFailResult = PgApprovalResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .approvalStatus(FAILED)
+                .build();
         payment.fail(pgFailResult); // 결제상태 = FAILED
 
         return payment;
@@ -166,19 +147,17 @@ class OrderTxServiceTest {
         Long paymentId = 10L;
 
         Order createdOrder = createdOrder(orderId);
-        Payment approvedPayment = approvedPayment(paymentId, createdOrder);
 
         // 결제, 주문 조회
         given(paymentTxService.findPaymentByIdWithOrder(paymentId))
-                .willReturn(approvedPayment);
+                .willReturn(approvedPayment(paymentId, createdOrder));
 
         // when
         orderTxService.updatePaidOrderStatus(orderId, paymentId);
 
         // then
-        // 의존성 호출 검증
+        // 결제,주문 조회 호출 검증
         verify(paymentTxService).findPaymentByIdWithOrder(paymentId);
-
         // 주문 상태변경 검증
         assertEquals(PAID, createdOrder.getOrderStatus());
     }
@@ -212,20 +191,17 @@ class OrderTxServiceTest {
         Long paymentId = 10L;
 
         Order createdOrder = createdOrder(orderId);
-        Payment failedPayment = failedPayment(paymentId, createdOrder); // 승인 실패된 결제
 
-        // 결제 조회
+        // 결제 조회 (승인 실패된 결제 반환)
         given(paymentTxService.findPaymentByIdWithOrder(paymentId))
-                .willReturn(failedPayment);
+                .willReturn(failedPayment(paymentId, createdOrder));
 
         // when
         orderTxService.updatePaidOrderStatus(orderId, paymentId);
 
         // then
-        // 의존성 호출 검증
+        // 결제 조회 호출 검증
         verify(paymentTxService).findPaymentByIdWithOrder(paymentId);
-        verify(orderRepository, never()).findByIdAndOrderStatus(any(), any());
-
         // 주문 상태 미변경 검증
         assertEquals(CREATED, createdOrder.getOrderStatus());
     }
@@ -277,15 +253,13 @@ class OrderTxServiceTest {
     @DisplayName("주문 결제 실패 - 주문상태가 CREATED가 아니면 예외발생")
     void updatePaidOrderStatus_shouldThrowException_whenStatusIsNotCreated() {
         // given
-        Long oderId = 5L;
+        Long orderId = 5L;
         Long paymentId = 10L;
 
-        Order createdOrder = createdOrder(oderId);
+        Order createdOrder = createdOrder(orderId);
         Payment approvedPayment = approvedPayment(paymentId, createdOrder);
-
-        // 주문상태 강제로 결제완료(PAID)로 변경
+        // 결제 요청한 주문 상태는 이미 결제완료(PAID) 처리됨
         ReflectionTestUtils.setField(createdOrder, "orderStatus", PAID);
-        ReflectionTestUtils.setField(approvedPayment, "order", createdOrder);
 
         // 결제, 주문 조회
         given(paymentTxService.findPaymentByIdWithOrder(paymentId))
@@ -294,7 +268,8 @@ class OrderTxServiceTest {
         // when
         // then
         OrderException e = assertThrows(OrderException.class, () ->
-                orderTxService.updatePaidOrderStatus(oderId, paymentId));
+                orderTxService.updatePaidOrderStatus(orderId, paymentId));
+        // order.paid() 호출에 의한 예외 검증
         assertEquals(ORDER_STATUS_NOT_CREATED, e.getErrorCode());
     }
 }

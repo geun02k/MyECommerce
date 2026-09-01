@@ -10,6 +10,7 @@ import com.myecommerce.MyECommerce.entity.payment.Payment;
 import com.myecommerce.MyECommerce.entity.product.Product;
 import com.myecommerce.MyECommerce.entity.product.ProductOption;
 import com.myecommerce.MyECommerce.exception.PaymentException;
+import com.myecommerce.MyECommerce.type.MemberAuthorityType;
 import com.myecommerce.MyECommerce.type.PaymentMethodType;
 import com.myecommerce.MyECommerce.type.PaymentStatusType;
 import com.myecommerce.MyECommerce.type.PgProviderType;
@@ -24,6 +25,7 @@ import static com.myecommerce.MyECommerce.exception.errorcode.PaymentErrorCode.*
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.PaymentMethodType.CARD;
 import static com.myecommerce.MyECommerce.type.PaymentStatusType.*;
+import static com.myecommerce.MyECommerce.type.PgProviderType.MOCK_PG;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -35,67 +37,72 @@ class PaymentPolicyTest {
         Test Fixtures
        ------------------ */
 
-    /** 고객권한 사용자 */
-    Member customer() {
+    /** 회원 */
+    Member member(Long id, MemberAuthorityType memberAuthorityType) {
         return Member.builder()
-                .id(1L)
-                .userId("customer")
+                .id(id)
                 .roles(List.of(MemberAuthority.builder()
-                        .authority(CUSTOMER)
+                        .authority(memberAuthorityType)
                         .build()))
                 .build();
+    }
+    Member member(MemberAuthorityType memberAuthorityType) {
+        return member(1L, memberAuthorityType);
+    }
+
+    /** 권한없는 회원 */
+    Member memberOfEmptyRole() {
+        return Member.builder()
+                .roles(List.of())
+                .build();
+    }
+
+    /** 고객권한 회원 */
+    Member customer(Long id) {
+        return member(id, CUSTOMER);
+    }
+    Member customer() {
+        return customer(1L);
     }
 
     /** 등록된 상품 옵션 */
     ProductOption registeredOption() {
-        Product registeredProduct = Product.builder()
+        Product product = Product.builder()
                 .saleStatus(ON_SALE)
                 .build();
 
         return ProductOption.builder()
                 .quantity(100)
                 .price(new BigDecimal("10000"))
-                .product(registeredProduct)
+                .product(product)
                 .build();
     }
 
     /** 주문 생성 */
-    Order order() {
-        ProductOption registeredOption = registeredOption();
-        OrderItem orderItem =
-                OrderItem.createOrderItem(registeredOption, 1);
-        Member member = customer();
-        return Order.createOrder(List.of(orderItem), member);
-    }
-
     Order order(Member member) {
-        ProductOption registeredOption = registeredOption();
         OrderItem orderItem =
-                OrderItem.createOrderItem(registeredOption, 1);
-
+                OrderItem.createOrderItem(registeredOption(), 1);
         return Order.createOrder(List.of(orderItem), member);
     }
 
-    /** PG 결제대행사 반환 */
-    PgProviderType pgProvider() {
-        return PgProviderType.MOCK_PG;
+    /** PG 요청된 결제 객체 생성 */
+    Payment pgRequestedPayment(Order order) {
+        // 결제 생성 (결제 상태는 READY)
+        Payment payment = Payment.createPayment(order, CARD, MOCK_PG);
+        // PG 결제요청
+        PgResult pgRequestResult = PgResult.builder()
+                .pgTransactionId("pgTransactionId")
+                .build();
+        payment.requestPgPayment(pgRequestResult); // 결제상태 = IN_PROGRESS
+
+        return payment;
     }
 
     /** PG 승인실패된 결제 생성 - 결제상태 FAILED */
-    Payment failedPayment() {
-        // 등록된 주문 (주문 상태는 CREATED)
-        Order order = order();
-        // 요청 결제 방식
-        PaymentMethodType requestMethod = CARD;
-        // 회사와 결제 계약된 PG사
-        PgProviderType pgProvider = pgProvider();
-
-        // 결제 생성 (READY)
-        Payment payment = Payment.createPayment(order, requestMethod, pgProvider);
-        // PG 결제 요청 (READY -> IN_PROGRESS)
-        PgResult pgResult = pgResult();
-        payment.requestPgPayment(pgResult);
-        // PG 결제 승인
+    Payment failedPayment(Order order) {
+        // pg 요청된 결제 생성 (IN_PROGRESS)
+        Payment payment = pgRequestedPayment(order);
+        // PG 결제 승인 실패
         PgApprovalResult pgApprovalResult = pgApprovalResult(FAILED);
         payment.fail(pgApprovalResult);
 
@@ -103,19 +110,9 @@ class PaymentPolicyTest {
     }
 
     /** PG 승인된 결제 생성 - 결제상태 APPROVED */
-    Payment approvedPayment() {
-        // 등록된 주문 (주문 상태는 CREATED)
-        Order order = order();
-        // 요청 결제 방식
-        PaymentMethodType requestMethod = CARD;
-        // 회사와 결제 계약된 PG사
-        PgProviderType pgProvider = pgProvider();
-
-        // 결제 생성 (READY)
-        Payment payment = Payment.createPayment(order, requestMethod, pgProvider);
-        // PG 결제 요청 (READY -> IN_PROGRESS)
-        PgResult pgResult = pgResult();
-        payment.requestPgPayment(pgResult);
+    Payment approvedPayment(Order order) {
+        // pg 요청된 결제 생성 (IN_PROGRESS)
+        Payment payment = pgRequestedPayment(order);
         // PG 결제 승인
         PgApprovalResult pgApprovalResult = pgApprovalResult(APPROVED);
         payment.approve(pgApprovalResult);
@@ -124,30 +121,13 @@ class PaymentPolicyTest {
     }
 
     /** PG 승인취소된 결제 생성 - 결제상태 CANCELED */
-    Payment canceledPayment() {
-        // 등록된 주문 (주문 상태는 CREATED)
-        Order order = order();
-        // 요청 결제 방식
-        PaymentMethodType requestMethod = CARD;
-        // 회사와 결제 계약된 PG사
-        PgProviderType pgProvider = pgProvider();
-
-        // 결제 생성 (READY)
-        Payment payment = Payment.createPayment(order, requestMethod, pgProvider);
-        // PG 결제 요청 (READY -> IN_PROGRESS)
-        PgResult pgResult = pgResult();
-        payment.requestPgPayment(pgResult);
+    Payment canceledPayment(Order order) {
+        // pg 요청된 결제 생성 (IN_PROGRESS)
+        Payment payment = pgRequestedPayment(order);
         // PG 결제 승인취소 (현재 로직에서 미지원으로 강제변경)
         ReflectionTestUtils.setField(payment, "paymentStatus", CANCELED);
 
         return payment;
-    }
-
-    /** PG 요청 결과 생성 */
-    PgResult pgResult() {
-        return PgResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .build();
     }
 
     /** PG 승인 결과 생성 */
@@ -171,12 +151,7 @@ class PaymentPolicyTest {
     @DisplayName("결제생성 사전 정책 통과 - 유효한 요청 시 정책 통과")
     void preValidateCreate_shouldPass_whenValidMember() {
         // given
-        Member member = Member.builder()
-                .userId("customer")
-                .roles(List.of(MemberAuthority.builder()
-                        .authority(CUSTOMER)
-                        .build()))
-                .build();
+        Member member = member(CUSTOMER); // 고객 권한 회원
 
         // when
         // then
@@ -187,10 +162,12 @@ class PaymentPolicyTest {
     @DisplayName("결제생성 사전 정책 실패 - 비회원 결제 차단")
     void validateCreate_shouldThrowException_whenAccessNotMember() {
         // given
+        Member notMember = null; // 회원 정보 없음
+
         // when
         // then
         PaymentException e = assertThrows(PaymentException.class, () ->
-                paymentPolicy.preValidateCreate(null)); // 회원 비로그인
+                paymentPolicy.preValidateCreate(notMember));
         assertEquals(MEMBER_NOT_LOGGED_IN, e.getErrorCode());
     }
 
@@ -199,9 +176,7 @@ class PaymentPolicyTest {
     void preValidateCreate_shouldThrowException_whenHaveNotCustomerRole() {
         // given
         // 요청 고객
-        Member invalidMember = Member.builder()
-                .roles(List.of())
-                .build(); // 고객 권한 없음
+        Member invalidMember = memberOfEmptyRole(); // 고객 권한 없음
 
         // when
         // then
@@ -219,9 +194,7 @@ class PaymentPolicyTest {
     void validateCreate_shouldPass_whenValidAll() {
         // given
         // 주문 결제 요청 회원
-        Member member = Member.builder()
-                .id(1L)
-                .build();
+        Member member = customer();
         // 주문
         Order order = order(member);
         // 주문에 대한 결제
@@ -239,13 +212,9 @@ class PaymentPolicyTest {
     void validateCreate_shouldThrowException_whenAccessNotOrderOwner() {
         // given
         // 결제 요청 회원
-        Member requestMember = Member.builder()
-                .id(1L)
-                .build();
+        Member requestMember = customer(1L);
         // 주문한 회원
-        Member orderMember = Member.builder()
-                .id(5L)
-                .build();
+        Member orderMember = customer(5L);
         // 주문
         Order order = order(orderMember);
         // 주문에 대한 결제
@@ -268,7 +237,7 @@ class PaymentPolicyTest {
         // 주문
         Order order = order(member);
         // 주문에 대한 결제 (PG 결제실패)
-        Payment payment = failedPayment();
+        Payment payment = failedPayment(order);
 
         // when
         // then
@@ -285,7 +254,7 @@ class PaymentPolicyTest {
         // 주문
         Order order = order(member);
         // 주문에 대한 결제 (PG 결제승인)
-        Payment invalidPayment = approvedPayment();
+        Payment invalidPayment = approvedPayment(order);
 
         // when
         // then
@@ -303,7 +272,7 @@ class PaymentPolicyTest {
         // 주문
         Order order = order(member);
         // 주문에 대한 결제 (PG 결제승인)
-        Payment invalidPayment = canceledPayment();
+        Payment invalidPayment = canceledPayment(order);
 
         // when
         // then
@@ -311,5 +280,13 @@ class PaymentPolicyTest {
                 paymentPolicy.validateCreate(List.of(invalidPayment), order, member));
         assertEquals(PAYMENT_ALREADY_COMPLETED, e.getErrorCode());
     }
+
+    // TODO: 결제생성 정책 실패 - IN_PROGRESS 결제 존재 시 신규 결제생성 차단 (validateCreate())
+
+    /* ------------------------------------
+        PG 요청 가능한 유효한 결제 판단 Tests
+       ------------------------------------ */
+
+    // TODO: 결제생성 정책 실패 - 결제 수단, PG사, 결제 상태에 따른 boolean 반환 (isPaymentAvailablePgRequestAboutRequest())
 
 }

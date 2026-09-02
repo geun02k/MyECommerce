@@ -12,6 +12,7 @@ import com.myecommerce.MyECommerce.exception.PaymentException;
 import com.myecommerce.MyECommerce.repository.payment.PaymentRepository;
 import com.myecommerce.MyECommerce.service.order.OrderTxService;
 import com.myecommerce.MyECommerce.type.PaymentMethodType;
+import com.myecommerce.MyECommerce.type.PaymentStatusType;
 import com.myecommerce.MyECommerce.type.PgProviderType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -156,6 +157,20 @@ class PaymentServiceTest {
         return PgResult.builder()
                 .pgTransactionId("pgTransactionId")
                 .redirectUrl(redirectUrl)
+                .build();
+    }
+
+    /** PG 승인 결과 응답 */
+    PgApprovalResult pgApprovalResult(String pgTransactionId,
+                                      PaymentStatusType paymentStatusType) {
+        return PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
+                .approvalStatus(paymentStatusType)
+                .build();
+    }
+    PgApprovalResult pgApprovalResult(String pgTransactionId) {
+        return PgApprovalResult.builder()
+                .pgTransactionId(pgTransactionId)
                 .build();
     }
 
@@ -314,12 +329,9 @@ class PaymentServiceTest {
         // given
         Long orderId = 1L;
         Long paymentId = 10L;
-        // PG 결제승인 요청에 대한 웹훅 응답
-        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .approvalStatus(APPROVED) // PG 결제 승인
-                .paidAmount(new BigDecimal(10000))
-                .build();
+        // PG 결제승인 요청에 대한 웹훅 응답 (PG 승인)
+        PgApprovalResult pgApprovalResult =
+                pgApprovalResult("pgTransactionId", APPROVED);
 
         // PG 트랜잭션 ID와 일치하는 결제 조회 (주문에 대한 PG 요청된 결제)
         Payment payment = inProgressPayment(10L, order(1L));
@@ -344,23 +356,21 @@ class PaymentServiceTest {
     void handlePgWebHook_shouldFailPayment_whenExistsTransactionId() {
         // given
         Long paymentId = 10L;
-        // PG 결제승인 요청에 대한 웹훅 응답
-        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .approvalStatus(FAILED) // PG 결제 실패
-                .build();
+        // PG 결제승인 요청에 대한 웹훅 응답 (PG 승인실패)
+        PgApprovalResult pgFailResult =
+                pgApprovalResult("pgTransactionId", FAILED);
 
         // PG 트랜잭션 ID와 일치하는 결제 조회 (주문에 대한 PG 요청된 결제 반환)
         given(paymentRepository.findByPgTransactionIdWithOrder(any()))
                 .willReturn(Optional.of(inProgressPayment(paymentId)));
 
         // when
-        paymentService.handlePgWebHook(pgApprovalResult);
+        paymentService.handlePgWebHook(pgFailResult);
 
         // then
         // 결제 조회 및 상태변경 필수 검증
         verify(paymentRepository).findByPgTransactionIdWithOrder("pgTransactionId");
-        verify(paymentTxService).updatePgApprovalResult(paymentId, pgApprovalResult);
+        verify(paymentTxService).updatePgApprovalResult(paymentId, pgFailResult);
         // 결제 실패 시 주문상태 미변경 검증
         verify(orderTxService, never()).updatePaidOrderStatus(any(),any());
     }
@@ -373,11 +383,9 @@ class PaymentServiceTest {
     @DisplayName("PG 결제승인 웹훅 멱등성 보장 - 종결된 결제에 대해 승인완료 재요청 시 웹훅 무시")
     void handlePgWebHook_shouldNotChange_whenReRequestSamePaymentStatus() {
         // given
-        // PG 결제승인 요청에 대한 웹훅 응답
-        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .approvalStatus(APPROVED) // PG 승인완료
-                .build();
+        // PG 결제승인 요청에 대한 웹훅 응답 (PG 승인)
+        PgApprovalResult pgApprovalResult =
+                pgApprovalResult("pgTransactionId", APPROVED);
 
         // PG 트랜잭션 ID와 일치하는 결제 조회 (주문에 대한 PG 승인된 결제 반환)
         given(paymentRepository.findByPgTransactionIdWithOrder(any()))
@@ -398,18 +406,16 @@ class PaymentServiceTest {
     @DisplayName("PG 결제승인 웹훅 멱등성 보장 - 종결된 결제에 대한 다른 승인상태로 재요청 시 웹훅 무시로 상태역전 방지")
     void handlePgWebHook_shouldNotChange_whenReRequestDifferentPaymentStatus() {
         // given
-        // PG 결제승인 요청에 대한 웹훅 응답
-        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .approvalStatus(FAILED) // PG 승인실패
-                .build();
+        // PG 결제승인 요청에 대한 웹훅 응답 (PG 승인실패)
+        PgApprovalResult pgFailResult =
+                pgApprovalResult("pgTransactionId", FAILED);
 
         // PG 트랜잭션 ID와 일치하는 결제 조회 (주문에 대한 PG 승인된 결제 반환)
         given(paymentRepository.findByPgTransactionIdWithOrder(any()))
                 .willReturn(Optional.of(approvedPayment()));
 
         // when
-        paymentService.handlePgWebHook(pgApprovalResult);
+        paymentService.handlePgWebHook(pgFailResult);
 
         // then
         // 결제 조회 필수 검증
@@ -433,42 +439,15 @@ class PaymentServiceTest {
     // 정상 시나리오에서의 일부 값을 다시 검증하므로 불필요
 
     /* ----------------------------------
-        PG 결제승인 웹훅 실패 Tests
-       ---------------------------------- */
-
-    @Test
-    @DisplayName("PG 결제승인 웹훅 실패 - 트랜잭션 ID에 대한 결제 미존재 시 예외발생")
-    void handlePgWebHook_shouldThrowException_whenNotExistsTransactionId() {
-        // given
-        // PG 결제승인 요청에 대한 웹훅 응답
-        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .build();
-
-        // PG 트랜잭션 ID와 일치하는 결제 조회
-        given(paymentRepository.findByPgTransactionIdWithOrder(any()))
-                .willReturn(Optional.empty());
-
-        // when
-        // then
-        PaymentException e = assertThrows(PaymentException.class, () ->
-                paymentService.handlePgWebHook(pgApprovalResult));
-        assertEquals(PG_TRANSACTION_ID_NOT_EXISTS, e.getErrorCode());
-    }
-
-    /* ----------------------------------
         PG 결제승인 웹훅 정합성 Tests
        ---------------------------------- */
 
     @Test
     @DisplayName("PG 결제승인 웹훅 정합성 - Order 처리 실패 시에도 Payment 승인은 유지되고 예외를 전파하지 않음")
     void handlePgWebHook_shouldNotThrowException_whenAlreadyPaidOrder() {
-        // PG 결제승인 요청에 대한 웹훅 응답
-        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .approvalStatus(APPROVED) // PG 결제 승인
-                .paidAmount(new BigDecimal("10000"))
-                .build();
+        // PG 결제승인 요청에 대한 웹훅 응답 (PG 승인)
+        PgApprovalResult pgApprovalResult =
+                pgApprovalResult("pgTransactionId", APPROVED);
 
         // PG 트랜잭션 ID와 일치하는 결제 조회 (주문에 대한 PG 요청된 결제 반환)
         given(paymentRepository.findByPgTransactionIdWithOrder(any()))
@@ -488,5 +467,27 @@ class PaymentServiceTest {
 
     // 금액 검증, TransactionId 검증, 상태 전이 검증 등의 경우
     // PaymentTest에 이미 존재하므로, 이미 검증된 책임에 대해서는 검증 제외
+
+    /* ----------------------------------
+        PG 결제승인 웹훅 실패 Tests
+       ---------------------------------- */
+
+    @Test
+    @DisplayName("PG 결제승인 웹훅 실패 - 트랜잭션 ID에 대한 결제 미존재 시 예외발생")
+    void handlePgWebHook_shouldThrowException_whenNotExistsTransactionId() {
+        // given
+        // PG 결제승인 요청에 대한 웹훅 응답
+        PgApprovalResult pgApprovalResult = pgApprovalResult("pgTransactionId");
+
+        // PG 트랜잭션 ID와 일치하는 결제 조회
+        given(paymentRepository.findByPgTransactionIdWithOrder(any()))
+                .willReturn(Optional.empty());
+
+        // when
+        // then
+        PaymentException e = assertThrows(PaymentException.class, () ->
+                paymentService.handlePgWebHook(pgApprovalResult));
+        assertEquals(PG_TRANSACTION_ID_NOT_EXISTS, e.getErrorCode());
+    }
 
 }

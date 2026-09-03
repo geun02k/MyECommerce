@@ -217,7 +217,7 @@ class PaymentTxServiceTest {
         given(paymentRepository.save(any())).willReturn(savedPayment);
 
         // when
-        Payment response = paymentTxService.createPayment(request, member);
+        Payment responsePayment = paymentTxService.createPayment(request, member);
 
         // then
         // 신규 결제 저장 여부 검증
@@ -229,6 +229,11 @@ class PaymentTxServiceTest {
         assertEquals(CARD, paymentBeforeSave.getPaymentMethod());
         assertEquals(MOCK_PG, paymentBeforeSave.getPgProvider());
         assertEquals(READY, paymentBeforeSave.getPaymentStatus()); // 결제 상태 '준비'로 변경
+        assertNotNull(paymentBeforeSave.getPaymentCode()); // paymentCode 규칙 검증은 Payment Entity에서 검증 (paymentCode 생성 규칙 바뀌면 Service 테스트가 깨지기 때문)
+
+        // 응답 검증
+        assertEquals(10L, responsePayment.getId());
+        assertSame(savedPayment, responsePayment);
     }
 
     @Test
@@ -264,7 +269,6 @@ class PaymentTxServiceTest {
         Payment responsePayment = paymentTxService.createPayment(request, member);
 
         // then
-        // TODO: 호출 순서대로 나열할것 (가독성 향상)
         // 기존 결제 조회 여부 검증
         verify(paymentRepository).findLockedAllByOrderId(orderId);
         // 기존 결제내역의 PG 요청 가능 여부 검증
@@ -277,9 +281,9 @@ class PaymentTxServiceTest {
         assertSame(originPayment, responsePayment);
     }
 
-    // 결제생성 정상 시나리오 - 기존 결제내역목록 중 동일 결제 존재 시 재사용
+    // TODO: 결제생성 정상 시나리오 - 다건의 기존 결제내역목록 중 동일 결제 존재 시 재사용
 
-    // 결제생성 정상 시나리오 - 재사용 불가능 기존 결제 존재 시 결제 신규생성 및 저장
+    // TODO: 결제생성 정상 시나리오 - 재사용 불가능 기존 결제 존재 시 결제 신규생성 및 저장
 
     /* ----------------------------
         결제생성 책임 행위 검증 Tests
@@ -315,52 +319,12 @@ class PaymentTxServiceTest {
         verify(paymentPolicy).validateCreate(Collections.emptyList(), order, member);
     }
 
-    @Test
-    @DisplayName("결제생성 책임 - 신규 결제 요청 시 결제 객체 생성 및 저장 검증")
-    void createPayment_shouldCreateAndSavePayment_whenRequestNewPayment() {
-        // given
-        Long orderId = 1L;
-        PgProviderType pgProvider = MOCK_PG;
-        PaymentMethodType paymentMethod = CARD;
-        // 요청 결제 정보
-        RequestPaymentDto request = requestPaymentDto(orderId, paymentMethod);
-        // 결제 요청 고객
-        Member member = customer();
+    // 결제생성 책임 - 신규 결제 요청 시 결제 객체 생성 및 저장 검증
+    // 정상 시나리오와 테스트 중복되므로 통합하고 제거함
 
-        // PG 결제대행사 반환
-        given(pgClient.getProvider()).willReturn(pgProvider);
-        // 요청 결제에 대한 주문 조회
-        Order order = order(member);
-        given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
-                .willReturn(Optional.of(order));
-        // 주문에 대한 기존 결제내역 미존재
-        given(paymentRepository.findLockedAllByOrderId(any()))
-                .willReturn(Collections.emptyList());
-        // 신규 결제 생성 및 저장
-        Payment savedPayment = payment(10L, order, paymentMethod, pgProvider);
-        given(paymentRepository.save(any())).willReturn(savedPayment);
+    // TODO: 결제생성 책임 - PgProvider 호출 검증
 
-        // when
-        Payment response = paymentTxService.createPayment(request, member);
-
-        // then
-        // 결제 저장여부 검증
-        ArgumentCaptor<Payment> paymentArgCaptor = ArgumentCaptor.forClass(Payment.class);
-        verify(paymentRepository).save(paymentArgCaptor.capture());
-        // Payment 저장 전, 신규 생성된 결제객체 검증
-        Payment capturedPayment = paymentArgCaptor.getValue();
-        assertEquals(order, capturedPayment.getOrder());
-        assertEquals(request.getPaymentMethod(), capturedPayment.getPaymentMethod());
-        assertEquals(pgProvider, capturedPayment.getPgProvider());
-        assertNotNull(capturedPayment.getPaymentCode()); // paymentCode 규칙 검증은 Payment Entity에서 검증 (paymentCode 생성 규칙 바뀌면 Service 테스트가 깨지기 때문)
-        assertEquals(READY, capturedPayment.getPaymentStatus()); // 결제 생성 상태
-        // 응답 검증
-        assertEquals(10L, response.getId());
-    }
-
-    // 결제생성 책임 - PgProvider 호출 검증
-
-    // 결제생성 책임 - 메서드 호출 순서 검증
+    // TODO: 결제생성 책임 - 메서드 호출 순서 검증
 
     /* ----------------------------
         결제생성 실패 Tests
@@ -411,6 +375,7 @@ class PaymentTxServiceTest {
         doThrow(new PaymentException(PAYMENT_ACCESS_AVAILABLE_ONLY_BUYER))
                 .when(paymentPolicy)
                 .validateCreate(Collections.emptyList(), order, requestMember);
+
         // when
         // then
         PaymentException e = assertThrows(PaymentException.class, () ->
@@ -439,7 +404,7 @@ class PaymentTxServiceTest {
         assertEquals(PAYMENT_ORDER_NOT_EXISTS, e.getErrorCode());
     }
 
-    // 결제생성 실패 - 결제객체 저장 실패 시 예외발생
+    // TODO: 결제생성 실패 - 결제객체 저장 실패 시 예외발생
 
     /* ----------------------------
         PG 결제승인 정상 시나리오 Tests

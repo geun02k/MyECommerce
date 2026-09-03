@@ -195,32 +195,40 @@ class PaymentTxServiceTest {
     @DisplayName("결제생성 정상 시나리오 - 요청한 주문, 결제방법, PG 결제사에 대한 결제 미존재 시 신규 객체 저장")
     void createPayment_shouldSavePayment_whenNotExistsPaymentOfOrder() {
         // given
+        Long orderId = 1L;
+        PaymentMethodType paymentMethod = CARD;
+        PgProviderType pgProvider = MOCK_PG;
         // 요청 결제 정보
-        RequestPaymentDto request = requestPaymentDto(1L, CARD);
+        RequestPaymentDto request = requestPaymentDto(orderId, paymentMethod);
         // 결제 요청 고객
         Member member = customer();
 
         // PG 결제대행사 반환
-        given(pgClient.getProvider()).willReturn(MOCK_PG);
+        given(pgClient.getProvider()).willReturn(pgProvider);
         // 요청 결제에 대한 주문 조회
-        given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
-                .willReturn(Optional.of(order(1L, member)));
+        Order order = order(orderId, member);
+        given(orderRepository.findLockedByIdAndOrderStatus(orderId, CREATED))
+                .willReturn(Optional.of(order));
         // 주문에 대한 기존 결제내역 미존재
-        given(paymentRepository.findLockedAllByOrderId(any()))
+        given(paymentRepository.findLockedAllByOrderId(orderId))
                 .willReturn(Collections.emptyList());
         // 신규 결제 생성 및 저장
-        given(paymentRepository.save(any()))
-                .willAnswer(invocationOnMock ->
-                        invocationOnMock.getArgument(0));
+        Payment savedPayment = payment(10L, order, paymentMethod, pgProvider);
+        given(paymentRepository.save(any())).willReturn(savedPayment);
 
         // when
         Payment response = paymentTxService.createPayment(request, member);
 
         // then
-        assertEquals(1L, response.getOrder().getId());
-        assertEquals(CARD, response.getPaymentMethod());
-        assertEquals(MOCK_PG, response.getPgProvider());
-        assertEquals(READY, response.getPaymentStatus()); // 결제 상태 '준비'로 변경
+        // 신규 결제 저장 여부 검증
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        Payment paymentBeforeSave = captor.getValue();
+        assertNull(paymentBeforeSave.getId()); // 신규 객체로 아이디 없어야 함
+        assertEquals(1L, paymentBeforeSave.getOrder().getId());
+        assertEquals(CARD, paymentBeforeSave.getPaymentMethod());
+        assertEquals(MOCK_PG, paymentBeforeSave.getPgProvider());
+        assertEquals(READY, paymentBeforeSave.getPaymentStatus()); // 결제 상태 '준비'로 변경
     }
 
     @Test
@@ -239,31 +247,34 @@ class PaymentTxServiceTest {
         // PG 결제대행사 반환
         given(pgClient.getProvider()).willReturn(pgProvider);
         // 요청 결제에 대한 주문 조회
-        Order order = order(1L, member);
-        given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
+        Order order = order(orderId, member);
+        given(orderRepository.findLockedByIdAndOrderStatus(orderId, CREATED))
                 .willReturn(Optional.of(order));
         // 주문에 대한 기존 결제내역 존재
         Payment originPayment =
                 payment(originPaymentId, order, paymentMethod, pgProvider);
-        given(paymentRepository.findLockedAllByOrderId(any()))
+        given(paymentRepository.findLockedAllByOrderId(orderId))
                 .willReturn(List.of(originPayment));
         // 기존 PG 결제 요청 가능 여부 반환
-        given(paymentPolicy.isPaymentAvailablePgRequestAboutRequest(any(), any(), any()))
+        given(paymentPolicy.isPaymentAvailablePgRequestAboutRequest(
+                originPayment, paymentMethod, pgProvider))
                 .willReturn(true);
 
         // when
-        paymentTxService.createPayment(request, member);
+        Payment responsePayment = paymentTxService.createPayment(request, member);
 
         // then
         // TODO: 호출 순서대로 나열할것 (가독성 향상)
         // 기존 결제 조회 여부 검증
         verify(paymentRepository).findLockedAllByOrderId(orderId);
-        // 기존 결제를 이용하므로, 신규 결제 저장되지 않음을 검증
-        verify(paymentRepository, never()).save(any());
         // 기존 결제내역의 PG 요청 가능 여부 검증
         verify(paymentPolicy).isPaymentAvailablePgRequestAboutRequest(
                 originPayment, paymentMethod, pgProvider);
-        // 결제 재사용 로직으로 응답이 달라질 가능성은 없으므로, 응답 검증 제외
+        // 기존 결제를 이용하므로, 신규 결제 저장되지 않음을 검증
+        verify(paymentRepository, never()).save(any());
+
+        // 응답 검증
+        assertSame(originPayment, responsePayment);
     }
 
     // 결제생성 정상 시나리오 - 기존 결제내역목록 중 동일 결제 존재 시 재사용
@@ -291,20 +302,17 @@ class PaymentTxServiceTest {
         // 주문에 대한 기존 결제내역 미존재
         given(paymentRepository.findLockedAllByOrderId(orderId))
                 .willReturn(Collections.emptyList());
-        // 실행조건 mock
         // 신규 결제 저장
-        given(paymentRepository.save(any()))
-                .willAnswer(invocationOnMock ->
-                        invocationOnMock.getArgument(0));
+        given(paymentRepository.save(any())).willAnswer(
+                invocation -> invocation.getArgument(0));
 
         // when
         paymentTxService.createPayment(request, member);
 
         // then
         // 정책 실행여부 검증
-        verify(paymentPolicy).preValidateCreate(eq(member));
-        verify(paymentPolicy).validateCreate(
-                argThat(List::isEmpty), eq(order), eq(member));
+        verify(paymentPolicy).preValidateCreate(member);
+        verify(paymentPolicy).validateCreate(Collections.emptyList(), order, member);
     }
 
     @Test
@@ -368,7 +376,7 @@ class PaymentTxServiceTest {
         // 사전 정책 실행 시 예외발생
         doThrow(new PaymentException(PAYMENT_CUSTOMER_ONLY))
                 .when(paymentPolicy)
-                .preValidateCreate(eq(invalidMember));
+                .preValidateCreate(invalidMember);
 
         // when
         // then
@@ -392,20 +400,17 @@ class PaymentTxServiceTest {
         Member orderMember = customer(orderMemberId);
 
         // 요청 결제에 대한 주문 조회
-        Order order = order(orderMember);
-        given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
+        Order order = order(orderId, orderMember);
+        given(orderRepository.findLockedByIdAndOrderStatus(orderId, CREATED))
                 .willReturn(Optional.of(order));
         // 주문에 대한 기존 결제내역 미존재
-        given(paymentRepository.findLockedAllByOrderId(any()))
+        given(paymentRepository.findLockedAllByOrderId(orderId))
                 .willReturn(Collections.emptyList());
 
         // 정책 실행 시 예외발생
         doThrow(new PaymentException(PAYMENT_ACCESS_AVAILABLE_ONLY_BUYER))
                 .when(paymentPolicy)
-                .validateCreate(argThat(List::isEmpty),
-                        argThat(o -> o.getId().equals(orderId)
-                                && o.getBuyer().getId().equals(orderMemberId)),
-                        argThat(m -> m.getId().equals(requestMemberId)));
+                .validateCreate(Collections.emptyList(), order, requestMember);
         // when
         // then
         PaymentException e = assertThrows(PaymentException.class, () ->
@@ -418,12 +423,13 @@ class PaymentTxServiceTest {
     void createPayment_shouldThrowException_whenNotExistsOrder() {
         // given
         // 요청 결제 정보
-        RequestPaymentDto request = requestPaymentDto(1L, CARD);
+        Long orderId = 1L;
+        RequestPaymentDto request = requestPaymentDto(orderId, CARD);
         // 결제 요청 고객
         Member member = customer();
 
         // 요청 결제에 대한 주문 미존재
-        given(orderRepository.findLockedByIdAndOrderStatus(eq(1L), eq(CREATED)))
+        given(orderRepository.findLockedByIdAndOrderStatus(orderId, CREATED))
                 .willReturn(Optional.empty());
 
         // when
@@ -438,7 +444,6 @@ class PaymentTxServiceTest {
     /* ----------------------------
         PG 결제승인 정상 시나리오 Tests
        ---------------------------- */
-
 
     // TODO: 검증 대상 금액 테스트에 노출되도록 수정 필요
     @Test

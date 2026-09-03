@@ -63,12 +63,22 @@ class PaymentTxServiceTest {
        ------------------ */
 
     /** 고객권한 회원 */
-    Member customer() {
+    Member customer(Long memberId) {
         return Member.builder()
-                .userId("customer")
+                .id(memberId)
                 .roles(List.of(MemberAuthority.builder()
                         .authority(CUSTOMER)
                         .build()))
+                .build();
+    }
+    Member customer() {
+        return customer(3L);
+    }
+
+    /** 권한없는 회원 */
+    Member memberOfEmptyRole() {
+        return Member.builder()
+                .roles(List.of())
                 .build();
     }
 
@@ -90,6 +100,13 @@ class PaymentTxServiceTest {
     }
 
     /** 등록된 주문 */
+    Order order(Long orderId, Member member) {
+        OrderItem orderItem = OrderItem.createOrderItem(productOption(), 1);
+        Order order = Order.createOrder(List.of(orderItem), member);
+        ReflectionTestUtils.setField(order, "id", orderId);
+        return order;
+    }
+
     Order order(Member member) {
         ProductOption productOption = productOption();
         OrderItem orderItem = OrderItem.createOrderItem(productOption, 1);
@@ -100,14 +117,19 @@ class PaymentTxServiceTest {
     }
 
     /** 저장된 결제 (id 추가) */
-    Payment payment(Order order,
+    Payment payment(Long paymentId,
+                    Order order,
                     PaymentMethodType requestPaymentMethod,
                     PgProviderType pgProvider) {
-        Payment payment = Payment.createPayment(
-                order, requestPaymentMethod, pgProvider);
-        ReflectionTestUtils.setField(payment, "id", 10L);
-
+        Payment payment =
+                Payment.createPayment(order, requestPaymentMethod, pgProvider);
+        ReflectionTestUtils.setField(payment, "id", paymentId);
         return payment;
+    }
+    Payment payment(Order order,
+                    PaymentMethodType paymentMethod,
+                    PgProviderType pgProvider) {
+        return payment(10L, order, paymentMethod, pgProvider);
     }
 
     /** PG 요청에 대한 응답 */
@@ -148,10 +170,11 @@ class PaymentTxServiceTest {
         return payment;
     }
 
-    /** 고객 권한 */
-    MemberAuthority customerRole() {
-        return MemberAuthority.builder()
-                .authority(CUSTOMER)
+    /** 요청 결제 */
+    RequestPaymentDto requestPaymentDto(Long orderId, PaymentMethodType paymentMethod) {
+        return RequestPaymentDto.builder()
+                .orderId(orderId)
+                .paymentMethod(paymentMethod)
                 .build();
     }
 
@@ -159,27 +182,11 @@ class PaymentTxServiceTest {
         Helper Method
        ------------------ */
 
-    void givenPgProvider(PgProviderType pgProvider) {
-        given(pgClient.getProvider()).willReturn(pgProvider);
-    }
-
-    void givenOrderOfPayment(Order order) {
-        given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
-                .willReturn(Optional.of(order));
-    }
-
-    /** 실행가능상태 준비 - 신규 payment 저장 mocking */
-    void givenPaymentSaveSucceeds() {
-        // 신규 결제 저장
-        given(paymentRepository.save(any()))
-                .willAnswer(invocationOnMock ->
-                        invocationOnMock.getArgument(0));
-    }
-
     // BigDecimal 금액 반환
     BigDecimal price(String price) {
         return new BigDecimal(price);
     }
+
     /* ---------------------------
         결제생성 정상 시나리오 Tests
        --------------------------- */
@@ -188,26 +195,16 @@ class PaymentTxServiceTest {
     @DisplayName("결제생성 정상 시나리오 - 요청한 주문, 결제방법, PG 결제사에 대한 결제 미존재 시 신규 객체 저장")
     void createPayment_shouldSavePayment_whenNotExistsPaymentOfOrder() {
         // given
-        Long requestOrderId = 1L;
-        PaymentMethodType requestPaymentMethod = PaymentMethodType.CARD;
         // 요청 결제 정보
-        RequestPaymentDto request = RequestPaymentDto.builder()
-                .orderId(requestOrderId)
-                .paymentMethod(requestPaymentMethod)
-                .build();
+        RequestPaymentDto request = requestPaymentDto(1L, CARD);
         // 결제 요청 고객
         Member member = customer();
 
-        // PG 결제대행사
-        PgProviderType pgProvider = PgProviderType.MOCK_PG;
-        // 요청 결제에 대한 주문
-        Order order = order(member);
-
         // PG 결제대행사 반환
-        given(pgClient.getProvider()).willReturn(pgProvider);
+        given(pgClient.getProvider()).willReturn(MOCK_PG);
         // 요청 결제에 대한 주문 조회
         given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
-                .willReturn(Optional.of(order));
+                .willReturn(Optional.of(order(1L, member)));
         // 주문에 대한 기존 결제내역 미존재
         given(paymentRepository.findLockedAllByOrderId(any()))
                 .willReturn(Collections.emptyList());
@@ -220,9 +217,9 @@ class PaymentTxServiceTest {
         Payment response = paymentTxService.createPayment(request, member);
 
         // then
-        assertEquals(requestOrderId, response.getOrder().getId());
-        assertEquals(requestPaymentMethod, response.getPaymentMethod());
-        assertEquals(pgProvider, response.getPgProvider());
+        assertEquals(1L, response.getOrder().getId());
+        assertEquals(CARD, response.getPaymentMethod());
+        assertEquals(MOCK_PG, response.getPgProvider());
         assertEquals(READY, response.getPaymentStatus()); // 결제 상태 '준비'로 변경
     }
 
@@ -230,29 +227,26 @@ class PaymentTxServiceTest {
     @DisplayName("결제생성 정상 시나리오 - 기존 결제내역 중 동일 주문, 결제방식, 결제사에 대한 결제 존재 시 재사용")
     void createPayment_shouldReUsePayment_whenAlreadyExistsPayment() {
         // given
-        Long requestOrderId = 1L;
-        PaymentMethodType requestPaymentMethod = PaymentMethodType.CARD;
-        PgProviderType pgProvider = PgProviderType.MOCK_PG;
+        Long orderId = 1L;
+        Long originPaymentId = 10L;
+        PaymentMethodType paymentMethod = CARD;
+        PgProviderType pgProvider = MOCK_PG;
         // 요청 결제 정보
-        RequestPaymentDto request = RequestPaymentDto.builder()
-                .orderId(requestOrderId)
-                .paymentMethod(requestPaymentMethod)
-                .build();
+        RequestPaymentDto request = requestPaymentDto(orderId, paymentMethod);
         // 결제 요청 고객
         Member member = customer();
 
-        // 요청 결제에 대한 주문
-        Order order = order(member);
-        // 기존 결제 내역
-        Payment existingPayment = Payment.createPayment(
-                order, requestPaymentMethod, pgProvider);
-        ReflectionTestUtils.setField(existingPayment, "id", 10L);
-
-        givenPgProvider(pgProvider); // PG 결제대행사 반환
-        givenOrderOfPayment(order); // 요청 결제에 대한 주문 조회
-        // 주문에 대한 기존 결제내역 미존재
+        // PG 결제대행사 반환
+        given(pgClient.getProvider()).willReturn(pgProvider);
+        // 요청 결제에 대한 주문 조회
+        Order order = order(1L, member);
+        given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
+                .willReturn(Optional.of(order));
+        // 주문에 대한 기존 결제내역 존재
+        Payment originPayment =
+                payment(originPaymentId, order, paymentMethod, pgProvider);
         given(paymentRepository.findLockedAllByOrderId(any()))
-                .willReturn(List.of(existingPayment));
+                .willReturn(List.of(originPayment));
         // 기존 PG 결제 요청 가능 여부 반환
         given(paymentPolicy.isPaymentAvailablePgRequestAboutRequest(any(), any(), any()))
                 .willReturn(true);
@@ -261,13 +255,14 @@ class PaymentTxServiceTest {
         paymentTxService.createPayment(request, member);
 
         // then
+        // TODO: 호출 순서대로 나열할것 (가독성 향상)
         // 기존 결제 조회 여부 검증
-        verify(paymentRepository).findLockedAllByOrderId(requestOrderId);
+        verify(paymentRepository).findLockedAllByOrderId(orderId);
         // 기존 결제를 이용하므로, 신규 결제 저장되지 않음을 검증
         verify(paymentRepository, never()).save(any());
         // 기존 결제내역의 PG 요청 가능 여부 검증
         verify(paymentPolicy).isPaymentAvailablePgRequestAboutRequest(
-                existingPayment, requestPaymentMethod, pgProvider);
+                originPayment, paymentMethod, pgProvider);
         // 결제 재사용 로직으로 응답이 달라질 가능성은 없으므로, 응답 검증 제외
     }
 
@@ -283,27 +278,24 @@ class PaymentTxServiceTest {
     @DisplayName("결제생성 책임 - 결제 시작 시 정책 호출 검증")
     void createPayment_shouldCallPaymentPolicy_whenStartPayment() {
         // given
-        Long requestOrderId = 1L;
+        Long orderId = 1L;
         // 요청 결제 정보
-        RequestPaymentDto request = RequestPaymentDto.builder()
-                .orderId(requestOrderId)
-                .paymentMethod(CARD)
-                .build();
+        RequestPaymentDto request = requestPaymentDto(orderId, CARD);
         // 결제 요청 고객
         Member member = customer();
 
-        // 요청 결제에 대한 주문
-        Order order = order(member);
-
         // 요청 결제에 대한 주문 조회
-        given(orderRepository.findLockedByIdAndOrderStatus(
-                requestOrderId, CREATED))
+        Order order = order(orderId, member);
+        given(orderRepository.findLockedByIdAndOrderStatus(orderId, CREATED))
                 .willReturn(Optional.of(order));
         // 주문에 대한 기존 결제내역 미존재
-        given(paymentRepository.findLockedAllByOrderId(requestOrderId))
+        given(paymentRepository.findLockedAllByOrderId(orderId))
                 .willReturn(Collections.emptyList());
         // 실행조건 mock
-        givenPaymentSaveSucceeds();
+        // 신규 결제 저장
+        given(paymentRepository.save(any()))
+                .willAnswer(invocationOnMock ->
+                        invocationOnMock.getArgument(0));
 
         // when
         paymentTxService.createPayment(request, member);
@@ -319,36 +311,26 @@ class PaymentTxServiceTest {
     @DisplayName("결제생성 책임 - 신규 결제 요청 시 결제 객체 생성 및 저장 검증")
     void createPayment_shouldCreateAndSavePayment_whenRequestNewPayment() {
         // given
-        Long requestOrderId = 1L;
-        PaymentMethodType requestPaymentMethod = CARD;
+        Long orderId = 1L;
+        PgProviderType pgProvider = MOCK_PG;
+        PaymentMethodType paymentMethod = CARD;
         // 요청 결제 정보
-        RequestPaymentDto request = RequestPaymentDto.builder()
-                .orderId(requestOrderId)
-                .paymentMethod(requestPaymentMethod)
-                .build();
+        RequestPaymentDto request = requestPaymentDto(orderId, paymentMethod);
         // 결제 요청 고객
         Member member = customer();
-
-        // PG 결제대행사
-        PgProviderType pgProvider = PgProviderType.MOCK_PG;
-        // 요청 결제에 대한 주문
-        Order order = order(member);
-        // 저장된 신규 결제
-        Payment savedPayment =Payment.createPayment(
-                order, requestPaymentMethod, pgProvider);
-        ReflectionTestUtils.setField(savedPayment, "id", 10L);
 
         // PG 결제대행사 반환
         given(pgClient.getProvider()).willReturn(pgProvider);
         // 요청 결제에 대한 주문 조회
+        Order order = order(member);
         given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
                 .willReturn(Optional.of(order));
         // 주문에 대한 기존 결제내역 미존재
         given(paymentRepository.findLockedAllByOrderId(any()))
                 .willReturn(Collections.emptyList());
         // 신규 결제 생성 및 저장
-        given(paymentRepository.save(any())) // stub은 any()로, 검증은 captor로 진행
-                .willReturn(savedPayment);
+        Payment savedPayment = payment(10L, order, paymentMethod, pgProvider);
+        given(paymentRepository.save(any())).willReturn(savedPayment);
 
         // when
         Payment response = paymentTxService.createPayment(request, member);
@@ -381,9 +363,7 @@ class PaymentTxServiceTest {
     void createPayment_shouldThrowException_whenPreValidate() {
         // given
         RequestPaymentDto request = RequestPaymentDto.builder().build();
-        Member invalidMember = Member.builder()
-                .roles(Collections.emptyList()) // 고객 권한 없음
-                .build();
+        Member invalidMember = memberOfEmptyRole(); // 고객 권한 없음
 
         // 사전 정책 실행 시 예외발생
         doThrow(new PaymentException(PAYMENT_CUSTOMER_ONLY))
@@ -401,28 +381,18 @@ class PaymentTxServiceTest {
     @DisplayName("결제생성 실패 - DB 조회 후 정책 검증 실패 시 예외발생")
     void createPayment_shouldThrowException_whenValidateAfterSearch() {
         // given
-        final Long requestOrderId = 1L;
+        final Long orderId = 1L;
         final Long requestMemberId = 5L;
         final Long orderMemberId = 7L;
         // 요청 결제 정보
-        RequestPaymentDto request = RequestPaymentDto.builder()
-                .orderId(requestOrderId)
-                .paymentMethod(CARD)
-                .build();
+        RequestPaymentDto request = requestPaymentDto(orderId, CARD);
         // 결제 요청 고객
-        Member requestMember = Member.builder()
-                .id(requestMemberId)
-                .roles(List.of(customerRole()))
-                .build();
+        Member requestMember = customer(requestMemberId);
         // 주문한 고객
-        Member orderMember = Member.builder()
-                .id(orderMemberId)
-                .roles(List.of(customerRole()))
-                .build();
-        // 요청 결제에 대한 주문
-        Order order = order(orderMember);
+        Member orderMember = customer(orderMemberId);
 
         // 요청 결제에 대한 주문 조회
+        Order order = order(orderMember);
         given(orderRepository.findLockedByIdAndOrderStatus(any(), any()))
                 .willReturn(Optional.of(order));
         // 주문에 대한 기존 결제내역 미존재
@@ -433,7 +403,7 @@ class PaymentTxServiceTest {
         doThrow(new PaymentException(PAYMENT_ACCESS_AVAILABLE_ONLY_BUYER))
                 .when(paymentPolicy)
                 .validateCreate(argThat(List::isEmpty),
-                        argThat(o -> o.getId().equals(requestOrderId)
+                        argThat(o -> o.getId().equals(orderId)
                                 && o.getBuyer().getId().equals(orderMemberId)),
                         argThat(m -> m.getId().equals(requestMemberId)));
         // when
@@ -448,10 +418,7 @@ class PaymentTxServiceTest {
     void createPayment_shouldThrowException_whenNotExistsOrder() {
         // given
         // 요청 결제 정보
-        RequestPaymentDto request = RequestPaymentDto.builder()
-                .orderId(1L)
-                .paymentMethod(CARD)
-                .build();
+        RequestPaymentDto request = requestPaymentDto(1L, CARD);
         // 결제 요청 고객
         Member member = customer();
 

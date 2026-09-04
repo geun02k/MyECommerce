@@ -86,14 +86,10 @@ class PaymentTxServiceTest {
     /** 등록된 상품 옵션 */
     ProductOption productOption() {
         Product registeredProduct = Product.builder()
-                .id(5L)
-                .code("productCode")
-                .seller(1L)
                 .saleStatus(ON_SALE)
                 .build();
 
         return ProductOption.builder()
-                .optionCode("optionCode")
                 .quantity(100)
                 .price(new BigDecimal("10000"))
                 .product(registeredProduct)
@@ -182,7 +178,7 @@ class PaymentTxServiceTest {
 
     @Test
     @DisplayName("결제생성 정상 시나리오 - 요청한 주문, 결제방법, PG 결제사에 대한 결제 미존재 시 신규 객체 저장")
-    void createPayment_shouldSavePayment_whenNotExistsPaymentOfOrder() {
+    void createPayment_shouldSavePayment_whenNotExistsPaymentAboutOrder() {
         // given
         Long orderId = 1L;
         PaymentMethodType paymentMethod = CARD;
@@ -226,7 +222,7 @@ class PaymentTxServiceTest {
     }
 
     @Test
-    @DisplayName("결제생성 정상 시나리오 - 기존 결제내역 중 동일 주문, 결제방식, 결제사에 대한 결제 존재 시 재사용")
+    @DisplayName("결제생성 정상 시나리오 - 동일 주문, 결제방식, 결제사에 대한 기존 결제내역 단건 존재 시 재사용")
     void createPayment_shouldReUsePayment_whenAlreadyExistsPayment() {
         // given
         Long orderId = 1L;
@@ -339,7 +335,7 @@ class PaymentTxServiceTest {
     }
 
     @Test
-    @DisplayName("결제생성 실패 - DB 조회 후 정책 검증 실패 시 예외발생")
+    @DisplayName("결제생성 실패 - 결제에 대한 주문 조회 후 정책 검증 실패 시 예외발생")
     void createPayment_shouldThrowException_whenValidateAfterSearch() {
         // given
         final Long orderId = 1L;
@@ -373,8 +369,8 @@ class PaymentTxServiceTest {
     }
 
     @Test
-    @DisplayName("결제생성 실패 - 결제 요청에 대한 주문 미존재 시 예외발생")
-    void createPayment_shouldThrowException_whenNotExistsOrder() {
+    @DisplayName("결제생성 실패 - 요청 결제에 대한 주문 미존재 시 예외발생")
+    void createPayment_shouldThrowException_whenNotFoundOrder() {
         // given
         // 요청 결제 정보
         Long orderId = 1L;
@@ -396,11 +392,19 @@ class PaymentTxServiceTest {
     // TODO: 결제생성 실패 - 결제객체 저장 실패 시 예외발생
 
     /* ----------------------------
+        결제에 PG요청 결과반영 Tests
+       ---------------------------- */
+    // updatePaymentToInProgress() 테스트 작성
+    // TODO: 결제에 PG요청 결과반영 성공 - 정상 시나리오
+    // TODO: 결제에 PG요청 결과반영 실패 - 결제 조회 불가 시 예외발생 (테스트 수정 후 작성 필요)
+    // PG요청 결과반영 예외처리는 PaymentTest에서 진행하므로 제외
+
+    /* ----------------------------
         PG 결제승인 정상 시나리오 Tests
        ---------------------------- */
 
     @Test
-    @DisplayName("PG 결제승인 상태 분기 - PG 결과가 승인(APPROVED)일 때 결제상태 변경하여 1반환 검증")
+    @DisplayName("PG 결제 승인 반영 - PG 결과가 승인(APPROVED)일 때 결제상태 변경하여 1반환")
     void updatePgApprovalResult_shouldReturn1_whenPgResultIsApproved() {
         // given
         Long paymentId = 10L;
@@ -427,7 +431,7 @@ class PaymentTxServiceTest {
     }
 
     @Test
-    @DisplayName("PG 결제승인 상태 분기 - PG 결과가 실패(FAILED)일 때 결제상태 변경하여 1반환 검증")
+    @DisplayName("PG 결제 승인실패 반영 - PG 결과가 실패(FAILED)일 때 결제상태 변경하여 1반환")
     void updatePgApprovalResult_shouldReturn1_whenPgResultIsFailed() {
         // given
         Long paymentId = 10L;
@@ -453,8 +457,12 @@ class PaymentTxServiceTest {
         assertEquals(1, response); // 최종 반환 결과
     }
 
+    /* ----------------------------
+        PG 결제승인 정합성 Tests
+       ---------------------------- */
+
     @Test
-    @DisplayName("PG 결제승인 상태 분기 - PG 결과가 PG요청 진행중(IN_PROGRESS)일 때 결제상태 미변경으로 0반환 검증")
+    @DisplayName("PG 결제승인 실패 - PG 결과가 PG 요청중(IN_PROGRESS)일 때 결제상태 미변경으로 0반환")
     void updatePgApprovalResult_shouldReturn0_whenPgResultIsInProgress() {
         // given
         Long paymentId = 10L;
@@ -477,8 +485,12 @@ class PaymentTxServiceTest {
         assertEquals(0, response); // 최종 반환 결과
     }
 
+    /* ----------------------------
+        PG 결제승인 멱등성 Tests
+       ---------------------------- */
+
     @Test
-    @DisplayName("PG 결제승인 상태 분기 - 결제가 이미 승인된 상태였다면 결제상태 미변경으로 0반환 검증")
+    @DisplayName("PG 결제승인 멱등성 - 이미 승인된 결제 건은 결제상태 미변경으로 0반환")
     void updatePgApprovalResult_shouldReturn0_whenPaymentAlreadyApproved() {
         // given
         String pgTransactionId = "pgTransactionId";
@@ -486,8 +498,8 @@ class PaymentTxServiceTest {
         // 승인된 결제건에 대해 FAILED 재응답 시도
         PgApprovalResult pgFailResult = pgApprovalResult(pgTransactionId, FAILED);
 
-        // 결제 조회
-        Payment approvedPayment = approvedPayment(paymentId, pgTransactionId); // 이미 승인된 결제
+        // 결제 조회 - 이미 승인된 결제 조회
+        Payment approvedPayment = approvedPayment(paymentId, pgTransactionId);
         given(paymentRepository.findByIdWithOrder(paymentId))
                 .willReturn(Optional.of(approvedPayment));
         // 조건부로 결제상태 우선변경
@@ -505,7 +517,7 @@ class PaymentTxServiceTest {
     }
 
     /* ----------------------------
-        PG 결제승인 실패 시나리오 Tests
+        PG 결제승인 실패 Tests
        ---------------------------- */
 
     @Test

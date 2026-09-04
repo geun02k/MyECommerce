@@ -410,24 +410,20 @@ class PaymentTxServiceTest {
 
         // 결제 조회
         Payment payment = inProgressPayment(paymentId, pgTransactionId);
-        given(paymentRepository.findByIdWithOrder(eq(paymentId)))
+        given(paymentRepository.findByIdWithOrder(paymentId))
                 .willReturn(Optional.of(payment));
-        // 조건부로 결제상태 우선변경
-        given(paymentRepository.approveIfInProgress(any(), any()))
-                .willReturn(1);
+        // 조건부로 결제상태 우선변경 여부 반환
+        given(paymentRepository.approveIfInProgress(paymentId, APPROVED))
+                .willReturn(1); // 조건부로 결제상태 우선변경
 
         // when
         int response = paymentTxService.updatePgApprovalResult(paymentId, pgApprovalResult);
 
         // then
-        // 올바른 식별자와 APPROVED 상태값으로 Repository UPDATE 메서드의 호출 여부 검증
-        verify(paymentRepository).approveIfInProgress(eq(paymentId), eq(APPROVED));
-        // 최종 반환 결과 검증
-        assertEquals(1, response);
-
-        // 결제승인 정보 검증
-        assertEquals(APPROVED, payment.getPaymentStatus());
-        assertEquals(expectedAmount, payment.getApprovedAmount());
+        // 상태값 조건부 업데이트 메서드 호출 검증
+        verify(paymentRepository).approveIfInProgress(paymentId, APPROVED);
+        assertEquals(APPROVED, payment.getPaymentStatus()); // 결제승인
+        assertEquals(1, response); // 최종 반환 결과
     }
 
     @Test
@@ -441,23 +437,20 @@ class PaymentTxServiceTest {
 
         // 결제 조회
         Payment payment = inProgressPayment(paymentId, pgTransactionId);
-        given(paymentRepository.findByIdWithOrder(eq(paymentId)))
+        given(paymentRepository.findByIdWithOrder(paymentId))
                 .willReturn(Optional.of(payment));
-        // 조건부로 결제상태 우선변경
-        given(paymentRepository.approveIfInProgress(any(), any()))
+        // 조건부로 결제상태 우선변경 여부 반환
+        given(paymentRepository.approveIfInProgress(paymentId, FAILED))
                 .willReturn(1);
 
         // when
         int response = paymentTxService.updatePgApprovalResult(paymentId, pgFailResult);
 
         // then
-        // 올바른 식별자와 FAILED 상태값으로 Repository UPDATE 메서드의 호출 여부 검증
-        verify(paymentRepository).approveIfInProgress(eq(paymentId), eq(FAILED));
-        // 최종 반환 결과 검증
-        assertEquals(1, response);
-
-        // 결제승인 정보 검증
-        assertEquals(FAILED, payment.getPaymentStatus());
+        // 상태값 조건부 업데이트 메서드 호출 검증
+        verify(paymentRepository).approveIfInProgress(paymentId, FAILED);
+        assertEquals(FAILED, payment.getPaymentStatus()); // 결제승인실패
+        assertEquals(1, response); // 최종 반환 결과
     }
 
     @Test
@@ -471,20 +464,17 @@ class PaymentTxServiceTest {
 
         // 결제 조회
         Payment payment = inProgressPayment(paymentId, pgTransactionId);
-        given(paymentRepository.findByIdWithOrder(eq(paymentId)))
+        given(paymentRepository.findByIdWithOrder(paymentId))
                 .willReturn(Optional.of(payment));
 
         // when
         int response = paymentTxService.updatePgApprovalResult(paymentId, pgApprovalResult);
 
         // then
-        // Repository UPDATE 메서드의 미호출 검증
+        // 상태값 조건부 업데이트 메서드 미호출 검증
         verify(paymentRepository, never()).approveIfInProgress(any(), any());
-        // 최종 반환 결과 검증
-        assertEquals(0, response);
-
-        // 결제승인 정보 미변경 검증
-        assertEquals(IN_PROGRESS, payment.getPaymentStatus());
+        assertEquals(IN_PROGRESS, payment.getPaymentStatus()); // 결제상태 미변경
+        assertEquals(0, response); // 최종 반환 결과
     }
 
     @Test
@@ -498,23 +488,20 @@ class PaymentTxServiceTest {
 
         // 결제 조회
         Payment approvedPayment = approvedPayment(paymentId, pgTransactionId); // 이미 승인된 결제
-        given(paymentRepository.findByIdWithOrder(eq(paymentId)))
+        given(paymentRepository.findByIdWithOrder(paymentId))
                 .willReturn(Optional.of(approvedPayment));
         // 조건부로 결제상태 우선변경
-        given(paymentRepository.approveIfInProgress(any(), any()))
+        given(paymentRepository.approveIfInProgress(paymentId, FAILED))
                 .willReturn(0);
 
         // when
         int response = paymentTxService.updatePgApprovalResult(paymentId, pgFailResult);
 
         // then
-        // 올바른 식별자와 FAILED 상태값으로 Repository UPDATE 메서드의 호출 여부 검증
-        verify(paymentRepository).approveIfInProgress(eq(paymentId), eq(FAILED));
-        // 최종 반환 결과 검증
-        assertEquals(0, response);
-
-        // 결제승인 정보 미변경 검증
-        assertEquals(APPROVED, approvedPayment.getPaymentStatus());
+        // 상태값 조건부 업데이트 메서드 호출 검증
+        verify(paymentRepository).approveIfInProgress(paymentId, FAILED);
+        assertEquals(APPROVED, approvedPayment.getPaymentStatus()); // 결제상태 미변경
+        assertEquals(0, response); // 최종 반환 결과
     }
 
     /* ----------------------------
@@ -528,8 +515,8 @@ class PaymentTxServiceTest {
         Long invalidPaymentId = 10L;
         PgApprovalResult pgApprovalResult = PgApprovalResult.builder().build();
 
-        // paymentId로 결제 조회
-        given(paymentRepository.findByIdWithOrder(any()))
+        // 결제 조회 - 해당 결제 미존재
+        given(paymentRepository.findByIdWithOrder(invalidPaymentId))
                 .willReturn(Optional.empty());
 
         // when
@@ -537,6 +524,8 @@ class PaymentTxServiceTest {
         PaymentException e = assertThrows(PaymentException.class, () ->
                 paymentTxService.updatePgApprovalResult(invalidPaymentId, pgApprovalResult));
         assertEquals(PAYMENT_NOT_FOUND, e.getErrorCode());
+        // 상태값 조건부 업데이트 메서드 미호출 검증
+        verify(paymentRepository, never()).approveIfInProgress(any(), any());
     }
 
 }

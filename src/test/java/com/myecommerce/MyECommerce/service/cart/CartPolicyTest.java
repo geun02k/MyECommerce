@@ -20,15 +20,14 @@ import java.util.Optional;
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_CUSTOMER_ONLY;
 import static com.myecommerce.MyECommerce.exception.errorcode.CartErrorCode.CART_SIZE_EXCEEDED;
 import static com.myecommerce.MyECommerce.exception.errorcode.ProductErrorCode.PRODUCT_NOT_ON_SALE;
+import static com.myecommerce.MyECommerce.service.cart.CartPolicy.CART_MAX_SIZE;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CartPolicyTest {
@@ -47,103 +46,130 @@ class CartPolicyTest {
        ------------------ */
 
     /** 고객권한 사용자 */
-    Member customer() {
+    Member customer(String userId) {
         return Member.builder()
-                .userId("tester")
+                .userId(userId)
                 .roles(List.of(MemberAuthority.builder()
                         .authority(CUSTOMER)
                         .build()))
                 .build();
     }
 
+    /** 판매자권한 사용자 */
+    Member seller() {
+        return Member.builder()
+                .roles(List.of(MemberAuthority.builder()
+                        .authority(SELLER)
+                        .build()))
+                .build();
+    }
+
+    /** 상품 */
+    Product product(Long optionId) {
+        return Product.builder()
+                .id(optionId)
+                .saleStatus(ON_SALE)
+                .build();
+    }
 
     /* ----------------------
         Helper Method
        ---------------------- */
 
-    /** 사용자 장바구니 사이즈 조회 given절 */
-    void givenUserCartSize(Member member) {
-        given(redisMultiDataService.getSizeOfHashData(CART, member.getUserId()))
-                .willReturn(1L);
-    }
-
-    /* ----------------------
-        장바구니추가정책 Tests
-       ---------------------- */
+    /* ---------------------------
+        장바구니추가 정책 통과 Tests
+       --------------------------- */
 
     @Test
-    @DisplayName("장바구니추가정책 통과")
+    @DisplayName("장바구니추가 정책 통과")
     void validateAdd_shouldPass_whenAllValid() {
         // given
-        Long productOptionId = 5L;
-        Member customer = customer();
+        String userId = "userId";
+        Long optionId = 5L;
+        Member customer = customer(userId);
+
         // 사용자 장바구니 현재 사이즈 반환
-        given(redisMultiDataService.getSizeOfHashData(CART, customer.getUserId()))
+        given(redisMultiDataService.getSizeOfHashData(CART, userId))
                 .willReturn(1L);
-        // 요청한 상품은 판매중인 상품으로 반환
-        given(productRepository.findByOptionIdAndSaleStatusOnSale(eq(productOptionId)))
-                .willReturn(Optional.of(Product.builder()
-                        .id(productOptionId)
-                        .saleStatus(ON_SALE).build()));
+        // 상품옵션에 대해 판매중인 상품 반환
+        Product product = product(optionId);
+        given(productRepository.findByOptionIdAndSaleStatusOnSale(optionId))
+                .willReturn(Optional.of(product));
 
         // when
         // then
-        assertDoesNotThrow(() ->
-                cartPolicy.validateAdd(productOptionId, customer));
+        assertDoesNotThrow(() -> cartPolicy.validateAdd(optionId, customer));
     }
 
+    /* ---------------------------
+        장바구니추가 정책 경계값 Tests
+       --------------------------- */
+
+    // TODO: 장바구니추가 정책 경계값 - 장바구니 최대 사이즈 - 1 일 때 정책 통과
+    // TODO: 장바구니추가 정책 경계값 - 장바구니 최대 사이즈 + 1 때 정책 실패
+
+    /* ---------------------------
+        장바구니추가 정책 실패 Tests
+       --------------------------- */
+
     @Test
-    @DisplayName("장바구니추가정책 실패 - 이미 장바구니에 허용된 최대 사이즈 도달 시 예외발생")
+    @DisplayName("장바구니추가 정책 실패 - 이미 장바구니에 최대 사이즈 도달 시 예외발생")
     void validateAdd_shouldReturnCartSizeExceeded_whenCartItemCountExceed() {
         // given
-        Long productOptionId = 5L;
-        Member customer = customer();
+        String userId = "userId";
+        Long optionId = 5L;
+        Member customer = customer(userId);
 
-        given(redisMultiDataService.getSizeOfHashData(CART, customer.getUserId()))
-                .willReturn((long)CartPolicy.CART_MAX_SIZE);
+        // 사용자 장바구니 현재 사이즈 반환
+        given(redisMultiDataService.getSizeOfHashData(CART, userId))
+                .willReturn((long) CART_MAX_SIZE);
+
         // when
         // then
         CartException e = assertThrows(CartException.class, () ->
-                cartPolicy.validateAdd(productOptionId, customer()));
+                cartPolicy.validateAdd(optionId, customer));
         assertEquals(CART_SIZE_EXCEEDED, e.getErrorCode());
-
+        // 이후 정책 미검증
+        verifyNoInteractions(productRepository);
     }
 
     @Test
-    @DisplayName("장바구니추가정책 실패 - 판매중인 상품이 아니면 예외발생")
+    @DisplayName("장바구니추가 정책 실패 - 판매중인 상품이 아니면 예외발생")
     void validateAdd_shouldReturnProductNotOnSale_whenProductNotOnSale() {
         // given
-        Long productOptionId = 5L;
-        Member customer = customer();
-        // 사용자 장바구니 사이즈 (타정책 통과용)
-        givenUserCartSize(customer);
-        // 판매중단된 상품으로 조회되지 않음
-        given(productRepository.findByOptionIdAndSaleStatusOnSale(eq(productOptionId)))
+        String userId = "userId";
+        Long optionId = 5L;
+        Member customer = customer(userId);
+
+        // 사용자 장바구니 현재 사이즈 반환
+        given(redisMultiDataService.getSizeOfHashData(CART, userId))
+                .willReturn(1L);
+        // 상품옵션에 대해 미판매중으로 상품 미반환
+        given(productRepository.findByOptionIdAndSaleStatusOnSale(optionId))
                 .willReturn(Optional.empty());
 
         // when
         // then
-        ProductException e =assertThrows(ProductException.class, () ->
-                cartPolicy.validateAdd(productOptionId, customer));
+        ProductException e = assertThrows(ProductException.class, () ->
+                cartPolicy.validateAdd(optionId, customer));
         assertEquals(PRODUCT_NOT_ON_SALE, e.getErrorCode());
-        // 판매상태 조회 실행여부 검증
-        verify(productRepository, times(1))
-                .findByOptionIdAndSaleStatusOnSale(productOptionId);
     }
 
+    // TODO: 장바구니추가 정책 실패 - 비회원 주문 불가 (null 체크)
+
     @Test
-    @DisplayName("장바구니추가정책 실패 - 고객 외 장바구니 접근 시 예외발생")
+    @DisplayName("장바구니추가 정책 실패 - 고객 외 장바구니 접근 시 예외발생")
     void validateAdd_shouldReturnCartCustomerOnly_whenAccessNotCustomer() {
         // given
-        Long productOptionId = 5L;
-        Member invalidMember = Member.builder()
-                .roles(List.of(MemberAuthority.builder()
-                        .authority(SELLER).build())).build();; // 고객아님
+        Long optionId = 5L;
+        Member invalidMember = seller(); // 고객아님
 
         // when
         // then
         CartException e = assertThrows(CartException.class, () ->
-                cartPolicy.validateAdd(productOptionId, invalidMember));
+                cartPolicy.validateAdd(optionId, invalidMember));
         assertEquals(CART_CUSTOMER_ONLY, e.getErrorCode());
+        // 이후 정책 미검증
+        verifyNoInteractions(redisMultiDataService, productRepository);
     }
 }

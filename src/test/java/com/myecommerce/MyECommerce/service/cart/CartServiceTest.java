@@ -65,9 +65,9 @@ class CartServiceTest {
        ------------------ */
 
     /** 고객권한 사용자 */
-    Member member() {
+    Member member(String userId) {
         return Member.builder()
-                .userId("tester")
+                .userId(userId)
                 .roles(List.of(MemberAuthority.builder()
                                 .authority(CUSTOMER)
                                 .build()))
@@ -75,17 +75,17 @@ class CartServiceTest {
     }
 
     /** 장바구니에 존재하는 상품옵션 단건  */
-    RedisCartDto existingCartItem(Long productOptionId, int quantity) {
+    RedisCartDto existingCartItem(Long optionId, int quantity) {
         return RedisCartDto.builder()
-                .optionId(productOptionId)
+                .optionId(optionId)
                 .quantity(quantity)
                 .build();
     }
 
     /** 판매중인 상품옵션 단건  */
-    RedisCartDto requestedItemNotInCart(Long productOptionId) {
+    RedisCartDto requestedItemNotInCart(Long optionId) {
         return RedisCartDto.builder()
-                .optionId(productOptionId)
+                .optionId(optionId)
                 .build();
     }
 
@@ -109,6 +109,22 @@ class CartServiceTest {
                 .toList();
     }
 
+    /** 장바구니 추가 요청 */
+    RequestCartDto requestCartDto(Long optionId, int quantity) {
+        return RequestCartDto.builder()
+                .productOptionId(optionId)
+                .quantity(quantity)
+                .build();
+    }
+
+    /** 장바구니 추가 응답 */
+    ResponseCartDto responseCartDto(Long optionId, int quantity) {
+        return ResponseCartDto.builder()
+                .optionId(optionId)
+                .quantity(quantity)
+                .build();
+    }
+
     /* ----------------------
         장바구니 추가 Tests
        ---------------------- */
@@ -117,46 +133,40 @@ class CartServiceTest {
     @DisplayName("장바구니추가 성공 - 장바구니에 동일 상품 존재하는 경우 장바구니 수량 증가")
     void addCart_shouldIncreaseQuantity_whenProductAlreadyExistsInCart() {
         // given
+        String userId = "userId";
+        Long optionId = 5L;
+        int requestQuantity = 1;  // 요청수량
+        int existingQuantity = 1; // 기존수량
+        int expectedQuantity = requestQuantity + existingQuantity; // 최종기대수량
         // 요청 장바구니 상품 정보
-        RequestCartDto requestCartDto = RequestCartDto.builder()
-                .productOptionId(5L)
-                .quantity(1) // 수량 1개 추가
-                .build();
+        RequestCartDto requestCartDto = requestCartDto(optionId, requestQuantity);
         // 요청 사용자 정보
-        Member member = member();
-
-        // 요청자 장바구니에 존재하는 동일 상품옵션
-        RedisCartDto targetRedisCartDto = existingCartItem(5L, 1); // 기존 수량 1개
+        Member member = member(userId);
 
         // Redis key
-        String redisKey = member.getUserId();
-        String redisHashKey = String.valueOf(requestCartDto.getProductOptionId());
+        String redisKey = userId;
+        String redisHashKey = String.valueOf(optionId);
 
-        // 반환 상품정보
-        ResponseCartDto expectedResponseCartDto = ResponseCartDto.builder()
-                .optionId(targetRedisCartDto.getOptionId())
-                .quantity(2)
-                .build();
-
-        // 요청 상품 Redis 장바구니에서 조회
+        // 요청자 장바구니에 존재하는 동일 상품옵션 조회
+        RedisCartDto userCartDto = existingCartItem(optionId, existingQuantity);
         given(redisSingleDataService.getSingleHashValueData(eq(RedisNamespaceType.CART), eq(redisKey), eq(redisHashKey)))
-                .willReturn(targetRedisCartDto);
-        given(objectMapper.convertValue(targetRedisCartDto, RedisCartDto.class))
-                .willReturn(targetRedisCartDto);
+                .willReturn(userCartDto);
+        given(objectMapper.convertValue(userCartDto, RedisCartDto.class))
+                .willReturn(userCartDto);
 
-        // RedisCartDto -> 응답DTO 변환.
-        given(redisCartMapper.toResponseDto(targetRedisCartDto))
-                .willReturn(expectedResponseCartDto);
+        // RedisCartDto -> 응답DTO 변환
+        ResponseCartDto responseCartDto = responseCartDto(optionId, expectedQuantity);
+        given(redisCartMapper.toResponseDto(userCartDto))
+                .willReturn(responseCartDto);
 
         // when
-        ResponseCartDto responseCartDto = cartService.addCart(requestCartDto, member);
+        ResponseCartDto response = cartService.addCart(requestCartDto, member);
 
         ArgumentCaptor<RedisCartDto> redisCartDtoCaptor =
                 ArgumentCaptor.forClass(RedisCartDto.class);
         // then
         // 정책 실행여부 검증
-        verify(cartPolicy, times(1))
-                .validateAdd(requestCartDto.getProductOptionId(), member);
+        verify(cartPolicy, times(1)).validateAdd(optionId, member);
         verify(productOptionRepository, never()).findByIdOfOnSale(any());
         // redis 저장 실행여부 검증
         verify(redisSingleDataService, times(1))
@@ -165,64 +175,53 @@ class CartServiceTest {
         // redis 만료 기간 갱신 검증
         verify(redisSingleDataService, times(1))
                 .setExpire(eq(RedisNamespaceType.CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
-        // 캡쳐 결과 검증
+        // 저장 전 수량 검증
         RedisCartDto capturedRedisCartDto = redisCartDtoCaptor.getValue();
-        assertEquals(2, capturedRedisCartDto.getQuantity());
+        assertEquals(expectedQuantity, capturedRedisCartDto.getQuantity());
         // 반환 결과 검증
-        assertEquals(5L, responseCartDto.getOptionId());
-        assertEquals(2, responseCartDto.getQuantity());
+        assertEquals(optionId, response.getOptionId());
+        assertEquals(expectedQuantity, response.getQuantity());
     }
 
     @Test
     @DisplayName("장바구니추가 성공 - 장바구니에 요청 상품 미존재 시 상품 옵션 신규 추가")
     void addCart_shouldAddNewItemWithRequestedQuantity_whenProductNotInCart() {
         // given
+        String userId = "userId";
+        Long optionId = 10L;
+        int requestQuantity = 5;  // 요청수량
         // 요청 장바구니 상품 정보
-        RequestCartDto requestCartDto = RequestCartDto.builder()
-                .productOptionId(10L)
-                .quantity(5)
-                .build();
+        RequestCartDto requestCartDto = requestCartDto(optionId, requestQuantity);
         // 요청 사용자 정보
-        Member member = member();
-
-        // DB 요청 상품옵션 정보 조회
-        RedisCartDto foundOptionDto =
-                requestedItemNotInCart(requestCartDto.getProductOptionId());
+        Member member = member(userId);
 
         // Redis key
-        String redisKey = member.getUserId();
-        String redisHashKey = String.valueOf(requestCartDto.getProductOptionId());
+        String redisKey = userId;
+        String redisHashKey = String.valueOf(optionId);
 
         // 반환 상품정보
-        ResponseCartDto expectedResponseCartDto = ResponseCartDto.builder()
-                .optionId(10L)
-                .quantity(5)
-                .build();
+        ResponseCartDto responseCartDto = responseCartDto(optionId, requestQuantity);
 
-        // 요청 상품 Redis 장바구니에서 조회
+        // 요청자 장바구니에 존재하는 동일 상품옵션 조회
         given(redisSingleDataService.getSingleHashValueData(
                 eq(RedisNamespaceType.CART), eq(redisKey), eq(redisHashKey)))
                 .willReturn(null);
-        // 판매중인 상품옵션 DB에서 조회.
-        given(productOptionRepository.findByIdOfOnSale(
-                eq(requestCartDto.getProductOptionId())))
+        // 판매중인 상품옵션 조회
+        RedisCartDto foundOptionDto = requestedItemNotInCart(optionId);
+        given(productOptionRepository.findByIdOfOnSale(eq(optionId)))
                 .willReturn(Optional.of(foundOptionDto));
-        // RedisCartDto -> 응답DTO 변환.
+        // RedisCartDto -> 응답DTO 변환
         given(redisCartMapper.toResponseDto(any()))
-                .willReturn(expectedResponseCartDto);
+                .willReturn(responseCartDto);
 
         // when
-        ResponseCartDto responseCartDto =
-                cartService.addCart(requestCartDto, member);
+        ResponseCartDto response = cartService.addCart(requestCartDto, member);
 
         // then
         // 정책 실행여부 검증
-        verify(cartPolicy, times(1))
-                .validateAdd(eq(requestCartDto.getProductOptionId()),
-                             eq(member));
+        verify(cartPolicy, times(1)).validateAdd(eq(optionId), eq(member));
         // 요청 상품 장바구니 미존재해 상품 옵션 조회
-        verify(productOptionRepository, times(1))
-                .findByIdOfOnSale(eq(10L));
+        verify(productOptionRepository, times(1)).findByIdOfOnSale(eq(optionId));
         // redis 저장 실행여부 검증
         ArgumentCaptor<RedisCartDto> redisCartDtoCaptor =
                 ArgumentCaptor.forClass(RedisCartDto.class);
@@ -234,10 +233,10 @@ class CartServiceTest {
         verify(redisSingleDataService, times(1))
                 .setExpire(eq(RedisNamespaceType.CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
         // 캡쳐 결과 검증
-        assertEquals(5, redisCartDtoCaptor.getValue().getQuantity());
+        assertEquals(requestQuantity, redisCartDtoCaptor.getValue().getQuantity());
         // 반환 결과 검증
-        assertEquals(requestCartDto.getProductOptionId(), responseCartDto.getOptionId());
-        assertEquals(5, responseCartDto.getQuantity());
+        assertEquals(optionId, response.getOptionId());
+        assertEquals(requestQuantity, response.getQuantity());
     }
 
     /* ----------------------
@@ -252,10 +251,10 @@ class CartServiceTest {
     @DisplayName("장바구니에서 주문물품제거 성공 - 단건 주문물품 존재 시 주문물품삭제 메서드 호출")
     void removeOrderItems_shouldCallDeleteMethod_whenExistAOrderItem() {
         // given
+        String userId = "userId";
         Long orderOptionId = 13L;
 
         OrderPathType orderPath = OrderPathType.CART;
-        String userId = member().getUserId();
         List<OrderItem> orderItems = List.of(
                 OrderItem.createOrderItem(productOption(orderOptionId), 1));
 
@@ -271,10 +270,10 @@ class CartServiceTest {
     @DisplayName("장바구니에서 주문물품제거 성공 - 다건 주문물품 존재 시 주문물품삭제 메서드 호출")
     void removeOrderItems_shouldCallDeleteMethod_whenExistOrderItemList() {
         // given
+        String userId = "userId";
         List<Long> orderOptionIds = Arrays.asList(1L, 2L);
 
         OrderPathType orderPath = OrderPathType.CART;
-        String userId = member().getUserId();
         List<OrderItem> orderItems = orderItems(orderOptionIds);
 
         // when

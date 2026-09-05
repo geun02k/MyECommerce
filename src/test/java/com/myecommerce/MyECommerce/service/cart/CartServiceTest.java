@@ -33,7 +33,8 @@ import java.util.Optional;
 import static com.myecommerce.MyECommerce.service.cart.CartService.EXPIRATION_PERIOD;
 import static com.myecommerce.MyECommerce.type.MemberAuthorityType.CUSTOMER;
 import static com.myecommerce.MyECommerce.type.ProductSaleStatusType.ON_SALE;
- import static org.junit.jupiter.api.Assertions.*;
+import static com.myecommerce.MyECommerce.type.RedisNamespaceType.CART;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
@@ -149,37 +150,36 @@ class CartServiceTest {
 
         // 요청자 장바구니에 존재하는 동일 상품옵션 조회
         RedisCartDto userCartDto = existingCartItem(optionId, existingQuantity);
-        given(redisSingleDataService.getSingleHashValueData(eq(RedisNamespaceType.CART), eq(redisKey), eq(redisHashKey)))
+        given(redisSingleDataService.getSingleHashValueData(CART, redisKey, redisHashKey))
                 .willReturn(userCartDto);
         given(objectMapper.convertValue(userCartDto, RedisCartDto.class))
                 .willReturn(userCartDto);
 
         // RedisCartDto -> 응답DTO 변환
-        ResponseCartDto responseCartDto = responseCartDto(optionId, expectedQuantity);
         given(redisCartMapper.toResponseDto(userCartDto))
-                .willReturn(responseCartDto);
+                .willReturn(responseCartDto(optionId, expectedQuantity));
 
         // when
         ResponseCartDto response = cartService.addCart(requestCartDto, member);
 
-        ArgumentCaptor<RedisCartDto> redisCartDtoCaptor =
-                ArgumentCaptor.forClass(RedisCartDto.class);
         // then
-        // 정책 실행여부 검증
-        verify(cartPolicy, times(1)).validateAdd(optionId, member);
+        verify(cartPolicy).validateAdd(optionId, member); // 정책실행검증
+        // 판매중인 상품옵션 미조회 검증
         verify(productOptionRepository, never()).findByIdOfOnSale(any());
-        // redis 저장 실행여부 검증
-        verify(redisSingleDataService, times(1))
-                .saveSingleHashValueData(
-                        eq(RedisNamespaceType.CART), eq(redisKey), eq(redisHashKey), redisCartDtoCaptor.capture());
-        // redis 만료 기간 갱신 검증
-        verify(redisSingleDataService, times(1))
-                .setExpire(eq(RedisNamespaceType.CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
+        // 장바구니에 상품옵션 저장 실행 검증
+        ArgumentCaptor<RedisCartDto> cartDtoCaptor = ArgumentCaptor.forClass(RedisCartDto.class);
+        verify(redisSingleDataService).saveSingleHashValueData(
+                eq(CART), eq(redisKey), eq(redisHashKey), cartDtoCaptor.capture());
+        // 장바구니 만료 기간 갱신 검증
+        verify(redisSingleDataService).setExpire(
+                CART, redisKey, Duration.ofDays(EXPIRATION_PERIOD));
+
         // 저장 전 수량 검증
-        RedisCartDto capturedRedisCartDto = redisCartDtoCaptor.getValue();
-        assertEquals(expectedQuantity, capturedRedisCartDto.getQuantity());
-        // 반환 결과 검증
-        assertEquals(optionId, response.getOptionId());
+        RedisCartDto capturedCartDto = cartDtoCaptor.getValue();
+        assertEquals(5L, capturedCartDto.getOptionId());
+        assertEquals(expectedQuantity, capturedCartDto.getQuantity());
+        // 응답 검증
+        assertEquals(5L, response.getOptionId());
         assertEquals(expectedQuantity, response.getQuantity());
     }
 
@@ -203,41 +203,41 @@ class CartServiceTest {
         ResponseCartDto responseCartDto = responseCartDto(optionId, requestQuantity);
 
         // 요청자 장바구니에 존재하는 동일 상품옵션 조회
-        given(redisSingleDataService.getSingleHashValueData(
-                eq(RedisNamespaceType.CART), eq(redisKey), eq(redisHashKey)))
+        given(redisSingleDataService.getSingleHashValueData(CART, redisKey, redisHashKey))
                 .willReturn(null);
         // 판매중인 상품옵션 조회
         RedisCartDto foundOptionDto = requestedItemNotInCart(optionId);
-        given(productOptionRepository.findByIdOfOnSale(eq(optionId)))
+        given(productOptionRepository.findByIdOfOnSale(optionId))
                 .willReturn(Optional.of(foundOptionDto));
         // RedisCartDto -> 응답DTO 변환
-        given(redisCartMapper.toResponseDto(any()))
-                .willReturn(responseCartDto);
+        given(redisCartMapper.toResponseDto(foundOptionDto)).willReturn(responseCartDto);
 
         // when
         ResponseCartDto response = cartService.addCart(requestCartDto, member);
 
         // then
-        // 정책 실행여부 검증
-        verify(cartPolicy, times(1)).validateAdd(eq(optionId), eq(member));
-        // 요청 상품 장바구니 미존재해 상품 옵션 조회
-        verify(productOptionRepository, times(1)).findByIdOfOnSale(eq(optionId));
-        // redis 저장 실행여부 검증
-        ArgumentCaptor<RedisCartDto> redisCartDtoCaptor =
-                ArgumentCaptor.forClass(RedisCartDto.class);
-        verify(redisSingleDataService, times(1))
-                .saveSingleHashValueData(
-                        eq(RedisNamespaceType.CART), eq(redisKey), eq(redisHashKey),
-                        redisCartDtoCaptor.capture());
-        // redis 만료 기간 셋팅 검증
-        verify(redisSingleDataService, times(1))
-                .setExpire(eq(RedisNamespaceType.CART), eq(redisKey), eq(Duration.ofDays(EXPIRATION_PERIOD)));
-        // 캡쳐 결과 검증
-        assertEquals(requestQuantity, redisCartDtoCaptor.getValue().getQuantity());
-        // 반환 결과 검증
-        assertEquals(optionId, response.getOptionId());
+        verify(cartPolicy).validateAdd(optionId, member); // 정책 실행 검증
+        // 요청 상품이 장바구니에 미존재해 상품 옵션 조회
+        verify(productOptionRepository).findByIdOfOnSale(optionId);
+        // 장바구니에 상품옵션 저장 실행 검증
+        ArgumentCaptor<RedisCartDto> cartDtoCaptor = ArgumentCaptor.forClass(RedisCartDto.class);
+        verify(redisSingleDataService).saveSingleHashValueData(
+                eq(CART), eq(redisKey), eq(redisHashKey), cartDtoCaptor.capture());
+        // 장바구니 만료 기간 셋팅 검증
+        verify(redisSingleDataService).setExpire(
+                CART, redisKey, Duration.ofDays(EXPIRATION_PERIOD));
+
+        // 저장 전 수량 검증
+        RedisCartDto capturedCartDto = cartDtoCaptor.getValue();
+        assertEquals(10L, capturedCartDto.getOptionId());
+        assertEquals(requestQuantity, capturedCartDto.getQuantity());
+        // 응답 검증
+        assertEquals(10L, response.getOptionId());
         assertEquals(requestQuantity, response.getQuantity());
     }
+
+    // TODO: 정책검증실패
+    // TODO: 장바구니에 없는 상품 새로 추가 시, DB에 옵션이 존재하지 않거나 판매중이 아닌 경우 예외발생 (PRODUCT_OPTION_NOT_EXIST 예외발생검증)
 
     /* ----------------------
         장바구니 조회 Tests
@@ -263,7 +263,7 @@ class CartServiceTest {
 
         // then
         verify(redisMultiDataService).deleteMultiHashData(
-                RedisNamespaceType.CART, userId, List.of(String.valueOf(orderOptionId)));
+                CART, userId, List.of(String.valueOf(orderOptionId)));
     }
 
     @Test
@@ -282,7 +282,7 @@ class CartServiceTest {
         // then
         List<String> strOrderOptionIds = orderOptionIds.stream().map(String::valueOf).toList();
         verify(redisMultiDataService).deleteMultiHashData(
-                RedisNamespaceType.CART, userId, strOrderOptionIds);
+                CART, userId, strOrderOptionIds);
     }
 
     @Test

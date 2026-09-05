@@ -243,6 +243,13 @@ class CartServiceTest {
         장바구니 조회 Tests
        ---------------------- */
 
+    // TODO: 장바구니 조회 성공 시나리오
+    // TODO: 장바구니에서 상품 미조회 시 빈 리스트 반환 (그 후 진행하지 않음 검증)
+    // TODO: 장바구니목록 및 재고 키 목록 생성 검증 (둘의 순서 동일해야함)
+    // 재고 캐시 데이터 조회 검증 (STOCK:optionId 형태의 Key 생성이 올바른지, stockCacheService로 넘겨져 결과를 정상 수신하는지 검증)
+    // - 정상 시나리오와 중복으로 제외
+    // TODO: 구매가능여부(품절여부, 구매가능수량) 검증 - 경계값 검증으로 재고 0, -1, 1, null 검증
+
     /* -------------------------------
         장바구니에서 주문물품 제거 Tests
        ------------------------------- */
@@ -311,4 +318,6 @@ class CartServiceTest {
         // then
         verify(redisMultiDataService, never()).deleteMultiHashData(any(), any(), any());
     }
+
+    // TODO: 장바구니에서 주문물품제거 실패 - 주문물품이 null이면 주문물품제거 미수행
 }

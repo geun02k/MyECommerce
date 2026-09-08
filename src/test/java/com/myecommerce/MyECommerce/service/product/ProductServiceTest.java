@@ -55,8 +55,8 @@ class ProductServiceTest {
        ------------------ */
 
     /** 회원 */
-    Member seller() {
-        return Member.builder().id(1L).build();
+    Member seller(Long id) {
+        return Member.builder().id(id).build();
     }
 
     /** 유효한 수정할 상품 옵션 요청 */
@@ -72,19 +72,6 @@ class ProductServiceTest {
         return RequestModifyProductOptionDto.builder()
                 .optionCode("optionCode")
                 .quantity(20)
-                .build();
-    }
-
-    /** 등록된 상품 Entity */
-    Product insertedOnSaleProduct(Long id, Member member, RequestProductDto product) {
-        return Product.builder()
-                .id(id)
-                .seller(member.getId())
-                .code(product.getCode())
-                .name(product.getName())
-                .category(product.getCategory())
-                .saleStatus(ON_SALE)
-                .options(null)
                 .build();
     }
 
@@ -104,20 +91,6 @@ class ProductServiceTest {
                 .build();
     }
 
-    /** 등록할 상품옵션 Entity */
-    ProductOption insertedProductOption(Long id,
-                                        RequestProductOptionDto option,
-                                        Product product) {
-        return ProductOption.builder()
-                .id(id)
-                .optionCode(option.getOptionCode())
-                .optionName(option.getOptionName())
-                .price(option.getPrice())
-                .quantity(option.getQuantity())
-                .product(product)
-                .build();
-    }
-
     /* ------------------
         Helper Method
        ------------------ */
@@ -134,16 +107,15 @@ class ProductServiceTest {
         상품등록 Tests
        ---------------------- */
 
-    // 각 단계의 존재 여부가 중요 -> 하나의 테스트가 모든 것을 검증하지 않고 테스트 분리
     @Test
-    @DisplayName("상품등록 성공 - 신규 상품 및 상품옵션 등록 후 응답 반환")
+    @DisplayName("상품등록 성공 - 신규 상품 및 상품옵션 등록 후 재고 등록")
     void registerProduct_shouldInsertProductAndOption_whenValidProduct() {
         // given
         // 요청 상품옵션 DTO
         RequestProductOptionDto requestOptionDto = RequestProductOptionDto.builder()
                 .optionCode("S-BL")
                 .optionName("스몰사이즈 블루컬러")
-                .price(BigDecimal.valueOf(67900))
+                .price(new BigDecimal("67900"))
                 .quantity(30)
                 .build();
         // 요청 상품 DTO
@@ -151,53 +123,48 @@ class ProductServiceTest {
                 .code("RM-JK-D11S51")
                 .name("제 품 명")
                 .category(WOMEN_CLOTHING)
-                .options(Collections.singletonList(requestOptionDto))
+                .options(List.of(requestOptionDto))
                 .build();
         // 요청 회원 DTO
-        Member member = seller();
+        Member member = seller(10L);
 
-        // 저장된 상품 Entity
-        Product insertedProduct =
-                insertedOnSaleProduct(1L, member, requestProductDto);
-        // 저장된 상품옵션 Entity
-        ProductOption insertedOption =
-                insertedProductOption(1L, requestOptionDto, insertedProduct);
-
-        given(productRepository.save(any())).willReturn(insertedProduct);
-        given(productOptionRepository.save(any())).willReturn(insertedOption);
+        // 상품 저장
+        given(productRepository.save(any()))
+                .willAnswer(invocation -> invocation.getArgument(0));
 
         // when
         ResponseProductDto response =
                 productService.registerProduct(requestProductDto, member);
 
         // then
-        // 저장 여부 검증
-        verify(productRepository, times(1))
-                .save(any(Product.class));
-        ArgumentCaptor<ProductOption> optionCaptor =
-                ArgumentCaptor.forClass(ProductOption.class);
-        verify(productOptionRepository, times(1))
-                .save(optionCaptor.capture());
+        // 정책 실행 검증
+        verify(productPolicy).validateRegister(any(ServiceProductDto.class), eq(member));
+        // 상품 저장 검증
+        ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(productCaptor.capture());
+        // 상품옵션 저장 검증
+        ArgumentCaptor<ProductOption> optionCaptor = ArgumentCaptor.forClass(ProductOption.class);
+        Product capturedProduct = productCaptor.getValue();
+        verify(productOptionRepository).save(optionCaptor.capture());
+        // 상품 캐시 재고 등록 검증
+        verify(stockCacheService).saveProductStock(capturedProduct);
+
+        // 상품 전달인자 검증
+        assertEquals(ON_SALE, capturedProduct.getSaleStatus());
+        assertEquals(10L, capturedProduct.getSeller());
+        assertEquals("RM-JK-D11S51", capturedProduct.getCode());
+        assertEquals("제 품 명", capturedProduct.getName());
+        assertEquals(WOMEN_CLOTHING, capturedProduct.getCategory());
 
         // 상품옵션 전달인자 검증
-        ProductOption capturedOption = optionCaptor.getAllValues().get(0);
-        assertEquals(requestOptionDto.getOptionCode(), capturedOption.getOptionCode());
-        assertEquals(requestOptionDto.getQuantity(), capturedOption.getQuantity());
-        assertEquals(requestOptionDto.getPrice(), capturedOption.getPrice());
-        // response DTO 검증 (상품 전달인자 검증)
-        assertEquals(1L, response.getId());
+        ProductOption capturedOption = optionCaptor.getValue();
+        assertSame(capturedProduct, capturedOption.getProduct());
+
+        // 응답 검증
         assertEquals(ON_SALE, response.getSaleStatus());
-        assertEquals(member.getId(), response.getSeller());
-        assertEquals(requestProductDto.getCode(), response.getCode());
-        assertEquals(requestProductDto.getName(), response.getName());
-        assertEquals(requestProductDto.getCategory(), response.getCategory());
+        assertEquals(10L, response.getSeller());
+        assertEquals("RM-JK-D11S51", response.getCode());
     }
-
-    // TODO: 상품등록 성공 - 정책 검증 위임
-    // verify(productPolicy, times(1)).validateRegister(serviceProductDto, member);
-
-    // TODO: 상품등록 성공 - 상품 캐시 재고 등록 위임
-    // verify(stockCacheService, times(1)).saveProductStock(eq(insertedProduct));
 
     // TODO: 상품등록 실패 - 정책 검증 실패 시 상품 등록 불가
 
@@ -222,7 +189,7 @@ class ProductServiceTest {
                         .options(List.of(requestUpdateOption, requestInsertOption))
                         .build();
         // 요청 회원 DTO
-        Member member = seller();
+        Member member = seller(10L);
 
         Product targetProduct = onSaleProductEntity();
 
@@ -273,7 +240,7 @@ class ProductServiceTest {
                         .options(List.of(requestUpdateOption, requestInsertOption))
                         .build();
         // 요청 회원 DTO
-        Member member = seller();
+        Member member = seller(10L);
 
         Product targetProduct = onSaleProductEntity();
 
@@ -314,7 +281,7 @@ class ProductServiceTest {
                         .id(5L)
                         .options(List.of(requestUpdateOption()))
                         .build();
-        Member member = seller();
+        Member member = seller(10L);
 
         // 요청 상품의 기존 상태 (이미 판매 종료된 상품)
         Product targetProduct = Product.builder()

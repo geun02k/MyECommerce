@@ -9,6 +9,7 @@ import com.myecommerce.MyECommerce.mapper.*;
 import com.myecommerce.MyECommerce.repository.product.ProductOptionRepository;
 import com.myecommerce.MyECommerce.repository.product.ProductRepository;
 import com.myecommerce.MyECommerce.service.stock.StockCacheService;
+import com.myecommerce.MyECommerce.type.ProductSaleStatusType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -59,35 +60,65 @@ class ProductServiceTest {
         return Member.builder().id(id).build();
     }
 
+    /** 요청 상품 */
+    RequestModifyProductDto requestProductDto(Long id,
+                                              ProductSaleStatusType saleStatus,
+                                              RequestModifyProductOptionDto optionDto) {
+        return RequestModifyProductDto.builder()
+                .id(id)
+                .saleStatus(saleStatus)
+                .options(List.of(optionDto))
+                .build();
+    }
+    RequestModifyProductDto requestProductDto(Long id) {
+        return requestProductDto(id, null, new RequestModifyProductOptionDto());
+    }
+
     /** 유효한 수정할 상품 옵션 요청 */
-    RequestModifyProductOptionDto requestUpdateOption() {
+    RequestModifyProductOptionDto requestUpdateOption(Long id, int quantity) {
         return RequestModifyProductOptionDto.builder()
-                .id(1L)
+                .id(id)
                 .optionCode("existingOptionCode")
-                .quantity(10)
+                .quantity(quantity)
                 .build();
     }
     /** 유효한 등록할 상품 옵션 요청 */
-    RequestModifyProductOptionDto requestInsertOption() {
+    RequestModifyProductOptionDto requestInsertOption(String optionCode, int quantity) {
         return RequestModifyProductOptionDto.builder()
-                .optionCode("optionCode")
-                .quantity(20)
+                .optionCode(optionCode)
+                .quantity(quantity)
                 .build();
     }
 
-    /** 수정할 상품 Entity */
-    Product onSaleProductEntity() {
+    /** 등록되어있던 기존 상품 옵션 Entity */
+    ProductOption originOption(Long id, int quantity) {
+        return ProductOption.builder()
+                .id(id)
+                .quantity(quantity)
+                .build();
+    }
+
+    /** 수정할 상품 Entity - 판매중인 상태 */
+    Product originOnSaleProduct(Long id, Long sellerId, String description,
+                                ProductOption option) {
         return Product.builder()
-                .id(5L)
-                .code("productCode")
-                .description("description")
+                .id(id)
+                .seller(sellerId)
+                .description(description)
                 .saleStatus(ON_SALE)
-                .options(new ArrayList<>(List.of(
-                        ProductOption.builder()
-                                .id(1L)
-                                .optionCode("existingOptionCode")
-                                .quantity(1)
-                                .build())))
+                .options(new ArrayList<>(List.of(option))) // 가변리스트전달
+                .build();
+    }
+    Product originOnSaleProduct(Long id, Long sellerId, String description) {
+        return originOnSaleProduct(id, sellerId, description, originOption(1L, 50));
+    }
+
+    /** 수정할 상품 Entity */
+    Product originProduct(Long id, ProductSaleStatusType saleStatus) {
+        return Product.builder()
+                .id(id)
+                .saleStatus(saleStatus)
+                .options(List.of())
                 .build();
     }
 
@@ -172,132 +203,203 @@ class ProductServiceTest {
         상품수정 Tests
        ---------------------- */
 
-    // 모든 단계가 서로 영향을 끼침 -> 테스트에서 반드시 함께 검증
     @Test
-    @DisplayName("상품수정 성공 - 판매중 유지 상품 수정 시 상품/옵션 변경 후 재고 등록")
-    void modifyProduct_shouldUpdateProductAndSaveStock_whenProductOnSale() {
+    @DisplayName("상품수정 성공 - 상품이 판매중이면 상품의 설명 및 상태 수정")
+    void modifyProduct_shouldUpdateProduct_whenProductOnSale() {
         // given
+        Long productId = 5L;
+        Long sellerId = 10L;
+        // 요청 상품 DTO
+        RequestModifyProductDto requestProduct = RequestModifyProductDto.builder()
+                .id(productId)
+                .description("수정한 상품 설명입니다.")
+                .saleStatus(ON_SALE) // 판매중 유지
+                .build();
+        // 요청 회원 DTO
+        Member member = seller(sellerId);
+
+        // 요청 상품 조회
+        Product targetProduct = originOnSaleProduct(
+                productId, sellerId, "설명입니다.");
+        given(productRepository.findByIdAndSeller(productId, sellerId))
+                .willReturn(Optional.of(targetProduct));
+
+        // when
+        ResponseProductDto response = productService.modifyProduct(requestProduct, member);
+
+        // then
+        // 상품 조회 검증
+        verify(productRepository).findByIdAndSeller(productId, sellerId);
+        // 정책 실행 검증
+        verify(productPolicy).validateModify(any(Product.class), anyList());
+
+        // 상품 수정 검증
+        assertEquals(productId, targetProduct.getId());
+        assertEquals(sellerId, targetProduct.getSeller());
+        assertEquals(ON_SALE, targetProduct.getSaleStatus());
+        assertEquals("수정한 상품 설명입니다.", targetProduct.getDescription());
+
+        // 응답 검증
+        assertEquals(productId, response.getId());
+        assertEquals(sellerId, response.getSeller());
+    }
+
+    @Test
+    @DisplayName("상품수정 성공 - 상품이 판매중이면 옵션 수량 변경 후 재고 등록")
+    void modifyProduct_shouldUpdateOptionAndSaveStock_whenProductOnSale() {
+        // given
+        Long productId = 5L;
+        Long sellerId = 10L;
+        Long optionId = 1L;
+        int originOptionQuantity = 10;  // 기존 옵션 수량
+        int requestOptionQuantity = 50; // 수정 요청한 옵션 수량
         // 요청 상품옵션 DTO 목록
-        RequestModifyProductOptionDto requestUpdateOption = requestUpdateOption();
-        RequestModifyProductOptionDto requestInsertOption = requestInsertOption();
+        RequestModifyProductOptionDto requestUpdateOption =
+                requestUpdateOption(optionId, requestOptionQuantity);
         // 요청 상품 DTO
         RequestModifyProductDto requestProduct =
-                RequestModifyProductDto.builder()
-                        .id(5L)
-                        .description("수정한 상품 설명입니다.")
-                        .saleStatus(ON_SALE) // 판매중 유지
-                        .options(List.of(requestUpdateOption, requestInsertOption))
-                        .build();
+                requestProductDto(productId, ON_SALE, requestUpdateOption);
         // 요청 회원 DTO
-        Member member = seller(10L);
+        Member member = seller(sellerId);
 
-        Product targetProduct = onSaleProductEntity();
-
-        // 요청한 셀러 상품 단건 조회 (반환 결과는 dirty checking 대상)
-        given(productRepository.findByIdAndSeller(
-                requestProduct.getId(), member.getId()))
+        // 요청 상품 조회
+        ProductOption originOption = originOption(optionId, originOptionQuantity);
+        Product targetProduct = originOnSaleProduct(
+                productId, sellerId, "설명입니다.", originOption);
+        given(productRepository.findByIdAndSeller(productId, sellerId))
                 .willReturn(Optional.of(targetProduct));
 
         // when
         productService.modifyProduct(requestProduct, member);
 
         // then
-        // 정책 검증 여부 검증
-        verify(productPolicy, times(1))
-                .validateModify(any(Product.class), anyList());
-        // 상품 재고 등록 여부 검증
-        verify(stockCacheService, times(1))
-                .saveProductStock(targetProduct);
-        // 상품 재고 삭제 여부 검증
+        // 상품 조회 검증
+        verify(productRepository).findByIdAndSeller(productId, sellerId);
+        // 정책 실행 검증
+        verify(productPolicy).validateModify(any(Product.class), anyList());
+        // 상품 재고 등록 검증
+        verify(stockCacheService).saveProductStock(targetProduct);
         verify(stockCacheService, never()).deleteProductStock(any());
 
-        // 상품 판매상태, 설명 / 신규, 수정 옵션 수량 검증 (옵션 변경이 실제로 반영되었는지 확인)
-        // 1. 상품 수정 검증
-        assertEquals(requestProduct.getDescription(), targetProduct.getDescription());
-        assertEquals(requestProduct.getSaleStatus(), targetProduct.getSaleStatus());
-        // 2. 상품옵션 수정 검증
-        ProductOption responseUpdatedOption = filterOption(targetProduct, 1L);
-        assertEquals(requestUpdateOption.getQuantity(), responseUpdatedOption.getQuantity());
-        // 3. 상품옵션 신규등록 검증 (JPA 더티체킹으로, 신규 생성되어야하는 아이디는 미검증)
-        ProductOption responseInsertedOption = filterOption(targetProduct, null);
-        assertEquals(requestInsertOption.getQuantity(), responseInsertedOption.getQuantity());
+        // 상품옵션 수정 검증
+        ProductOption updatedOption = filterOption(targetProduct, optionId);
+        assertEquals(1L, updatedOption.getId());
+        assertEquals(50, updatedOption.getQuantity());
     }
 
     @Test
-    @DisplayName("상품수정 성공 - 상품 판매중단으로 변경 시 상품/옵션 변경 후 재고 삭제")
-    @Transactional
+    @DisplayName("상품수정 성공 - 상품이 판매중이면 신규 옵션 등록 후 재고 등록")
+    void modifyProduct_shouldInsertOptionAndSaveStock_whenProductOnSale() {
+        // given
+        Long productId = 5L;
+        Long sellerId = 10L;
+        // 요청 상품옵션 DTO 목록
+        RequestModifyProductOptionDto requestInsertOption =
+                requestInsertOption("optionCode", 20);
+        // 요청 상품 DTO
+        RequestModifyProductDto requestProduct =
+                requestProductDto(productId, ON_SALE, requestInsertOption);
+        // 요청 회원 DTO
+        Member member = seller(10L);
+
+        // 요청 상품 조회
+        Product targetProduct = originOnSaleProduct(
+                productId, sellerId, "설명입니다.");
+        given(productRepository.findByIdAndSeller(productId, sellerId))
+                .willReturn(Optional.of(targetProduct));
+
+        // when
+        productService.modifyProduct(requestProduct, member);
+
+        // then
+        // 상품 조회 검증
+        verify(productRepository).findByIdAndSeller(productId, sellerId);
+        // 정책 실행 검증
+        verify(productPolicy).validateModify(any(Product.class), anyList());
+        // 상품 재고 등록 검증
+        verify(stockCacheService).saveProductStock(targetProduct);
+        verify(stockCacheService, never()).deleteProductStock(any());
+
+        // 상품옵션 신규등록 검증
+        ProductOption insertedOption = filterOption(targetProduct, null);
+        assertEquals("optionCode", insertedOption.getOptionCode());
+        assertEquals(20, insertedOption.getQuantity());
+        assertSame(insertedOption.getProduct(), targetProduct);
+    }
+
+    @Test
+    @DisplayName("상품수정 성공 - 상품 판매중단으로 변경 시 상품 수정 후 캐시 재고 삭제")
     void modifyProduct_shouldUpdateProductAndDeleteCacheStock_whenProductDisContinued() {
         // given
+        Long productId = 5L;
+        Long sellerId = 10L;
+        Long updateOptionId = 1L;
+        int originOptionQuantity = 0;  // 기존 옵션 수량
+        int updateOptionQuantity = 10;  // 수정 요청한 옵션 수량
         // 요청 상품옵션 DTO 목록
-        RequestModifyProductOptionDto requestUpdateOption = requestUpdateOption();
-        RequestModifyProductOptionDto requestInsertOption = requestInsertOption();
+        RequestModifyProductOptionDto requestUpdateOption =
+                requestUpdateOption(updateOptionId, updateOptionQuantity);
+        RequestModifyProductOptionDto requestInsertOption =
+                requestInsertOption("optionCode", 20);
         // 요청 상품 DTO
         RequestModifyProductDto requestProduct =
                 RequestModifyProductDto.builder()
-                        .id(5L)
+                        .id(productId)
                         .description("수정한 상품 설명입니다.")
                         .saleStatus(DISCONTINUED) // 판매중단으로 변경
                         .options(List.of(requestUpdateOption, requestInsertOption))
                         .build();
         // 요청 회원 DTO
-        Member member = seller(10L);
+        Member member = seller(sellerId);
 
-        Product targetProduct = onSaleProductEntity();
-
-        // 요청한 셀러 상품 단건 조회 (반환 결과는 dirty checking 대상)
-        given(productRepository.findByIdAndSeller(
-                requestProduct.getId(), member.getId()))
+        // 요청 상품 조회
+        ProductOption originOption =
+                originOption(updateOptionId, originOptionQuantity);
+        Product targetProduct = originOnSaleProduct(
+                productId, sellerId, "설명입니다.", originOption);
+        given(productRepository.findByIdAndSeller(productId, sellerId))
                 .willReturn(Optional.of(targetProduct));
 
         // when
         productService.modifyProduct(requestProduct, member);
 
         // then
-        // 정책 검증 여부 검증
-        verify(productPolicy, times(1))
-                .validateModify(any(Product.class), anyList());
-        // 상품 재고 등록 여부 검증
-        verify(stockCacheService, times(1)).deleteProductStock(targetProduct);
+        // 상품 조회 검증
+        verify(productRepository).findByIdAndSeller(productId, sellerId);
+        // 정책 실행 검증
+        verify(productPolicy).validateModify(any(Product.class), anyList());
+        // 상품 재고 등록 검증
         verify(stockCacheService, never()).saveProductStock(targetProduct);
+        verify(stockCacheService).deleteProductStock(targetProduct);
 
-        // 상품 판매상태, 설명 / 신규, 수정 옵션 수량 검증 (옵션 변경이 실제로 반영되었는지 확인)
         // 1. 상품 수정 검증
-        assertEquals(requestProduct.getDescription(), targetProduct.getDescription());
-        assertEquals(requestProduct.getSaleStatus(), targetProduct.getSaleStatus());
+        assertEquals("수정한 상품 설명입니다.", targetProduct.getDescription());
+        assertEquals(DISCONTINUED, targetProduct.getSaleStatus());
         // 2. 상품옵션 수정 검증
-        ProductOption responseUpdatedOption = filterOption(targetProduct, 1L);
-        assertEquals(requestUpdateOption.getQuantity(), responseUpdatedOption.getQuantity());
-        // 3. 상품옵션 신규등록 검증 (JPA 더티체킹으로, 신규 생성되어야하는 아이디는 미검증)
+        ProductOption responseUpdatedOption = filterOption(targetProduct, updateOptionId);
+        assertEquals(10, responseUpdatedOption.getQuantity());
+        // 3. 상품옵션 신규등록 검증
         ProductOption responseInsertedOption = filterOption(targetProduct, null);
-        assertEquals(requestInsertOption.getQuantity(), responseInsertedOption.getQuantity());
+        assertEquals(20, responseInsertedOption.getQuantity());
     }
 
     @Test
-    @DisplayName("상품수정 실패 - 이미 상품 판매종료인 경우 수정 불가")
+    @DisplayName("상품수정 실패 - 이미 상품 판매종료인 경우 수정 불가") // 정책검증실패
     void modifyProduct_shouldFail_whenAlreadyProductDeleted() {
         // given
-        RequestModifyProductDto requestProduct =
-                RequestModifyProductDto.builder()
-                        .id(5L)
-                        .options(List.of(requestUpdateOption()))
-                        .build();
-        Member member = seller(10L);
+        Long sellerId = 10L;
+        Long productId = 5L;
+        RequestModifyProductDto requestProduct = requestProductDto(productId);
+        Member member = seller(sellerId);
 
-        // 요청 상품의 기존 상태 (이미 판매 종료된 상품)
-        Product targetProduct = Product.builder()
-                .saleStatus(DELETION) // 이미 판매종료
-                .options(new ArrayList<>(List.of(
-                        ProductOption.builder().id(1L).build())))
-                .build();
-
-        // 요청한 셀러 상품 단건 조회
-        given(productRepository.findByIdAndSeller(
-                requestProduct.getId(), member.getId()))
-                .willReturn(Optional.of(targetProduct));
+        // 요청 상품 조회 (판매종료 상태)
+        Product deletionProduct = originProduct(productId, DELETION);
+        given(productRepository.findByIdAndSeller(productId, sellerId))
+                .willReturn(Optional.of(deletionProduct));
         // 정책에서 예외 발생
         doThrow(new ProductException(PRODUCT_ALREADY_DELETED))
                 .when(productPolicy)
-                .validateModify(eq(targetProduct), anyList());
+                .validateModify(eq(deletionProduct), anyList());
 
         // when
         // then
@@ -306,4 +408,6 @@ class ProductServiceTest {
         assertEquals(PRODUCT_ALREADY_DELETED, e.getErrorCode());
     }
 
+    // TODO: 일치하는 상품 조회 실패 시 상품수정 불가 (PRODUCT_EDIT_FORBIDDEN)
+    // TODO: 기존 등록된 상품 옵션이 아닌 경우 상품수정 불가 (PRODUCT_OPTION_NOT_EXIST)
 }

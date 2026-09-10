@@ -22,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.time.Duration;
 import java.util.*;
 
+import static com.myecommerce.MyECommerce.type.MemberAuthorityType.SELLER;
 import static com.myecommerce.MyECommerce.type.RedisNamespaceType.LOGIN;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,92 +54,117 @@ class MemberServiceTest {
     @InjectMocks
     private MemberService memberService;
 
+    /* ------------------
+        Test Fixtures
+       ------------------ */
+
+    /** 회원 권한 */
+    MemberAuthority memberAuthority(MemberAuthorityType memberAuthority) {
+        return MemberAuthority.builder()
+                .authority(memberAuthority)
+                .build();
+    }
+
+    /** 회원 Entity */
+    Member memberEntity(String encodingPassword,
+                        RequestMemberDto requestMemberDto) {
+        return Member.builder()
+                .password(encodingPassword)
+                .userId(requestMemberDto.getUserId())
+                .name(requestMemberDto.getName())
+                .telephone(requestMemberDto.getTelephone())
+                .address(requestMemberDto.getAddress())
+                .delYn('N')
+                .build();
+    }
+
+    /** 회원 응답 */
+    ResponseMemberDto responseMemberDto(Member member) {
+        return ResponseMemberDto.builder()
+                .id(member.getId())
+                .password(member.getPassword())
+                .userId(member.getUserId())
+                .name(member.getName())
+                .telephone(member.getTelephone())
+                .address(member.getAddress())
+                .delYn(member.getDelYn())
+                .build();
+    }
+
+    /* ---------------------------
+        회원가입 성공 Tests
+       --------------------------- */
+
     @Test
-    @DisplayName("회원가입성공")
-    void successSaveMember() {
+    @DisplayName("회원가입 성공 - 회원 권한 및 회원 정보 저장 후 회원 정보 반환")
+    void saveMember_shouldSaveMemberAndAuthority_whenValidMember() {
         // given
-        // 저장할 회원권한생성
-        List<MemberAuthority> memberAuthorityList = new ArrayList<>();
-        memberAuthorityList.add(MemberAuthority.builder()
-                                    .authority(MemberAuthorityType.SELLER)
-                                    .build());
-        // 저장할 회원객체생성
-        RequestMemberDto memberDto = RequestMemberDto.builder()
+        String phoneNumber = "01011112222";
+        String password = "123456789";
+        String encodedPassword = "encode123456789";
+        // 회원 권한 (판매자 권한)
+        MemberAuthority sellerAuthority = memberAuthority(SELLER);
+        // 회원
+        RequestMemberDto requestMemberDto = RequestMemberDto.builder()
                 .userId("sky")
-                .password("123456789")
+                .password(password)
                 .name("김하늘")
-                .telephone("01011112222")
+                .telephone(phoneNumber)
                 .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
                 .build();
 
-        // 저장된 회원 DTO객체 생성
-        ResponseMemberDto expectMemberDto = ResponseMemberDto.builder()
-                .id(1L)
-                .userId("sky")
-                .password("encode12345678")
-                .name("김하늘")
-                .telephone("01011112222")
-                .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
-                .delYn('N')
-                .build();
-        // 저장된 회원 Entity객체 생성
-        Member expectMemberEntity = Member.builder()
-                .id(1L)
-                .userId("sky")
-                .password("encode12345678")
-                .name("김하늘")
-                .telephone("01011112222")
-                .address("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층")
-                .delYn('N')
-                .build();
-        // 저장된 회원권한 Entity객체 생성
-        List<MemberAuthority> expectAuthorityList = new ArrayList<>();
-        expectAuthorityList.add(MemberAuthority.builder()
-                .id(1L)
-                .member(expectMemberEntity)
-                .authority(MemberAuthorityType.SELLER)
-                .build());
-
-        // stub(가설) : memberRepository.findByTel1AndTel2AndTel3() 실행 시 빈값 반환 예상.
-        given(memberRepository.findByTelephone(any()))
-                .willReturn(Optional.empty());
-
-        // stub(가설) : passwordEncoder.encode() 실행 시 encode12345678 반환 예상.
-        given(passwordEncoder.encode(any()))
-                .willReturn("encode12345678");
-
-        // stub(가설) : 저장된 회원정보 Dto를 Entity로 변환 예상.
-        given(memberMapper.toEntity(any(RequestMemberDto.class)))  // MemberDto -> Member 변환
-                .willReturn(expectMemberEntity);
-        // stub(가설) : 저장된 회원정보 Entity를 Dto로 변환 예상.
-        given(memberMapper.toDto(any(Member.class)))  // Member -> MemberDto 변환
-                .willReturn(expectMemberDto);
-
-        // stub(가설) : memberRepository.save() 실행 시 memberDto 데이터 반환 예상.
-        given(memberRepository.save(any(Member.class)))
-                .willReturn(expectMemberEntity);
-
-        // stub(가설) : memberAuthorityRepository.save() 실행 시 memberDto 데이터 반환 예상.
-        given(memberAuthorityRepository.save(any(MemberAuthority.class)))
-                .willReturn(expectAuthorityList.get(0));
+        // 전화번호 중복 조회
+        given(memberRepository.findByTelephone(phoneNumber)).willReturn(Optional.empty());
+        // 비밀번호 암호화
+        given(passwordEncoder.encode(password)).willReturn(encodedPassword);
+        // 회원 Dto -> Entity 변환
+        Member memberEntity = memberEntity(encodedPassword, requestMemberDto);
+        given(memberMapper.toEntity(requestMemberDto)).willReturn(memberEntity);
+        // 회원 저장
+        given(memberRepository.save(memberEntity))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        // 회원 권한 저장
+        given(memberAuthorityRepository.save(sellerAuthority))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        // 회원 Entity -> response Dto 변환
+        given(memberMapper.toDto(memberEntity)).willReturn(responseMemberDto(memberEntity));
 
         // when
-        ResponseMemberDto savedMember = memberService.saveMember(memberDto, memberAuthorityList);
+        ResponseMemberDto response =
+                memberService.saveMember(requestMemberDto, List.of(sellerAuthority));
 
         // then
         // 비밀번호 암호화 검증
-        verify(passwordEncoder).encode("123456789");
+        verify(passwordEncoder).encode(password);
+        // 회원 및 권한 저장 검증
+        verify(memberRepository).save(memberEntity);
+        verify(memberAuthorityRepository).save(sellerAuthority);
 
-        assertNotNull(savedMember);
-        assertNotNull(savedMember.getId());
-        assertEquals(1L, savedMember.getId());
-        assertEquals("sky", savedMember.getUserId());
-        assertEquals("encode12345678", savedMember.getPassword());
-        assertEquals("김하늘", savedMember.getName());
-        assertEquals("01011112222", savedMember.getTelephone());
-        assertEquals("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층", savedMember.getAddress());
-        assertEquals('N', savedMember.getDelYn());
+        // 회원 저장 검증
+        assertEquals("sky", memberEntity.getUserId());
+        assertEquals(encodedPassword, memberEntity.getPassword());
+        assertEquals("김하늘", memberEntity.getName());
+        assertEquals("01011112222", memberEntity.getTelephone());
+        assertEquals("서울 동작구 보라매로5가길 16 보라매아카데미타워 7층", memberEntity.getAddress());
+        assertEquals('N', memberEntity.getDelYn());
+
+        // 회원 권한 저장 검증
+        assertEquals(SELLER, sellerAuthority.getAuthority());
+        assertSame(memberEntity, sellerAuthority.getMember());
+
+        // 응답 검증
+        assertEquals("sky", response.getUserId());
+        assertEquals("01011112222", response.getTelephone());
+        assertEquals('N', response.getDelYn());
     }
+
+    // TODO: 회원ID 존재 시 예외 발생 (MEMBER_ALREADY_REGISTERED)
+    // TODO: 전화번호 정규화 - 전화번호 구분자 포함 시 숫자만 추출하여 정상 저장
+    // TODO: 전화번호 길이 - 전화번호 길이 10, 11자리가 아니면 예외 발생 (TELEPHONE_LENGTH_LIMITED)
+    // TODO: 전화번호 패턴 - 전화번호 패턴 불일치 시 예외 발생 (TELEPHONE_PATTERN_INVALID)
+    // TODO: 전화번호 중복 - 전화번호 중복 등록 시 예외 발생 (TELEPHONE_ALREADY_REGISTERED)
+    // TODO: 비밀번호 길이 - 비밀번호 길이가 8자 미만, 100자 초과이면 예외 발생 (PASSWORD_LENGTH_LIMITED)
+    // TODO: 이름 trim - 이름에 공백 포함 시 공백 제거 검증
 
     @Test
     @DisplayName("로그인성공")
@@ -160,7 +186,7 @@ class MemberServiceTest {
         List<MemberAuthority> expectRoleList =
                 Collections.singletonList(MemberAuthority.builder()
                 .id(id)
-                .authority(MemberAuthorityType.SELLER)
+                .authority(SELLER)
                 .build());
 
         // 반환될 토큰 값

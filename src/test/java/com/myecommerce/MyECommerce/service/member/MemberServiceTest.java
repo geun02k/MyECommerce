@@ -54,23 +54,6 @@ class MemberServiceTest {
     private MemberService memberService;
 
     @Test
-    @DisplayName("비밀번호암호화성공")
-    void passwordEncode() {
-        // given
-        String rawPassword = "12345678";
-        // stub(가설) : passwordEncoder.encode() 실행 시 expectEncodePassword 반환 예상.
-        String expectEncodePassword = "encode12345678";
-        given(passwordEncoder.encode(any()))
-                .willReturn(expectEncodePassword);
-
-        // when
-        String encodingPassword = passwordEncoder.encode(rawPassword);
-
-        // then
-        assertEquals(expectEncodePassword, encodingPassword);
-    }
-
-    @Test
     @DisplayName("회원가입성공")
     void successSaveMember() {
         // given
@@ -143,6 +126,9 @@ class MemberServiceTest {
         ResponseMemberDto savedMember = memberService.saveMember(memberDto, memberAuthorityList);
 
         // then
+        // 비밀번호 암호화 검증
+        verify(passwordEncoder).encode("123456789");
+
         assertNotNull(savedMember);
         assertNotNull(savedMember.getId());
         assertEquals(1L, savedMember.getId());

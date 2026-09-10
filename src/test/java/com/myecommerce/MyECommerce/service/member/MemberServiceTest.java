@@ -231,30 +231,33 @@ class MemberServiceTest {
     // TODO: 로그인 사용자 ID에 대한 회원 미존재 시 예외 발생 (USER_NOT_FOUND)
     // TODO: 로그인 비밀번호 불일치 시 예외 발생 (PASSWORD_MISMATCHED)
 
+    /* ---------------------------
+        로그아웃 성공 Tests
+       --------------------------- */
+
     @Test
-    @DisplayName("로그아웃성공")
-    void successSignOut() {
+    @DisplayName("로그아웃 성공 - 유효한 인증정보 요청 시 redis에서 토큰 삭제")
+    void signOut_shouldDeleteLoginToken_whenValidAuthorization() {
         // given
-        // 토큰
         String token = "TOKEN";
         String authorization = "Bearer " + token;
 
-        // stub(가설) : jwtAuthenticationProvider.parseToken() 실행 시
-        // TOKEN_PREFIX가 제외된 토큰값인 "TOKEN" 반환 예상.
+        // 인증정보에서 로그아웃 토큰 파싱 (TOKEN_PREFIX 제외한 토큰 반환)
         given(jwtAuthenticationProvider.parseToken(authorization))
                 .willReturn(token);
-
-        // stub(가설) : redisSingleDataService.getAndDeleteSingleData() 실행 시
-        // key값인 token의 value값인 "LOGIN" 반환 예상
-        given(redisSingleDataService.deleteSingleData(eq(LOGIN), eq(token)))
+        // redis에서 삭제한 토큰 반환
+        given(redisSingleDataService.deleteSingleData(LOGIN, token))
                 .willReturn("LOGIN");
 
         // when
         memberService.signOut(authorization);
 
         // then
-        // redis에 등록된 토큰 삭제 후 조회 1번 수행됨
-        verify(redisSingleDataService, times(1))
-                .deleteSingleData(eq(LOGIN), eq(token));
+        // 인증정보에서 로그아웃 토큰 파싱 검증
+        verify(jwtAuthenticationProvider).parseToken(authorization);
+        // redis에서 토큰 삭제 검증
+        verify(redisSingleDataService).deleteSingleData(LOGIN, token);
     }
+
+    // TODO: 로그아웃 시 토큰 미삭제 시 시 예외 발생 (USER_ALREADY_SIGNED_OUT)
 }

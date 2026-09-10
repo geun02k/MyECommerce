@@ -77,6 +77,13 @@ class MemberServiceTest {
                 .delYn('N')
                 .build();
     }
+    Member memberEntity(String userId) {
+        return Member.builder()
+                .password("encode12345678")
+                .userId(userId)
+                .delYn('N')
+                .build();
+    }
 
     /** 회원 응답 */
     ResponseMemberDto responseMemberDto(Member member) {
@@ -166,75 +173,63 @@ class MemberServiceTest {
     // TODO: 비밀번호 길이 - 비밀번호 길이가 8자 미만, 100자 초과이면 예외 발생 (PASSWORD_LENGTH_LIMITED)
     // TODO: 이름 trim - 이름에 공백 포함 시 공백 제거 검증
 
+    /* ---------------------------
+        로그인 성공 Tests
+       --------------------------- */
+
     @Test
-    @DisplayName("로그인성공")
-    void successSignIn() {
+    @DisplayName("로그인 성공 - 유효한 아이디와 비밀번호 요청 시 로그인 토큰 생성 및 반환")
+    void signIn_shouldCreateAndReturnLoginToken_whenValidUserIdAndPassword() {
         // given
-        Long id = 1L;
         String userId = "sky";
         String password = "12345678";
-        String encodedPassword = "encode12345678";
-        String name = "김하늘";
-        String telephone = "01011112222";
-        String address = "서울 동작구 보라매로5가길 16 보라매아카데미타워 7층";
-        Character delYn = 'N';
-
-        // 조회할 회원 DTO 객체 생성
-        RequestSignInMemberDto member =
+        // 조회할 회원 DTO
+        RequestSignInMemberDto requestSignInMember =
                 new RequestSignInMemberDto(userId, password);
-        // 조회된 회원권한 Entity 객체 생성
-        List<MemberAuthority> expectRoleList =
-                Collections.singletonList(MemberAuthority.builder()
-                .id(id)
-                .authority(SELLER)
-                .build());
 
-        // 반환될 토큰 값
-        String token = "TOKEN";
-
-        long nowTimeMs = new Date().getTime();
-        Date expirationDate = new Date(nowTimeMs + (1000L * 60 * 10)); // 현재시간+10분
-        long validTimeMs = expirationDate.getTime() - nowTimeMs;
-
-        // stub(가설) : memberRepository.findByUserIdAndDelYn() 실행 시 빈값 반환 예상.
-        given(memberRepository.findByUserIdAndDelYn(any(), any()))
-                .willReturn(Optional.ofNullable(Member.builder()
-                        .id(id)
-                        .userId(userId)
-                        .password(encodedPassword)
-                        .name(name)
-                        .telephone(telephone)
-                        .address(address)
-                        .delYn(delYn)
-                        .roles(expectRoleList)
-                        .build()));
-
-        // stub(가설) : passwordEncoder.matches() 실행 시 두 값이 일치하여 true 반환 예상.
-        given(passwordEncoder.matches(any(), any()))
+        // 사용자 조회
+        Member searchedMember = memberEntity(userId);
+        given(memberRepository.findByUserIdAndDelYn(userId, 'N'))
+                .willReturn(Optional.of(searchedMember));
+        // 비밀번호 검증 성공
+        given(passwordEncoder.matches(password, searchedMember.getPassword()))
                 .willReturn(true);
-
-        // stub(가설) : jwtAuthenticationProvider.createToken() 실행 시 JWT 토큰 생성해 문자열로 반환 예상.
-        given(jwtAuthenticationProvider.createToken(any(Member.class)))
+        // 사용자에 대한 JWT 토큰 생성
+        String token = "TOKEN";
+        given(jwtAuthenticationProvider.createToken(searchedMember))
                 .willReturn(token);
-
-        // stub(가설) : jwtAuthenticationProvider.getExpirationDateFromToken() 실행 시
-        // 토큰의 만료시간인 현재시간+10분 값 반환 예상.
+        // 토큰의 만료일자 조회 (현재시간+10분)
+        Date expirationDate = new Date(System.currentTimeMillis() +
+                Duration.ofMinutes(10).toMillis());
         given(jwtAuthenticationProvider.getExpirationDateFromToken(token))
                 .willReturn(expirationDate);
 
         // when
-        String returnToken = memberService.signIn(member);
+        String resultToken = memberService.signIn(requestSignInMember);
 
         // then
-        // 토큰이 redis에 1번 등록됨.(1번 수행됨)
-        verify(redisSingleDataService, times(1))
-                .saveSingleDataWithDuration(eq(LOGIN), eq(token), eq(null),
-                        argThat(duration ->
-                                duration.compareTo(Duration.ofMillis(validTimeMs)) <= 0));
-        // 생성된 토큰이 반환 토큰값과 동일.
-        assertEquals(token, returnToken);
+        // 회원 조회 검증
+        verify(memberRepository).findByUserIdAndDelYn(userId, 'N');
+        // 비밀번호 일치여부 검증
+        verify(passwordEncoder).matches(password, searchedMember.getPassword());
+        // 로그인 토큰 생성 검증
+        verify(jwtAuthenticationProvider).createToken(searchedMember);
+        // 로그인 토큰 만료 시간 조회 검증
+        verify(jwtAuthenticationProvider).getExpirationDateFromToken(token);
+        // TODO: Clock을 이용해 고정된 시간 사용하도록 개선 고려
+        // 로그인 토큰 등록 검증 (JWT 만료시간 10분을 기준으로 Redis TTL 설정 검증)
+        verify(redisSingleDataService).saveSingleDataWithDuration(
+                eq(LOGIN), eq(token), isNull(),
+                argThat(duration ->
+                        duration.compareTo(Duration.ofMinutes(10)) <= 0 &&
+                        duration.compareTo(Duration.ofMinutes(9)) > 0));
 
+        // 생성한 토큰과 결과 토큰의 일치여부 검증
+        assertEquals(token, resultToken);
     }
+
+    // TODO: 로그인 사용자 ID에 대한 회원 미존재 시 예외 발생 (USER_NOT_FOUND)
+    // TODO: 로그인 비밀번호 불일치 시 예외 발생 (PASSWORD_MISMATCHED)
 
     @Test
     @DisplayName("로그아웃성공")

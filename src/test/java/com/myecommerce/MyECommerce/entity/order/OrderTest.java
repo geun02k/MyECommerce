@@ -32,8 +32,19 @@ class OrderTest {
         Test Fixtures
        ------------------ */
 
+    /** 상품 옵션 */
+    ProductOption productOption(String price) {
+        return ProductOption.builder()
+                .price(new BigDecimal(price))
+                .quantity(10)
+                .product(Product.builder()
+                        .saleStatus(ON_SALE)
+                        .build())
+                .build();
+    }
+
     /** 판매중단된 주문 물품 생성 (유효하지 않은 주문 물품) */
-    OrderItem discontinuedItem() {
+    OrderItem discontinuedOrderItem() {
         ProductOption registeredOption = ProductOption.builder()
                 .price(new BigDecimal("10000"))
                 .quantity(10)
@@ -47,31 +58,14 @@ class OrderTest {
     }
 
     /** 주문물품 생성 */
-    private OrderItem orderItem() {
+    OrderItem orderItem(String price, int orderQuantity) {
         // 상품옵션 생성
-        ProductOption productOption =  ProductOption.builder()
-                .price(new BigDecimal("10000"))
-                .quantity(10)
-                .product(Product.builder()
-                        .saleStatus(ON_SALE)
-                        .build())
-                .build();
-
-        // 주문물품 생성
-        return OrderItem.createOrderItem(productOption, 1);
-    }
-    private OrderItem orderItem(String price, int orderQuantity) {
-        // 상품옵션 생성
-        ProductOption productOption =  ProductOption.builder()
-                .price(new BigDecimal(price))
-                .quantity(10)
-                .product(Product.builder()
-                        .saleStatus(ON_SALE)
-                        .build())
-                .build();
-
+        ProductOption productOption = productOption(price);
         // 주문물품 생성
         return OrderItem.createOrderItem(productOption, orderQuantity);
+    }
+    OrderItem orderItem() {
+        return orderItem("10000", 10);
     }
 
     /** 고객 생성 */
@@ -83,9 +77,7 @@ class OrderTest {
 
     /** 주문 생성 */
     Order order() {
-        Member member = member();
-        OrderItem item = orderItem();
-        return Order.createOrder(List.of(item), member);
+        return Order.createOrder(List.of(orderItem()), member());
     }
 
     /** 결제 생성 */
@@ -112,7 +104,7 @@ class OrderTest {
                 .build();
     }
 
-    /** PG 요청에 대한 응답 */
+    /** PG 승인 응답 */
     PgApprovalResult pgApprovalResult() {
         return PgApprovalResult.builder()
                 .pgTransactionId("pgTransactionId")
@@ -128,22 +120,18 @@ class OrderTest {
     /* -------------------
         주문 객체 생성 Test
        ------------------- */
+
     @Test
     @DisplayName("주문 객체 생성 성공 - 주문 객체 생성 시 주문 물품 양방향 연관관계 설정 및 총액 계산")
     void createOrder_shouldAssignOrderAndCalculateTotalPrice_whenValidItemsAndMember() {
         // given
-        // 주문 상품옵션
-        ProductOption registeredOption = ProductOption.builder()
-                .price(new BigDecimal("10000"))
-                .quantity(10)
-                .product(Product.builder()
-                        .saleStatus(ON_SALE)
-                        .build())
-                .build();
-        // 주문요청 상품옵션 수량
-        int orderQuantity = 3;
+        int orderQuantity = 3; // 구매 수량
+        String optionUnitPrice = "10000"; // 옵션 금액
+        BigDecimal totalPrice = new BigDecimal(optionUnitPrice)
+                .multiply(BigDecimal.valueOf(orderQuantity)); // 총 주문 금액
         // 주문 물품 목록
-        OrderItem item = OrderItem.createOrderItem(registeredOption, orderQuantity);
+        OrderItem item = OrderItem.createOrderItem(
+                productOption(optionUnitPrice), orderQuantity);
         // 주문자
         Member member = member();
 
@@ -151,27 +139,29 @@ class OrderTest {
         Order order = Order.createOrder(List.of(item), member);
 
         // then
-        assertEquals(member, order.getBuyer());
-        assertEquals(CREATED, order.getOrderStatus()); // 주문 생성 시 기본 상태 검증1
-        assertNotNull(order.getOrderedAt()); // 주문 생성 시 기본 상태 검증2
+        // 주문 생성 검증
+        assertEquals(CREATED, order.getOrderStatus());
+        assertNotNull(order.getOrderedAt());
         assertNotNull(order.getOrderNumber());
+        assertEquals(member, order.getBuyer());
+        assertEquals(totalPrice, order.getTotalPrice());
+
+        // 주문 물품 생성 검증
         assertEquals(1, order.getItems().size());
         OrderItem resultOrderItem = order.getItems().get(0);
         assertEquals(item, resultOrderItem);
-
         assertEquals(order, resultOrderItem.getOrder()); // 연관관계 검증
-        assertEquals(new BigDecimal("30000"), order.getTotalPrice()); // 금액 계산 로직 검증
     }
 
     @Test
     @DisplayName("주문 객체 생성 성공 - 주문 객체 생성 시 여러 주문물품의 금액은 합산")
     void createOrder_shouldCalculateTotalPrice_whenOrderItemsRequest() {
         // given
-        // 주문자
-        Member member = member();
         // 주문 물품 목록
         OrderItem item1 = orderItem("10000", 3); // 10,000 * 3 = 30,000
         OrderItem item2 = orderItem("1000", 5); // 1,000 * 5 = 5,000
+        // 주문자
+        Member member = member();
 
         // when
         Order order = Order.createOrder(List.of(item1, item2), member);
@@ -182,18 +172,18 @@ class OrderTest {
     }
 
     @Test
-    @DisplayName("주문 객체 생성 실패 - 판매 중이 아니면 주문 객체 생성 불가")
-    void createOrder_shouldNotCreateOrder_whenProductNotOnSale() {
+    @DisplayName("주문 객체 생성 실패 - 판매 중이 아니면 예외 발생으로 주문 객체 생성 불가")
+    void createOrder_shouldThrowException_whenProductNotOnSale() {
         // given
         // 주문 물품 목록
-        OrderItem discontinuedItem = discontinuedItem(); // 판매중단된 상품 옵션 주문
+        OrderItem discontinuedOrderItem = discontinuedOrderItem(); // 판매중단된 상품 옵션 주문
         // 주문자
         Member member = member();
 
         // when
         // then
         ProductException e = assertThrows(ProductException.class, () ->
-                Order.createOrder(List.of(discontinuedItem), member));
+                Order.createOrder(List.of(discontinuedOrderItem), member));
         assertEquals(PRODUCT_NOT_ON_SALE, e.getErrorCode());
     }
 
@@ -203,7 +193,7 @@ class OrderTest {
 
     @Test
     @DisplayName("CREATED -> PAID 성공 - 승인완료된 결제 전달 시 주문상태는 PAID로 변경")
-    void paid_shouldChangeToPaid_whenGiveApprovedPayment() {
+    void paid_shouldChangeToPaid_whenApprovedPaymentProvided() {
         // given
         Order order = order();
         Payment payment = approvedPayment(order);
@@ -220,7 +210,7 @@ class OrderTest {
        --------------------------- */
 
     @Test
-    @DisplayName("CREATED -> PAID 실패 - 결제 승인완료 상태가 아니면 주문 결제완료 실패")
+    @DisplayName("CREATED -> PAID 실패 - 결제 승인완료 상태가 아니면 주문 결제완료 불가")
     void paid_shouldThrowException_whenPaymentIsNotApproved() {
         // given
         Order order = order();
@@ -234,8 +224,8 @@ class OrderTest {
     }
 
     @Test
-    @DisplayName("CREATED -> PAID 실패 - 주문 완료상태가 아니면 주문 결제완료 실패")
-    void paid_shouldThrowException_whenOrderIsNotCreated() {
+    @DisplayName("CREATED -> PAID 실패 - 이미 주문 결제완료 시 주문 결제완료 실패")
+    void paid_shouldThrowException_whenOrderIsAlreadyPaid() {
         // given
         Order order = order();
         Payment payment = approvedPayment(order);

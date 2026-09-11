@@ -38,9 +38,9 @@ class PaymentTest {
     }
 
     /** 상품옵션 생성 */
-    ProductOption productOption() {
+    ProductOption productOption(BigDecimal price) {
         return ProductOption.builder()
-                .price(new BigDecimal("10000"))
+                .price(price)
                 .quantity(10)
                 .product(Product.builder()
                         .saleStatus(ON_SALE)
@@ -54,44 +54,29 @@ class PaymentTest {
     }
 
     /** 주문 생성 */
-    private Order order() {
+    private Order order(BigDecimal orderAmount) {
         // 주문 상품옵션
-        ProductOption productOption = productOption();
-        // 주문요청 상품옵션 수량
-        int orderQuantity = 1;
+        ProductOption productOption = productOption(orderAmount);
         // 주문 물품 목록
-        OrderItem item = OrderItem.createOrderItem(productOption, orderQuantity);
-        // 주문자
-        Member member = member();
+        OrderItem item = OrderItem.createOrderItem(productOption, 1);
 
-        return Order.createOrder(List.of(item), member);
+        return Order.createOrder(List.of(item), member());
+    }
+    private Order order() {
+        return order(new BigDecimal("10000"));
     }
 
     /** 결제 완료된 주문 생성 */
     private Order paidOrder() {
-        // 주문 상품옵션
-        ProductOption productOption = productOption();
-        // 주문요청 상품옵션 수량
-        int orderQuantity = 3;
-        // 주문 물품 목록
-        OrderItem item = OrderItem.createOrderItem(productOption, orderQuantity);
-        // 주문자
-        Member member = member();
-
         // 주문 생성
-        Order paidOrder = Order.createOrder(List.of(item), member);
-        // 주문에 대한 결제 생성
-        Payment payment = approvedPayment();
+        Order order = order();
         // 주문상태 결제완료로 변경
-        paidOrder.paid(payment);
-
-        return paidOrder;
+        order.paid(approvedPayment());
+        return order;
     }
 
     /** 결제 객체 생성 - 결제상태 READY */
-    Payment readyPayment() {
-        // 등록된 주문 (주문 상태는 CREATED)
-        Order order = order();
+    Payment readyPayment(Order order) {
         // 요청 결제 방식
         PaymentMethodType requestMethod = CARD;
         // 회사와 결제 계약된 PG사
@@ -100,95 +85,87 @@ class PaymentTest {
         // 결제 객체 생성
         return Payment.createPayment(order, requestMethod, pgProvider);
     }
+    Payment readyPayment() {
+        return readyPayment(order());
+    }
 
     /** PG 요청한 결제 객체 생성 - 결제상태 IN_PROGRESS */
-    Payment inProgressPayment() {
+    Payment inProgressPayment(Order order, String pgTransactionId) {
         // 결제 객체 생성
-        Payment payment = readyPayment();
+        Payment payment = readyPayment(order);
         // PG 요청 결과
-        PgResult pgResult = pgResult();
+        PgResult pgResult = pgResult(pgTransactionId);
         // 결제 객체에 PG 요청 결과 반영
         payment.requestPgPayment(pgResult);
-
         return payment;
+    }
+    Payment inProgressPayment(Order order) {
+        return inProgressPayment(order, "pgTransactionId");
+    }
+    Payment inProgressPayment(String pgTransactionId) {
+        return inProgressPayment(order(), pgTransactionId);
+    }
+    Payment inProgressPayment() {
+        return inProgressPayment(order(),"pgTransactionId");
     }
 
     /** PG 승인된 결제 생성 - 결제상태 APPROVED */
     Payment approvedPayment() {
-        // 등록된 주문 (주문 상태는 CREATED)
-        Order order = order();
-        // 요청 결제 방식
-        PaymentMethodType requestMethod = CARD;
-        // 회사와 결제 계약된 PG사
-        PgProviderType pgProvider = pgProvider();
-
-        // 결제 생성 (READY)
-        Payment payment = Payment.createPayment(order, requestMethod, pgProvider);
-        // PG 결제 요청 (READY -> IN_PROGRESS)
-        PgResult pgResult = pgResult();
-        payment.requestPgPayment(pgResult);
+        // PG 결제 요청한 결제
+        Payment payment = inProgressPayment();
         // PG 결제 승인
         PgApprovalResult pgApprovalResult = pgApprovalResult(APPROVED);
         payment.approve(pgApprovalResult);
-
         return payment;
     }
 
     /** PG 승인실패된 결제 생성 - 결제상태 FAILED */
     Payment failedPayment() {
-        // 등록된 주문 (주문 상태는 CREATED)
-        Order order = order();
-        // 요청 결제 방식
-        PaymentMethodType requestMethod = CARD;
-        // 회사와 결제 계약된 PG사
-        PgProviderType pgProvider = pgProvider();
-
-        // 결제 생성 (READY)
-        Payment payment = Payment.createPayment(order, requestMethod, pgProvider);
-        // PG 결제 요청 (READY -> IN_PROGRESS)
-        PgResult pgResult = pgResult();
-        payment.requestPgPayment(pgResult);
+        // PG 결제 요청한 결제
+        Payment payment = inProgressPayment();
         // PG 결제 승인
         PgApprovalResult pgApprovalResult = pgApprovalResult(FAILED);
         payment.fail(pgApprovalResult);
-
         return payment;
     }
 
     /** PG 승인취소된 결제 생성 - 결제상태 CANCELED */
     Payment canceledPayment() {
-        // 등록된 주문 (주문 상태는 CREATED)
-        Order order = order();
-        // 요청 결제 방식
-        PaymentMethodType requestMethod = CARD;
-        // 회사와 결제 계약된 PG사
-        PgProviderType pgProvider = pgProvider();
-
-        // 결제 생성 (READY)
-        Payment payment = Payment.createPayment(order, requestMethod, pgProvider);
-        // PG 결제 요청 (READY -> IN_PROGRESS)
-        PgResult pgResult = pgResult();
-        payment.requestPgPayment(pgResult);
+        // PG 결제 요청한 결제
+        Payment payment = inProgressPayment();
         // PG 결제 승인취소 (현재 로직에서 미지원으로 강제변경)
         ReflectionTestUtils.setField(payment, "paymentStatus", CANCELED);
-
         return payment;
     }
 
     /** PG 요청 결과 생성 */
-    PgResult pgResult() {
+    PgResult pgResult(String pgTransactionId) {
         return PgResult.builder()
-                .pgTransactionId("pgTransactionId")
+                .pgTransactionId(pgTransactionId)
                 .build();
+    }
+    PgResult pgResult() {
+        return pgResult("pgTransactionId");
     }
 
     /** PG 승인 결과 생성 */
-    PgApprovalResult pgApprovalResult(PaymentStatusType approvalStatus) {
+    PgApprovalResult pgApprovalResult(String pgTransactionId,
+                                      PaymentStatusType approvalStatus,
+                                      BigDecimal paidAmount) {
         return PgApprovalResult.builder()
-                .pgTransactionId("pgTransactionId")
+                .pgTransactionId(pgTransactionId)
                 .approvalStatus(approvalStatus)
-                .paidAmount(new BigDecimal("10000"))
+                .paidAmount(paidAmount)
                 .build();
+    }
+    PgApprovalResult pgApprovalResult(PaymentStatusType approvalStatus) {
+        return pgApprovalResult("pgTransactionId", approvalStatus, new BigDecimal("10000"));
+    }
+    PgApprovalResult pgApprovalResult(String pgTransactionId) {
+        return pgApprovalResult(pgTransactionId, APPROVED, new BigDecimal("10000"));
+    }
+    PgApprovalResult pgApprovalResult(BigDecimal paidAmount) {
+        return pgApprovalResult("pgTransactionId", APPROVED, paidAmount);
     }
 
     /* ------------------
@@ -211,15 +188,14 @@ class PaymentTest {
         PgProviderType pgProvider = pgProvider();
 
         // when
-        Payment payment =
-                Payment.createPayment(order, requestMethod, pgProvider);
+        Payment payment = Payment.createPayment(order, requestMethod, pgProvider);
 
         // then
-        assertEquals(order, payment.getOrder());
+        assertEquals(READY, payment.getPaymentStatus()); // 결제 생성 상태
+        assertSame(order, payment.getOrder());           // 주문과 연관관계 검증
         assertEquals(requestMethod, payment.getPaymentMethod());
         assertEquals(pgProvider, payment.getPgProvider());
         assertTrue(payment.getPaymentCode().startsWith(order.getOrderNumber()));
-        assertEquals(READY, payment.getPaymentStatus()); // 결제 생성 상태
     }
 
     @Test
@@ -251,16 +227,14 @@ class PaymentTest {
         // 결제 객체 생성 (결제상태 READY)
         Payment payment = readyPayment();
         // PG 요청 결과
-        PgResult pgResult = PgResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .build();
+        PgResult pgResult = pgResult("pgTransactionId");
 
         // when
         payment.requestPgPayment(pgResult);
 
         // then
         assertEquals(IN_PROGRESS, payment.getPaymentStatus());
-        assertEquals(pgResult.getPgTransactionId(), payment.getPgTransactionId());
+        assertEquals("pgTransactionId", payment.getPgTransactionId());
     }
 
     @Test
@@ -283,9 +257,7 @@ class PaymentTest {
         // 결제 객체 생성 (결제상태 READY)
         Payment payment = readyPayment();
         // PG 요청 결과
-        PgResult invalidPgResult = PgResult.builder()
-                .pgTransactionId(null) // 트랜잭션 ID 미존재
-                .build();
+        PgResult invalidPgResult = pgResult(null); // 트랜잭션 ID 미존재
 
         // when
         // then
@@ -313,7 +285,7 @@ class PaymentTest {
     void approve_shouldChangeToApproved_whenPgApprovalSucceeds() {
         // given
         // PG 결제 진행중인 결제 객체
-        Payment payment = inProgressPayment();
+        Payment payment = inProgressPayment("pgTransactionId");
         // PG 승인 결과
         PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
                 .pgTransactionId("pgTransactionId")
@@ -327,8 +299,8 @@ class PaymentTest {
 
         // then
         assertEquals(APPROVED, payment.getPaymentStatus()); // 결제 승인
-        assertEquals(pgApprovalResult.getPaidAmount(), payment.getApprovedAmount());
-        assertEquals(pgApprovalResult.getVatAmount(), payment.getVatAmount());
+        assertEquals(new BigDecimal("10000"), payment.getApprovedAmount());
+        assertEquals(new BigDecimal("1000"), payment.getVatAmount());
     }
 
     @Test
@@ -351,10 +323,9 @@ class PaymentTest {
     @DisplayName("IN_PROGRESS -> APPROVED 실패 - 트랜잭션 ID 불일치 시 결제승인 실패")
     void approve_shouldThrowException_whenPgTransactionIdMismatches() {
         // given
-        Payment payment = inProgressPayment(); // PG 트랜잭션 ID = pgTransactionId
-        PgApprovalResult invalidPgApprovalResult = PgApprovalResult.builder()
-                .pgTransactionId("invalidPgTransactionId") // PG 트랜잭션 ID = invalidPgTransactionId
-                .build();
+        Payment payment = inProgressPayment("pgTransactionId");
+        PgApprovalResult invalidPgApprovalResult =
+                pgApprovalResult("invalidPgTransactionId");
 
         // when
         // then
@@ -381,12 +352,12 @@ class PaymentTest {
     @DisplayName("IN_PROGRESS -> APPROVED 실패 - 결제 금액 불일치 시 결제승인 실패")
     void approve_shouldThrowException_whenPaidAmountMismatch() {
         // given
-        Payment payment = inProgressPayment(); // 주문금액 10000
-        PgApprovalResult invalidPgApprovalResult = PgApprovalResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .approvalStatus(APPROVED)
-                .paidAmount(new BigDecimal("50000")) // 결제금액 50000
-                .build();
+        BigDecimal orderAmount = new BigDecimal("10000"); // 주문금액 10000
+        BigDecimal paidAmount = new BigDecimal("50000");  // 결제금액 50000
+        Order order = order(orderAmount);
+
+        Payment payment = inProgressPayment(order);
+        PgApprovalResult invalidPgApprovalResult = pgApprovalResult(paidAmount);
 
         // when
         // then
@@ -397,16 +368,11 @@ class PaymentTest {
 
     @Test
     @DisplayName("IN_PROGRESS -> FAILED 성공 - PG 결제승인 실패 시 상태는 FAILED로 변경")
-    void fail_shouldChangeToFailed_whenPgRequestSucceeds() {
+    void fail_shouldChangeToFailed_whenPgApprovalFails() {
         // given
         Payment payment = inProgressPayment();
         // PG 승인 결과
-        PgApprovalResult pgApprovalResult = PgApprovalResult.builder()
-                .pgTransactionId("pgTransactionId")
-                .approvalStatus(FAILED) // PG 승인 실패
-                .paidAmount(new BigDecimal("10000"))
-                .vatAmount(new BigDecimal("1000"))
-                .build();
+        PgApprovalResult pgApprovalResult = pgApprovalResult(FAILED);
 
         // when
         payment.fail(pgApprovalResult);
@@ -435,10 +401,9 @@ class PaymentTest {
     @DisplayName("IN_PROGRESS -> FAILED 실패 - 트랜잭션 ID 불일치 시 결제실패 불가")
     void fail_shouldThrowException_whenPgTransactionIdMismatches() {
         // given
-        Payment payment = inProgressPayment(); // PG 트랜잭션 ID = pgTransactionId
-        PgApprovalResult invalidPgApprovalResult = PgApprovalResult.builder()
-                .pgTransactionId("invalidPgTransactionId") // PG 트랜잭션 ID = invalidPgTransactionId
-                .build();
+        Payment payment = inProgressPayment("pgTransactionId");
+        PgApprovalResult invalidPgApprovalResult =
+                pgApprovalResult("invalidPgTransactionId");
 
         // when
         // then
@@ -469,9 +434,9 @@ class PaymentTest {
     @DisplayName("결제 종결여부 판단 성공 - 결제상태가 결제승인이면 결제과정 종결")
     void isTerminal_shouldReturnTrue_whenPaymentStatusIsApproved() {
         // given
-        Payment payment = approvedPayment(); // PG 결제승인된 결제
+        Payment approvedPayment = approvedPayment(); // PG 결제승인된 결제
         // when
-        boolean isTerminal = payment.isTerminal();
+        boolean isTerminal = approvedPayment.isTerminal();
         // then
         assertTrue(isTerminal);
     }
@@ -480,9 +445,9 @@ class PaymentTest {
     @DisplayName("결제 종결여부 판단 성공 - 결제상태가 결제실패이면 결제과정 종결")
     void isTerminal_shouldReturnTrue_whenPaymentStatusIsFailed() {
         // given
-        Payment payment = failedPayment(); // PG 결제실패한 결제
+        Payment failedPayment = failedPayment(); // PG 결제실패한 결제
         // when
-        boolean isTerminal = payment.isTerminal();
+        boolean isTerminal = failedPayment.isTerminal();
         // then
         assertTrue(isTerminal);
     }
@@ -491,9 +456,9 @@ class PaymentTest {
     @DisplayName("결제 종결여부 판단 성공 - 결제상태가 결제취소이면 결제과정 종결")
     void isTerminal_shouldReturnTrue_whenPaymentStatusIsCanceled() {
         // given
-        Payment payment = canceledPayment(); // PG 결제취소된 결제
+        Payment canceledPayment = canceledPayment(); // PG 결제취소된 결제
         // when
-        boolean isTerminal = payment.isTerminal();
+        boolean isTerminal = canceledPayment.isTerminal();
         // then
         assertTrue(isTerminal);
     }
@@ -502,9 +467,9 @@ class PaymentTest {
     @DisplayName("결제 종결여부 판단 실패 - 결제상태가 결제요청이면 결제과정 미종결")
     void isTerminal_shouldReturnFalse_whenPaymentStatusIsInProgress() {
         // given
-        Payment payment = inProgressPayment(); // PG 요청된 결제
+        Payment inProgressPayment = inProgressPayment(); // PG 요청된 결제
         // when
-        boolean isTerminal = payment.isTerminal();
+        boolean isTerminal = inProgressPayment.isTerminal();
         // then
         assertFalse(isTerminal);
     }
@@ -513,9 +478,9 @@ class PaymentTest {
     @DisplayName("PG 요청 가능여부 판단 성공 - 결제상태가 준비이면 PG 요청 가능")
     void isPgRequestAvailable_shouldReturnTrue_whenPaymentStatusIsReady() {
         // given
-        Payment payment = readyPayment();
+        Payment readyPayment = readyPayment();
         // when
-        boolean isPgRequestAvailable = payment.isPgRequestAvailable();
+        boolean isPgRequestAvailable = readyPayment.isPgRequestAvailable();
         // then
         assertTrue(isPgRequestAvailable);
     }
@@ -524,9 +489,9 @@ class PaymentTest {
     @DisplayName("PG 요청 가능여부 판단 실패 - 결제상태가 준비가 아니면 PG 요청 불가능")
     void isPgRequestAvailable_shouldReturnFalse_whenPaymentStatusIsNotReady() {
         // given
-        Payment payment = inProgressPayment();
+        Payment inProgressPayment = inProgressPayment();
         // when
-        boolean isPgRequestAvailable = payment.isPgRequestAvailable();
+        boolean isPgRequestAvailable = inProgressPayment.isPgRequestAvailable();
         // then
         assertFalse(isPgRequestAvailable);
     }
@@ -535,9 +500,10 @@ class PaymentTest {
     @DisplayName("PG 승인요청 가능여부 판단 성공 - 결제상태가 승인대기중이면 승인요청 가능")
     void isPgApproveRequestAvailable_shouldReturnTrue_whenPaymentStatusIsInProgress() {
         // given
-        Payment payment = inProgressPayment();
+        Payment inProgressPayment = inProgressPayment();
         // when
-        boolean isApproveRequestAvailable = payment.isPgApproveRequestAvailable();
+        boolean isApproveRequestAvailable =
+                inProgressPayment.isPgApproveRequestAvailable();
         // then
         assertTrue(isApproveRequestAvailable);
     }
@@ -546,9 +512,10 @@ class PaymentTest {
     @DisplayName("PG 승인요청 가능여부 판단 실패 - 결제상태가 결제승인이면 승인요청 불가 판단")
     void isPgApproveRequestAvailable_shouldReturnFalse_whenPaymentStatusIsApproved() {
         // given
-        Payment payment = approvedPayment();
+        Payment approvedPayment = approvedPayment();
         // when
-        boolean isApproveRequestAvailable = payment.isPgApproveRequestAvailable();
+        boolean isApproveRequestAvailable =
+                approvedPayment.isPgApproveRequestAvailable();
         // then
         assertFalse(isApproveRequestAvailable);
     }

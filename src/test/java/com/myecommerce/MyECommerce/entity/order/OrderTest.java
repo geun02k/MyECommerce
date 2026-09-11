@@ -88,7 +88,7 @@ class OrderTest {
     /** PG 승인된 결제 */
     Payment approvedPayment(Order order) {
         PgResult pgRequestResult = pgResult();
-        PgApprovalResult pgApprovalResult = pgApprovalResult();
+        PgApprovalResult pgApprovalResult = pgApprovalResult(order.getTotalPrice());
 
         Payment payment = payment(order);
         payment.requestPgPayment(pgRequestResult); // 결제상태 = IN_PROGRESS
@@ -105,11 +105,11 @@ class OrderTest {
     }
 
     /** PG 승인 응답 */
-    PgApprovalResult pgApprovalResult() {
+    PgApprovalResult pgApprovalResult(BigDecimal paymentAmount) {
         return PgApprovalResult.builder()
                 .pgTransactionId("pgTransactionId")
                 .approvalStatus(APPROVED)
-                .paidAmount(new BigDecimal(10000))
+                .paidAmount(paymentAmount)
                 .build();
     }
 
